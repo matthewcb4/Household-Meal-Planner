@@ -8,21 +8,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
-        * {overflow-wrap: break-word;min-width: 0;}
+        * {min-width: 0;}
         *, *::before, *::after { box-sizing: border-box;}
         :root { --primary-color: #007bff; --secondary-color: #6c757d; --danger-color: #dc3545; --light-bg: #f8f9fa; --white: #ffffff; --text-color: #212529; --border-color: #dee2e6; --border-radius: 0.5rem; --shadow: 0 4px 6px rgba(0, 0, 0, 0.05); }
-        body { font-family: 'Inter', sans-serif; line-height: 1.6; margin: 0; padding: 24px; background-color: var(--light-bg); color: var(--text-color); }
+        html { overflow-x: hidden; } /* Keeps scrollbar from appearing during layout shifts */
+        body { font-family: 'Inter', sans-serif; line-height: 1.6; margin: 0; background-color: var(--light-bg); color: var(--text-color); }
         h1, h2, h3, h4 { color: var(--primary-color); text-align: center; font-weight: 700; }
         h4 { margin-top: 24px; text-align: left; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; font-weight: 500; }
-        main { width: 100%; max-width: 1200px; margin: 0 auto;}
+        main { width: 100%; max-width: 1200px; margin: 0 auto; padding: 24px; }
         section { background-color: var(--white); padding: 24px; border-radius: var(--border-radius); box-shadow: var(--shadow); border: 1px solid var(--border-color); margin-top: 24px; }
         button { display: inline-block; background-image: linear-gradient(to bottom, var(--primary-color), #0069d9); color: var(--white); padding: 10px 20px; border: 1px solid #0062cc; border-radius: var(--border-radius); cursor: pointer; font-size: 1em; font-weight: 500; transition: all 0.2s ease-in-out; }
         button:hover { box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1); transform: translateY(-2px); }
         button.secondary { background-image: linear-gradient(to bottom, var(--secondary-color), #5a6268); border-color: #545b62; }
         button.danger { background-image: linear-gradient(to bottom, var(--danger-color), #c82333); border-color: #bd2130; }
+        hr { border: none; border-top: 1px solid var(--border-color); margin: 20px 0; }
         video, img { max-width: 100%; border-radius: var(--border-radius); margin-top: 10px; }
         ul { list-style-type: none; padding: 0; }
-        li { background-color: var(--light-bg); padding: 12px; border-radius: var(--border-radius); margin-bottom: 8px; display: flex; align-items: center; border: 1px solid var(--border-color); }
+        li { background-color: var(--light-bg); padding: 12px; border-radius: var(--border-radius); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); }
         input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius); box-sizing: border-box; font-size: 1em; }
         .form-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr auto; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
         .confirmation-item { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr auto; gap: 10px; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
@@ -32,12 +34,33 @@
         .save-recipe-btn:hover { color: var(--primary-color); }
         #auth-container { text-align: right; padding-bottom: 10px; }
         #household-manager { text-align: center; }
-        #household-manager input { max-width: 200px; margin: 10px auto; display: block; }
+        #household-info {
+            font-size: 0.8em;
+            color: var(--secondary-color);
+            margin: -5px 15px 10px 0; /* Position it neatly under the welcome message */
+            padding: 0;
+        }
+        .household-action {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .household-action input { width: 100%; max-width: 250px; }
         .meal-type-selector { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; margin: 20px 0; }
         .meal-type-selector label { cursor: pointer; padding: 8px 16px; border-radius: 50px; border: 1px solid var(--border-color); transition: all 0.2s; }
-        .meal-type-selector input:checked + span { background-image: linear-gradient(to bottom, var(--primary-color), #0069d9); color: var(--white); border-color: var(--primary-color); padding: 5px; border-radius: 5px; }
+        .meal-type-selector input:checked + span { background-image: linear-gradient(to bottom, var(--primary-color), #0069d9); padding: 8px; border-radius: 25px; color: var(--white); border-color: var(--primary-color); }
         .meal-type-selector input { position: absolute; opacity: 0; }
-        .pantry-item-checkbox { margin-left: auto; transform: scale(1.5); flex-shrink: 0; }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .inline-form { display: flex; gap: 10px; margin-bottom: 20px; }
+        .inline-form input, .inline-form select { flex-grow: 1; }
+        .inline-form button { flex-shrink: 0; }
+        .pantry-item-checkbox { margin-left: 15px; transform: scale(1.5); flex-shrink: 0; }
         .pantry-header { display: flex; justify-content: space-between; align-items: center; }
         #bulk-edit-controls { margin-top: 15px; display: flex; gap: 10px; }
         .category-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
@@ -47,21 +70,38 @@
         .add-item-container { border-top: 1px solid var(--border-color); margin-top: 24px; padding-top: 24px; }
         .add-to-list-btn { font-size: 0.7em; padding: 2px 6px; margin-left: 8px; }
         .grocery-item { display: flex; align-items: center; }
+        .grocery-item .item-info { display: flex; align-items: center; flex-grow: 1; }
         .grocery-item input[type="checkbox"] { width: 1.25rem; height: 1.25rem; margin-right: 12px; flex-shrink: 0; }
-        .grocery-item label { flex-grow: 1; }
         .grocery-item-category { font-size: 0.8em; color: var(--secondary-color); margin-left: 8px; }
-        .grocery-item.checked label { text-decoration: line-through; color: var(--secondary-color); }
+        .grocery-item.checked .item-info { text-decoration: line-through; color: var(--secondary-color); }
         .delete-grocery-btn { padding: 2px 8px !important; font-size: 0.8em !important; margin-left: 10px; flex-shrink: 0; }
         @media (max-width: 600px) {
-            body { padding: 12px; }
+            main {
+                padding: 12px;
+            }
             h1 { font-size: 1.8em; }
             .form-grid, .confirmation-item { 
                 grid-template-columns: 1fr; 
                 gap: 12px; 
             }
             button { width: 100%; padding: 12px; }
+            /* --- FIX for horizontal scroll on mobile --- */
+            /* Override the general button rule for small, inline buttons to prevent them from causing overflow. */
+            .add-to-list-btn, 
+            .delete-grocery-btn, 
+            .remove-item-btn,
+            .save-recipe-btn { width: auto; }
+            #bulk-edit-controls,
+            .button-group,
+            .inline-form {
+                flex-direction: column;
+            }
             #auth-container { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
             #welcome-message { text-align: center; margin-right: 0; }
+            #household-info {
+                text-align: center;
+                margin: -5px 0 5px 0; /* Adjust margin for centered mobile layout */
+            }
             .pantry-header { flex-direction: column; align-items: stretch; gap: 10px; }
             .pantry-controls { flex-direction: column; }
         }
@@ -71,6 +111,7 @@
     <main>
         <div id="auth-container">
             <span id="welcome-message" style="display: none; margin-right: 15px; vertical-align: middle; font-weight: 500;"></span>
+            <p id="household-info" style="display: none;"></p>
             <button id="sign-in-btn">Sign in with Google</button>
             <button id="sign-out-btn" class="danger" style="display: none;">Sign Out</button>
         </div>
@@ -79,13 +120,12 @@
             <section>
                 <h2>Welcome! Join or Create a Household</h2>
                 <p>To share a pantry, create a new household or join one using an invite code.</p>
-                <div><h3>Create a New Household</h3><button id="create-household-btn">Create</button></div>
-                <hr style="margin: 20px 0;">
-                <div><h3>Join an Existing Household</h3><input type="text" id="household-code-input" placeholder="Enter Invite Code"><button id="join-household-btn">Join</button></div>
+                <div class="household-action"><h3>Create a New Household</h3><button id="create-household-btn">Create</button></div>
+                <hr>
+                <div class="household-action"><h3>Join an Existing Household</h3><input type="text" id="household-code-input" placeholder="Enter Invite Code"><button id="join-household-btn">Join</button></div>
             </section>
         </div>
         <div id="app-content" style="display: none;">
-            <p id="household-info" style="text-align: center; font-weight: bold; background-color: #e3f2fd; color: #1e88e5; padding: 10px; border-radius: var(--border-radius);"></p>
             <section id="pantry-section">
                 <div class="pantry-header">
                     <h2>My Pantry 🥫</h2>
@@ -130,15 +170,16 @@
             </section>
             <section id="grocery-list-section">
                 <h2>Grocery List 🛒</h2>
-                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                    <button id="show-add-grocery-form-btn" class="secondary" style="flex-grow: 1;">Add to List Manually</button>
-                    <button id="show-scan-grocery-btn" class="secondary" style="flex-grow: 1;">Scan for List</button>
+                <div class="button-group">
+                    <button id="show-add-grocery-form-btn" class="secondary">Add to List Manually</button>
+                    <button id="show-scan-grocery-btn" class="secondary">Scan for List</button>
                 </div>
-                <form id="add-grocery-item-form" style="display: none; gap: 10px; margin-bottom: 20px;">
-                    <input type="text" id="grocery-item-name" placeholder="e.g., Milk" style="flex-grow: 1;" required>
-                    <select id="grocery-item-category" style="flex-grow: 1;"></select>
+                <form id="add-grocery-item-form" class="inline-form" style="display: none;">
+                    <input type="text" id="grocery-item-name" placeholder="e.g., Milk" required>
+                    <select id="grocery-item-category"></select>
                     <button type="submit">Add</button>
                 </form>
+                <div id="grocery-scan-ui-placeholder"></div>
                 <ul id="grocery-list"></ul>
                 <button id="move-to-pantry-btn" class="secondary" style="display: none; margin-top: 20px;">Move Checked to Pantry</button>
                 <div id="move-to-pantry-form-container" style="display: none; margin-top: 20px;">
@@ -162,7 +203,7 @@
                     <label><input type="radio" name="mealType" value="dinner" checked><span>Dinner</span></label>
                     <label><input type="radio" name="mealType" value="snack"><span>Snack</span></label>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: center;">
+                <div class="button-group">
                     <button id="suggest-recipe-btn">Suggest from Pantry</button>
                     <button id="quick-meal-btn">Quick Meal from Photo</button>
                 </div>
@@ -176,13 +217,13 @@
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-functions-compat.js"></script>
     <script>
         const firebaseConfig = {
-        apiKey: "AIzaSyD-NEXCNVe8GuAeuKvcgvmgy7A01kZhgKI",
-        authDomain: "family-dinner-app-79249.firebaseapp.com",
-        projectId: "family-dinner-app-79249",
-        storageBucket: "family-dinner-app-79249.firebasestorage.app",
-        messagingSenderId: "665272276696",
-        appId: "1:665272276696:web:599165b284256c907e69ad",
-        measurementId: "G-YLVBPLNDWF"
+            apiKey: "AIzaSyD-NEXCNVe8GuAeuKvcgvmgy7A01kZhgKI",
+            authDomain: "family-dinner-app-79249.firebaseapp.com",
+            projectId: "family-dinner-app-79249",
+            storageBucket: "family-dinner-app-79249.firebasestorage.app",
+            messagingSenderId: "665272276696",
+            appId: "1:665272276696:web:599165b284256c907e69ad",
+            measurementId: "G-YLVBPLNDWF"
         };
 
         firebase.initializeApp(firebaseConfig);
@@ -237,6 +278,7 @@
         const moveToPantryForm = document.getElementById('move-to-pantry-form');
         const confirmMoveBtn = document.getElementById('confirm-move-btn');
         const favoritesSection = document.getElementById('favorites-section');
+        const groceryScanUIPlaceholder = document.getElementById('grocery-scan-ui-placeholder');
         const favoriteRecipesList = document.getElementById('favorite-recipes-list');
         const groceryItemCategorySelect = document.getElementById('grocery-item-category');
 
@@ -259,16 +301,19 @@
                     householdManager.style.display = 'none';
                     appContent.style.display = 'block';
                     householdInfo.textContent = `Household Invite Code: ${householdId}`;
+                    householdInfo.style.display = 'block';
                     initializeApp();
                 } else {
                     householdManager.style.display = 'block';
                     appContent.style.display = 'none';
+                    householdInfo.style.display = 'none';
                 }
             } else {
                 currentUser = null; householdId = null; isInEditMode = false;
                 signInBtn.style.display = 'block';
                 signOutBtn.style.display = 'none';
                 welcomeMessage.style.display = 'none';
+                householdInfo.style.display = 'none';
                 appContent.style.display = 'none';
                 householdManager.style.display = 'none';
             }
@@ -329,16 +374,34 @@
                 scanItemContainer.style.display = 'none';
                 confirmationSection.style.display = 'none';
             });
-            showScanItemBtn.addEventListener('click', () => openCameraFor('pantry'));
+            showScanItemBtn.addEventListener('click', () => {
+                const isScanUIVisible = scanItemContainer.style.display === 'block';
+                if (isScanUIVisible && scanMode === 'pantry') {
+                    addItemContainer.style.display = 'none';
+                    stopCamera();
+                } else {
+                    openCameraFor('pantry');
+                }
+            });
             addGroceryItemForm.addEventListener('submit', handleAddGroceryItem);
             groceryList.addEventListener('click', handleGroceryListClick);
             moveToPantryBtn.addEventListener('click', handleMoveToPantry);
+            recipeResultsDiv.addEventListener('click', handleSaveRecipe);
             recipeResultsDiv.addEventListener('click', handleAddFromRecipe);
             favoritesSection.addEventListener('click', handleFavoritesClick);
+            favoritesSection.addEventListener('click', handleAddFromRecipe);
             showAddGroceryFormBtn.addEventListener('click', () => {
                 addGroceryItemForm.style.display = addGroceryItemForm.style.display === 'none' ? 'flex' : 'none';
             });
-            showScanGroceryBtn.addEventListener('click', () => openCameraFor('grocery'));
+            showScanGroceryBtn.addEventListener('click', () => {
+                const isScanUIVisible = scanItemContainer.style.display === 'block';
+                if (isScanUIVisible && scanMode === 'grocery') {
+                    scanItemContainer.style.display = 'none';
+                    stopCamera();
+                } else {
+                    openCameraFor('grocery');
+                }
+            });
             confirmMoveBtn.addEventListener('click', handleConfirmMoveToPantry);
         }
         
@@ -359,11 +422,20 @@
 
         function openCameraFor(mode) {
             scanMode = mode;
-            addItemContainer.style.display = 'block';
+            // Always hide other forms first
             manualAddContainer.style.display = 'none';
-            scanItemContainer.style.display = 'block';
+            addGroceryItemForm.style.display = 'none';
             confirmationSection.style.display = 'none';
-            startCamera();
+
+            if (mode === 'grocery') {
+                groceryScanUIPlaceholder.appendChild(scanItemContainer);
+                scanItemContainer.style.display = 'block';
+                addItemContainer.style.display = 'none'; // Hide pantry's add container
+            } else { // 'pantry' or 'quickMeal'
+                addItemContainer.appendChild(scanItemContainer);
+                scanItemContainer.style.display = 'block';
+                addItemContainer.style.display = 'block';
+            }
         }
 
         async function handlePantryClick(event) {
@@ -374,7 +446,7 @@
                 if (list && list.tagName === 'UL') {
                     const isVisible = list.style.display !== 'none';
                     list.style.display = isVisible ? 'none' : 'block';
-                    toggle.textContent = isVisible ? '−' : '+';
+                    toggle.textContent = isVisible ? '+' : '−';
                 }
             }
         }
@@ -452,7 +524,7 @@
                     list.style.display = 'none';
                     groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
                         const listItem = document.createElement('li');
-                        const itemText = `<span>${item.name} (${item.quantity} ${item.unit})</span>`;
+                        const itemText = `<span class="flex-grow">${item.name} (${item.quantity} ${item.unit})</span>`;
                         const interactiveElement = isInEditMode
                             ? `<input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}">`
                             : '';
@@ -541,8 +613,10 @@
                     const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
                     const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
                     recipeCard.innerHTML = `
-                        <button class="save-recipe-btn" title="Save to Favorites">⭐</button>
-                        <h3><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h3>
+                        <div class="recipe-card-header">
+                            <h3><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h3>
+                            <button class="save-recipe-btn" title="Save to Favorites">⭐</button>
+                        </div>
                         <p>${recipe.description}</p>
                         <strong>Ingredients Used:</strong>
                         ${ingredientsHTML}`;
@@ -686,8 +760,10 @@
                     const li = document.createElement('li');
                     li.className = `grocery-item ${item.checked ? 'checked' : ''}`;
                     li.innerHTML = `
-                        <input type="checkbox" data-id="${doc.id}" ${item.checked ? 'checked' : ''}>
-                        <label>${item.name}<span class="grocery-item-category">(${item.category || 'Other'})</span></label>
+                        <div class="item-info">
+                            <input type="checkbox" data-id="${doc.id}" ${item.checked ? 'checked' : ''}>
+                            <label>${item.name}<span class="grocery-item-category">(${item.category || 'Other'})</span></label>
+                        </div>
                         <button class="delete-grocery-btn danger" data-id="${doc.id}">X</button>
                     `;
                     groceryList.appendChild(li);
@@ -872,8 +948,10 @@
                 const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
                 const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
                 recipeCard.innerHTML = `
-                    <button class="save-recipe-btn" title="Remove from Favorites">❌</button>
-                    <h3><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h3>
+                    <div class="recipe-card-header">
+                        <h3><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h3>
+                        <button class="save-recipe-btn" title="Remove from Favorites">❌</button>
+                    </div>
                     <p>${recipe.description}</p>
                     <strong>Ingredients Used:</strong>
                     ${ingredientsHTML}
