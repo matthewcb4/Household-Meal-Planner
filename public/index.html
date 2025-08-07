@@ -60,7 +60,16 @@
         .inline-form { display: flex; gap: 10px; margin-bottom: 20px; }
         .inline-form input, .inline-form select { flex-grow: 1; }
         .inline-form button { flex-shrink: 0; }
-        .meal-plan-container { display: grid; grid-template-columns: 3fr 1fr; gap: 24px; }
+        .week-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .week-navigation h3 {
+            margin: 0;
+        }
+        .meal-plan-container { display: grid; grid-template-columns: 1fr; gap: 24px; }
         #meal-planner-grid { display: grid; grid-template-columns: auto repeat(7, 1fr); border: 1px solid var(--border-color); border-radius: var(--border-radius); overflow: hidden; }
         .grid-cell { padding: 8px; border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); min-height: 100px; }
         .grid-cell:last-child { border-right: none; }
@@ -75,7 +84,11 @@
         }
         .meal-slot { background-color: #fdfdfd; }
         .meal-slot.drag-over { background-color: #e3f2fd; }
-        .meal-slot .recipe-title { font-size: 0.9em; font-weight: 500; background-color: var(--primary-color); color: var(--white); padding: 4px 8px; border-radius: 4px; display: inline-block; }
+        .meal-slot .recipe-title {
+            font-size: 0.9em; font-weight: 500; background-color: var(--primary-color); color: var(--white); 
+            padding: 4px 8px; border-radius: 4px; display: block; margin-bottom: 4px; text-align: left;
+        }
+        .meal-slot .recipe-title:last-child { margin-bottom: 0; }
         .recipe-card[draggable="true"] { cursor: grab; }
         /* --- Modal Styles --- */
         .modal {
@@ -95,23 +108,50 @@
         }
         .close-btn { color: var(--secondary-color); position: absolute; top: 10px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; }
         .close-btn:hover { color: var(--danger-color); }
-        #modal-recipe-ingredients { list-style-type: disc; padding-left: 20px; margin-bottom: 20px; }
-        #modal-recipe-title a {
+        .modal-recipe-item { border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 16px; margin-bottom: 16px; position: relative; }
+        .modal-recipe-item:last-child { margin-bottom: 0; }
+        .modal-recipe-item h4 { text-align: left; margin-top: 0; }
+        .modal-recipe-item h4 a {
             color: inherit;
             text-decoration: none;
         }
-        #modal-recipe-title a:hover { text-decoration: underline; }
-        #modal-recipe-ingredients li { background-color: transparent; border: none; padding: 2px 0; }
-        #remove-from-plan-btn { width: auto; /* Override mobile full-width style */ }
-
+        .modal-recipe-item h4 a:hover { text-decoration: underline; }
+        .modal-recipe-item ul { list-style-type: disc; padding-left: 20px; margin-bottom: 20px; }
+        .modal-recipe-item li { background-color: transparent; border: none; padding: 2px 0; }
+        .remove-from-plan-btn { 
+            width: auto !important; /* Override mobile full-width style */ 
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 2px 8px !important;
+        }
+        .source-tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 16px;
+            justify-content: center;
+        }
+        .source-tabs button {
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--secondary-color);
+            padding: 8px 12px;
+            border-radius: 0;
+        }
+        .source-tabs button.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
         /* --- Styles for Horizontal Recipe Suggestions --- */
-        #recipe-results {
+        #recipe-results, #favorite-recipes-list {
             display: flex;
             gap: 16px;
             overflow-x: auto;
             padding: 4px 4px 16px 4px; /* Add padding for shadow and scrollbar */
         }
-        #recipe-results .recipe-card {
+        #recipe-results .recipe-card, #favorite-recipes-list .recipe-card {
             flex: 0 0 320px; /* Give cards a fixed width so they don't squash */
             margin-top: 0; /* Remove top margin as gap handles spacing */
         }
@@ -160,6 +200,9 @@
             .meal-plan-container {
                 grid-template-columns: 1fr;
             }
+            .week-navigation h3 {
+                font-size: 1em;
+            }
             #auth-container { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
             #welcome-message { text-align: center; margin-right: 0; }
             #household-info {
@@ -192,28 +235,39 @@
         <div id="app-content" style="display: none;">
             <section id="meal-plan-section">
                 <h2>Weekly Meal Planner 🗓️</h2>
+                <div class="week-navigation">
+                    <button id="prev-week-btn" class="secondary">&lt; Prev</button>
+                    <h3 id="week-range-display"></h3>
+                    <button id="next-week-btn" class="secondary">Next &gt;</button>
+                </div>
                 <div class="meal-plan-container">
                     <div id="meal-planner-grid">
                         <!-- Calendar grid will be generated here by JS -->
                     </div>
-                    <div id="meal-plan-sources"></div>
                 </div>
                 <button id="generate-grocery-list-btn">Generate Grocery List for this Week</button>
             </section>
             <section id="recipe-section">
-                <h2>Meal Ideas 🍲</h2>
-                <div class="meal-type-selector" id="meal-type-selector">
-                    <label><input type="radio" name="mealType" value="breakfast"><span>Breakfast</span></label>
-                    <label><input type="radio" name="mealType" value="lunch"><span>Lunch</span></label>
-                    <label><input type="radio" name="mealType" value="dinner" checked><span>Dinner</span></label>
-                    <label><input type="radio" name="mealType" value="snack"><span>Snack</span></label>
+                <h2>Meal Sources</h2>
+                <div class="source-tabs">
+                    <button id="show-ideas-tab" class="active">Meal Ideas</button>
+                    <button id="show-favorites-tab">⭐ Favorites</button>
                 </div>
-                <div class="button-group">
-                    <button id="suggest-recipe-btn">Suggest from Pantry</button>
-                    <button id="quick-meal-btn">Quick Meal from Photo</button>
-                    <button id="discover-recipes-btn" class="secondary">Discover New Recipes</button>
+                <div id="ideas-content">
+                    <div class="meal-type-selector" id="meal-type-selector">
+                        <label><input type="radio" name="mealType" value="breakfast"><span>Breakfast</span></label>
+                        <label><input type="radio" name="mealType" value="lunch"><span>Lunch</span></label>
+                        <label><input type="radio" name="mealType" value="dinner" checked><span>Dinner</span></label>
+                        <label><input type="radio" name="mealType" value="snack"><span>Snack</span></label>
+                    </div>
+                    <div class="button-group">
+                        <button id="suggest-recipe-btn">Suggest from Pantry</button>
+                        <button id="quick-meal-btn">Quick Meal from Photo</button>
+                        <button id="discover-recipes-btn" class="secondary">Discover New Recipes</button>
+                    </div>
                 </div>
                 <div id="recipe-results"></div>
+                <div id="favorite-recipes-list" style="display: none;"></div>
             </section>
             <section id="pantry-section">
                 <div class="pantry-header">
@@ -277,23 +331,13 @@
                     <button id="confirm-move-btn" style="margin-top: 10px;">Confirm and Move</button>
                 </div>
             </section>
-            <section id="favorites-section">
-                <div class="category-header">
-                    <h2>⭐ Favorite Recipes</h2>
-                    <span class="category-toggle">+</span>
-                </div>
-                <div id="favorite-recipes-list" style="display: none;"></div>
-            </section>
         </div>
         <div id="meal-plan-modal" class="modal">
             <div class="modal-content">
                 <span class="close-btn" id="modal-close-btn">&times;</span>
-                <h3 id="modal-recipe-title"></h3>
-                <p id="modal-recipe-description"></p>
-                <strong>Ingredients:</strong>
-                <ul id="modal-recipe-ingredients"></ul>
-                <button id="remove-from-plan-btn" class="danger">Remove from Plan</button>
-            </section>
+                <h3 id="modal-slot-title"></h3>
+                <div id="modal-recipe-list"></div>
+            </div>
         </div>
     </main>
     <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
@@ -316,7 +360,7 @@
         const auth = firebase.auth();
         const functions = firebase.functions();
         
-        let currentUser = null, householdId = null, stream = null, isInEditMode = false, scanMode = 'pantry';
+        let currentUser = null, householdId = null, stream = null, isInEditMode = false, scanMode = 'pantry', currentDate = new Date(), unsubscribeMealPlan = () => {};
         const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"];
 
         const signInBtn = document.getElementById('sign-in-btn');
@@ -369,13 +413,17 @@
         const mealPlanSection = document.getElementById('meal-plan-section');
         const mealPlannerGrid = document.getElementById('meal-planner-grid');
         const generateGroceryListBtn = document.getElementById('generate-grocery-list-btn');
+        const prevWeekBtn = document.getElementById('prev-week-btn');
+        const nextWeekBtn = document.getElementById('next-week-btn');
+        const weekRangeDisplay = document.getElementById('week-range-display');
+        const showIdeasTab = document.getElementById('show-ideas-tab');
+        const showFavoritesTab = document.getElementById('show-favorites-tab');
+        const ideasContent = document.getElementById('ideas-content');
         const mealPlanModal = document.getElementById('meal-plan-modal');
         const modalCloseBtn = document.getElementById('modal-close-btn');
-        const modalRecipeTitle = document.getElementById('modal-recipe-title');
-        const modalRecipeDescription = document.getElementById('modal-recipe-description');
-        const modalRecipeIngredients = document.getElementById('modal-recipe-ingredients');
+        const modalSlotTitle = document.getElementById('modal-slot-title');
+        const modalRecipeList = document.getElementById('modal-recipe-list');
         const discoverRecipesBtn = document.getElementById('discover-recipes-btn');
-        const removeFromPlanBtn = document.getElementById('remove-from-plan-btn');
 
         signInBtn.addEventListener('click', () => {
             const provider = new firebase.auth.GoogleAuthProvider();
@@ -448,8 +496,7 @@
             populateCategoryDropdown(groceryItemCategorySelect);
             displayPantryItems();
             renderMealPlanner();
-            displayMealPlan(); 
-            document.getElementById('meal-plan-sources').append(favoritesSection);
+            updateWeekView();
             displayGroceryList();
             displayFavoriteRecipes();
             pantryListDiv.addEventListener('click', handlePantryClick);
@@ -487,8 +534,7 @@
             moveToPantryBtn.addEventListener('click', handleMoveToPantry);
             recipeResultsDiv.addEventListener('click', handleSaveRecipe);
             recipeResultsDiv.addEventListener('click', handleAddFromRecipe);
-            favoritesSection.addEventListener('click', handleFavoritesClick);
-            favoritesSection.addEventListener('click', handleAddFromRecipe);
+            favoriteRecipesList.addEventListener('click', handleAddFromRecipe);
             showAddGroceryFormBtn.addEventListener('click', () => {
                 addGroceryItemForm.style.display = addGroceryItemForm.style.display === 'none' ? 'flex' : 'none';
             });
@@ -503,9 +549,25 @@
             });
             confirmMoveBtn.addEventListener('click', handleConfirmMoveToPantry);
             generateGroceryListBtn.addEventListener('click', generateAutomatedGroceryList);
+            prevWeekBtn.addEventListener('click', () => navigateWeek('prev'));
+            nextWeekBtn.addEventListener('click', () => navigateWeek('next'));
+            showIdeasTab.addEventListener('click', () => {
+                ideasContent.style.display = 'block';
+                recipeResultsDiv.style.display = 'flex';
+                favoriteRecipesList.style.display = 'none';
+                showIdeasTab.classList.add('active');
+                showFavoritesTab.classList.remove('active');
+            });
+            showFavoritesTab.addEventListener('click', () => {
+                ideasContent.style.display = 'none';
+                recipeResultsDiv.style.display = 'none';
+                favoriteRecipesList.style.display = 'flex';
+                showFavoritesTab.classList.add('active');
+                showIdeasTab.classList.remove('active');
+            });
             mealPlannerGrid.addEventListener('click', handleMealSlotClick);
-            modalCloseBtn.addEventListener('click', () => mealPlanModal.style.display = 'none');
-            removeFromPlanBtn.addEventListener('click', handleRemoveFromPlan);
+            modalCloseBtn.addEventListener('click', () => { mealPlanModal.style.display = 'none'; });
+            modalRecipeList.addEventListener('click', handleRemoveFromPlanClick);
             window.addEventListener('click', (event) => {
                 if (event.target == mealPlanModal) {
                     mealPlanModal.style.display = 'none';
@@ -538,8 +600,32 @@
 
         function getMealPlanRef() {
             if (!householdId) return null;
-            const weekId = getWeekId();
+            const weekId = getWeekId(currentDate);
             return db.collection('households').doc(householdId).collection('mealPlan').doc(weekId);
+        }
+
+        function updateWeekView() {
+            displayWeekRange();
+            displayMealPlan();
+        }
+
+        function navigateWeek(direction) {
+            const newDate = new Date(currentDate);
+            newDate.setDate(newDate.getDate() + (direction === 'prev' ? -7 : 7));
+            currentDate = newDate;
+            updateWeekView();
+        }
+
+        function displayWeekRange() {
+            const startOfWeek = new Date(currentDate);
+            const day = startOfWeek.getDay();
+            const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+            startOfWeek.setDate(diff);
+
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+            weekRangeDisplay.textContent = `${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}`;
         }
 
         function openCameraFor(mode) {
@@ -674,7 +760,18 @@
             const unit = document.getElementById('manual-unit').value.trim();
             const category = manualCategorySelect.value;
             if (name && !isNaN(quantity) && quantity > 0) {
-                await pantryRef.add({ name, quantity, unit, category, addedBy: currentUser.email });
+                const querySnapshot = await pantryRef.where('name', '==', name).limit(1).get();
+                
+                if (!querySnapshot.empty) {
+                    // Item exists, update it
+                    const doc = querySnapshot.docs[0];
+                    const existingQuantity = doc.data().quantity || 0;
+                    await doc.ref.update({ quantity: existingQuantity + quantity });
+                } else {
+                    // Item doesn't exist, add it
+                    await pantryRef.add({ name, quantity, unit, category, addedBy: currentUser.email });
+                }
+
                 displayPantryItems();
                 manualAddForm.reset();
                 addItemContainer.style.display = 'none';
@@ -689,15 +786,33 @@
                 alert("No items to add!");
                 return;
             }
+
+            // 1. Fetch existing pantry items and map them by name
+            const pantrySnapshot = await pantryRef.get();
+            const existingPantryItems = {};
+            pantrySnapshot.forEach(doc => {
+                existingPantryItems[doc.data().name] = { id: doc.id, ...doc.data() };
+            });
+
             const batch = db.batch();
             confirmedItems.forEach(itemEl => {
                 const name = itemEl.querySelector('.item-name').value.trim().toLowerCase();
                 const quantity = parseFloat(itemEl.querySelector('.item-quantity').value);
                 const unit = itemEl.querySelector('.item-unit').value.trim();
                 const category = itemEl.querySelector('.item-category').value;
+
                 if (name && !isNaN(quantity) && quantity > 0) {
-                    const newItemRef = pantryRef.doc();
-                    batch.set(newItemRef, { name, quantity, unit, category, addedBy: currentUser.email });
+                    if (existingPantryItems[name]) {
+                        // Item exists, update quantity
+                        const existingItem = existingPantryItems[name];
+                        const newQuantity = (existingItem.quantity || 0) + quantity;
+                        const itemRef = pantryRef.doc(existingItem.id);
+                        batch.update(itemRef, { quantity: newQuantity });
+                    } else {
+                        // Item is new, add it
+                        const newItemRef = pantryRef.doc();
+                        batch.set(newItemRef, { name, quantity, unit, category, addedBy: currentUser.email });
+                    }
                 }
             });
             await batch.commit();
@@ -762,15 +877,16 @@
                 let ingredientsHTML = '<ul>';
                 if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
                     recipe.ingredients.forEach(ing => {
-                        let ingredientText, ingredientName;
+                        let ingredientText, ingredientName, ingredientCategory = 'Other';
                         if (typeof ing === 'object' && ing !== null && ing.name) {
                             ingredientText = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim();
                             ingredientName = ing.name;
+                            ingredientCategory = ing.category || 'Other';
                         } else {
                             ingredientText = ing;
                             ingredientName = String(ing).replace(/^[0-9.\s/]+(lbs?|oz|g|kg|cups?|tsps?|tbsps?)?\s*/i, '').trim();
                         }
-                        ingredientsHTML += `<li>${ingredientText} <button class="add-to-list-btn secondary" data-item-name="${ingredientName}">+ List</button></li>`;
+                        ingredientsHTML += `<li>${ingredientText} <button class="add-to-list-btn secondary" data-item-name="${ingredientName}" data-item-category="${ingredientCategory}">+ List</button></li>`;
                     });
                 }
                 ingredientsHTML += '</ul>';
@@ -1040,19 +1156,32 @@
             const groceryRef = getGroceryListRef();
             if (!pantryRef || !groceryRef) return;
 
+            // 1. Fetch existing pantry items and map them by name
+            const pantrySnapshot = await pantryRef.get();
+            const existingPantryItems = {};
+            pantrySnapshot.forEach(doc => {
+                existingPantryItems[doc.data().name] = { id: doc.id, ...doc.data() };
+            });
+
             const itemsToMove = moveToPantryForm.querySelectorAll('.form-grid');
             const batch = db.batch();
 
             itemsToMove.forEach((formRow) => {
-                const name = formRow.querySelector('.item-name').value;
+                const name = formRow.querySelector('.item-name').value.trim().toLowerCase();
                 const quantity = parseFloat(formRow.querySelector('.item-quantity').value);
                 const unit = formRow.querySelector('.item-unit').value;
                 const category = formRow.querySelector('.item-category').value;
                 const groceryItemId = formRow.querySelector('.grocery-item-id').value;
                 
                 if (name && quantity && unit && category) {
-                    const newPantryItemRef = pantryRef.doc();
-                    batch.set(newPantryItemRef, { name, quantity, unit, category, addedBy: currentUser.email });
+                    if (existingPantryItems[name]) {
+                        const existingItem = existingPantryItems[name];
+                        const newQuantity = (existingItem.quantity || 0) + quantity;
+                        batch.update(pantryRef.doc(existingItem.id), { quantity: newQuantity });
+                    } else {
+                        const newPantryItemRef = pantryRef.doc();
+                        batch.set(newPantryItemRef, { name, quantity, unit, category, addedBy: currentUser.email });
+                    }
                     
                     const groceryItemRef = groceryRef.doc(groceryItemId);
                     batch.delete(groceryItemRef);
@@ -1068,10 +1197,12 @@
         async function handleAddFromRecipe(event) {
             if (event.target.classList.contains('add-to-list-btn')) {
                 const itemName = event.target.dataset.itemName;
+                const itemCategory = event.target.dataset.itemCategory || 'Other';
                 const groceryRef = getGroceryListRef();
                 if (groceryRef && itemName) {
                     await groceryRef.add({
                         name: itemName.toLowerCase(),
+                        category: itemCategory,
                         checked: false,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -1125,18 +1256,19 @@
                 recipeCard.draggable = true;
                 recipeCard.dataset.id = doc.id;
                 let ingredientsHTML = '<ul>';
-                recipe.ingredients.forEach(ing => { 
-                    let ingredientText, ingredientName;
+                recipe.ingredients.forEach(ing => {
+                    let ingredientText, ingredientName, ingredientCategory = 'Other';
                     if (typeof ing === 'object' && ing !== null && ing.name) {
                         // Handle new structured format
                         ingredientText = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim();
                         ingredientName = ing.name;
+                        ingredientCategory = ing.category || 'Other';
                     } else {
                         // Handle old string format
                         ingredientText = ing;
                         ingredientName = String(ing).replace(/^[0-9.\s/]+(lbs?|oz|g|kg|cups?|tsps?|tbsps?)?\s*/i, '').trim();
                     }
-                    ingredientsHTML += `<li>${ingredientText} <button class="add-to-list-btn secondary" data-item-name="${ingredientName}">+ List</button></li>`;
+                    ingredientsHTML += `<li>${ingredientText} <button class="add-to-list-btn secondary" data-item-name="${ingredientName}" data-item-category="${ingredientCategory}">+ List</button></li>`;
                 });
                 ingredientsHTML += '</ul>';
                 const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
@@ -1157,17 +1289,11 @@
             });
         }
 
-        function handleFavoritesClick(event) {
-            if (event.target.closest('.category-header')) {
-                const list = favoriteRecipesList;
-                const toggle = event.target.closest('.category-header').querySelector('.category-toggle');
-                const isVisible = list.style.display !== 'none';
-                list.style.display = isVisible ? 'none' : 'block';
-                toggle.textContent = isVisible ? '+' : '−';
-            } else if (event.target.classList.contains('save-recipe-btn')) {
+        favoriteRecipesList.addEventListener('click', (event) => {
+            if (event.target.classList.contains('save-recipe-btn')) {
                 handleDeleteFavorite(event);
             }
-        }
+        });
 
         // --- Meal Planner Functions ---
 
@@ -1203,14 +1329,16 @@
         }
 
         function displayMealPlan() {
+            unsubscribeMealPlan();
+
             const mealPlanRef = getMealPlanRef();
             if (!mealPlanRef) return;
 
-            mealPlanRef.onSnapshot(doc => {
+            unsubscribeMealPlan = mealPlanRef.onSnapshot(doc => {
                 // First, clear all existing recipes from the grid to prevent duplicates
                 mealPlannerGrid.querySelectorAll('.meal-slot').forEach(slot => {
                     slot.innerHTML = '';
-                    delete slot.dataset.recipe;
+                    delete slot.dataset.recipes;
                     slot.style.cursor = 'default';
                 });
 
@@ -1219,10 +1347,10 @@
                     for (const day in plan) {
                         for (const meal in plan[day]) {
                             const slot = mealPlannerGrid.querySelector(`[data-day="${day}"][data-meal="${meal}"]`);
-                            const recipe = plan[day][meal];
-                            if (slot && recipe && recipe.title) {
-                                slot.innerHTML = `<span class="recipe-title">${plan[day][meal].title}</span>`;
-                                slot.dataset.recipe = JSON.stringify(recipe);
+                            const recipes = plan[day][meal];
+                            if (slot && Array.isArray(recipes) && recipes.length > 0) {
+                                slot.innerHTML = recipes.map(r => `<span class="recipe-title">${r.title}</span>`).join('');
+                                slot.dataset.recipes = JSON.stringify(recipes);
                                 slot.style.cursor = 'pointer';
                             }
                         }
@@ -1246,61 +1374,88 @@
             event.preventDefault();
             event.target.classList.remove('drag-over');
 
-            try {
-                const slot = event.target.closest('.meal-slot');
-                if (!slot) return; // Ensure drop happened on a valid slot
+            const slot = event.target.closest('.meal-slot');
+            if (!slot) return;
 
-                const recipeData = JSON.parse(event.dataTransfer.getData('text/plain'));
-                const { day, meal } = slot.dataset;
+            const recipeData = JSON.parse(event.dataTransfer.getData('text/plain'));
+            recipeData.planItemId = new Date().getTime() + Math.random(); // Add a unique ID for easy removal
+            const { day, meal } = slot.dataset;
 
-                const mealPlanRef = getMealPlanRef();
-                if (mealPlanRef) {
-                    // This creates a properly nested object that Firestore's `set` with `merge:true`
-                    // can use to update the document correctly.
-                    const updateData = { [day]: { [meal]: recipeData } };
-                    await mealPlanRef.set(updateData, { merge: true });
-                }
-            } catch (err) {
+            const mealPlanRef = getMealPlanRef();
+            if (!mealPlanRef) return;
+
+            // Use a transaction to safely read the existing array, add the new item, and write it back.
+            db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(mealPlanRef);
+                const plan = doc.exists ? doc.data() : {};
+                const currentRecipes = (plan[day] && plan[day][meal]) ? plan[day][meal] : [];
+                currentRecipes.push(recipeData);
+                const update = { ...plan, [day]: { ...plan[day], [meal]: currentRecipes } };
+                transaction.set(mealPlanRef, update);
+            }).catch(err => {
                 console.error("Failed to handle drop event:", err);
                 alert("Sorry, there was an error adding the recipe to the meal plan.");
-            }
+            });
         }
 
         function handleMealSlotClick(event) {
             const slot = event.target.closest('.meal-slot');
-            if (slot && slot.dataset.recipe) {
-                const recipe = JSON.parse(slot.dataset.recipe);
-                const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
-                const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
-                modalRecipeTitle.innerHTML = `<a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a>`;
-                modalRecipeDescription.textContent = recipe.description;
+            if (slot && slot.dataset.recipes) {
+                const recipes = JSON.parse(slot.dataset.recipes);
+                const { day, meal } = slot.dataset;
+                modalSlotTitle.textContent = `${day.charAt(0).toUpperCase() + day.slice(1)} - ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
+                modalRecipeList.innerHTML = '';
                 
-                modalRecipeIngredients.innerHTML = '';
-                if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-                    recipe.ingredients.forEach(ing => {
-                        const li = document.createElement('li');
-                        if (typeof ing === 'object' && ing !== null && ing.name) {
-                            li.textContent = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim();
-                        } else {
-                            li.textContent = ing;
-                        }
-                        modalRecipeIngredients.appendChild(li);
-                    });
-                }
-                
-                removeFromPlanBtn.dataset.day = slot.dataset.day;
-                removeFromPlanBtn.dataset.meal = slot.dataset.meal;
+                recipes.forEach(recipe => {
+                    const recipeItemDiv = document.createElement('div');
+                    recipeItemDiv.className = 'modal-recipe-item';
+                    const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
+                    const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
+
+                    let ingredientsHTML = '<ul>';
+                    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+                        recipe.ingredients.forEach(ing => {
+                            const text = (typeof ing === 'object' && ing !== null) ? `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim() : ing;
+                            ingredientsHTML += `<li>${text}</li>`;
+                        });
+                    }
+                    ingredientsHTML += '</ul>';
+
+                    recipeItemDiv.innerHTML = `
+                        <button class="remove-from-plan-btn danger" data-day="${day}" data-meal="${meal}" data-planitemid="${recipe.planItemId}">X</button>
+                        <h4><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h4>
+                        <p>${recipe.description}</p>
+                        <strong>Ingredients:</strong>
+                        ${ingredientsHTML}
+                    `;
+                    modalRecipeList.appendChild(recipeItemDiv);
+                });
+
                 mealPlanModal.style.display = 'block';
             }
         }
 
-        async function handleRemoveFromPlan() {
-            const { day, meal } = removeFromPlanBtn.dataset;
-            if (!day || !meal) return;
+        async function handleRemoveFromPlanClick(event) {
+            if (!event.target.classList.contains('remove-from-plan-btn')) return;
+
+            const { day, meal, planitemid } = event.target.dataset;
+            if (!day || !meal || !planitemid) return;
+
             const mealPlanRef = getMealPlanRef();
-            if (mealPlanRef) {
-                await mealPlanRef.update({ [`${day}.${meal}`]: firebase.firestore.FieldValue.delete() });
-                mealPlanModal.style.display = 'none';
+            await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(mealPlanRef);
+                if (!doc.exists) return;
+                const plan = doc.data();
+                const currentRecipes = (plan[day] && plan[day][meal]) ? plan[day][meal] : [];
+                const newRecipes = currentRecipes.filter(r => String(r.planItemId) !== planitemid);
+                const update = { ...plan, [day]: { ...plan[day], [meal]: newRecipes } };
+                transaction.set(mealPlanRef, update);
+            });
+
+            if (modalRecipeList.childElementCount <= 1) {
+                mealPlanModal.style.display = 'none'; // Close modal if it was the last item
+            } else {
+                event.target.closest('.modal-recipe-item').remove(); // Remove from UI for instant feedback
             }
         }
 
@@ -1317,21 +1472,26 @@
             const plan = mealPlanDoc.data();
             for (const day in plan) {
                 for (const meal in plan[day]) {
-                    if (plan[day][meal] && Array.isArray(plan[day][meal].ingredients)) {
-                        plan[day][meal].ingredients.forEach(ing => {
-                            let ingredientName, ingredientQuantity = 1, ingredientCategory = "Other";
-                            if (typeof ing === 'object' && ing !== null && ing.name) {
-                                ingredientName = ing.name;
-                                ingredientQuantity = ing.quantity || 1;
-                                ingredientCategory = ing.category || "Other";
-                            } else {
-                                ingredientName = String(ing).replace(/^[0-9.\s/]+(lbs?|oz|g|kg|cups?|tsps?|tbsps?)?\s*/i, '').trim();
-                            }
-                            if (ingredientName) {
-                                if (!neededIngredients[ingredientName]) {
-                                    neededIngredients[ingredientName] = { quantity: 0, category: ingredientCategory };
-                                }
-                                neededIngredients[ingredientName].quantity += ingredientQuantity;
+                    const recipes = plan[day][meal];
+                    if (Array.isArray(recipes)) {
+                        recipes.forEach(recipe => {
+                            if (recipe && Array.isArray(recipe.ingredients)) {
+                                recipe.ingredients.forEach(ing => {
+                                    let ingredientName, ingredientQuantity = 1, ingredientCategory = "Other";
+                                    if (typeof ing === 'object' && ing !== null && ing.name) {
+                                        ingredientName = ing.name;
+                                        ingredientQuantity = ing.quantity || 1;
+                                        ingredientCategory = ing.category || "Other";
+                                    } else {
+                                        ingredientName = String(ing).replace(/^[0-9.\s/]+(lbs?|oz|g|kg|cups?|tsps?|tbsps?)?\s*/i, '').trim();
+                                    }
+                                    if (ingredientName) {
+                                        if (!neededIngredients[ingredientName]) {
+                                            neededIngredients[ingredientName] = { quantity: 0, category: ingredientCategory };
+                                        }
+                                        neededIngredients[ingredientName].quantity += ingredientQuantity;
+                                    }
+                                });
                             }
                         });
                     }

@@ -7,7 +7,6 @@ admin.initializeApp();
 // identifyItems function is unchanged
 exports.identifyItems = functions.https.onRequest((request, response) => {
     cors(request, response, async () => {
-        if (request.method !== "POST") { return response.status(405).send("Method Not Allowed"); }
         try {
             const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
             const authToken = await auth.getAccessToken();
@@ -44,7 +43,6 @@ exports.identifyItems = functions.https.onRequest((request, response) => {
 // UPDATED suggestRecipes function
 exports.suggestRecipes = functions.https.onRequest((request, response) => {
     cors(request, response, async () => {
-        if (request.method !== "POST") { return response.status(405).send("Method Not Allowed"); }
         try {
             const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
             const authToken = await auth.getAccessToken();
@@ -84,7 +82,6 @@ exports.suggestRecipes = functions.https.onRequest((request, response) => {
 // Add Discover Recipes function
 exports.discoverRecipes = functions.https.onRequest((request, response) => {
     cors(request, response, async () => {
-        if (request.method !== "POST") { return response.status(405).send("Method Not Allowed"); }
         try {
             const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
             const authToken = await auth.getAccessToken();
