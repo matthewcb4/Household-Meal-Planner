@@ -14,7 +14,6 @@ const firebaseConfig = {
   appId: "1:665272276696:web:599165b284256c907e69ad",
   measurementId: "G-YLVBPLNDWF"
 };
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -216,6 +215,9 @@ async function displayFavoriteRecipes() {
         recipeCard.className = 'recipe-card';
         recipeCard.draggable = true;
         recipeCard.dataset.id = doc.id;
+        
+        const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/EEE/31343C?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+
         let ingredientsHTML = '<ul>';
         if(recipe.ingredients) {
             recipe.ingredients.forEach(ing => {
@@ -235,6 +237,7 @@ async function displayFavoriteRecipes() {
         const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
         const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
         recipeCard.innerHTML = `
+            <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
             <div class="recipe-card-header">
                 <h3><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h3>
                 <button class="save-recipe-btn" title="Remove from Favorites">❌</button>
@@ -243,7 +246,7 @@ async function displayFavoriteRecipes() {
             <strong>Ingredients Used:</strong>
             ${ingredientsHTML}
         `;
-        const recipeDataForStorage = { id: doc.id, title: recipe.title, description: recipe.description, ingredients: recipe.ingredients };
+        const recipeDataForStorage = { ...recipe, id: doc.id };
         recipeCard.dataset.recipe = JSON.stringify(recipeDataForStorage);
         recipeCard.addEventListener('dragstart', handleDragStart);
         favoriteRecipesList.appendChild(recipeCard);
@@ -351,18 +354,20 @@ async function addRecipeToPlan(day, meal, recipe) {
     if (!mealPlanRef) return;
     const mealEntryId = `meal_${Date.now()}`;
     
-    // This is the corrected path to match the reading logic
     const updatePath = `meals.${day}.${meal}.${mealEntryId}`;
     
-    // Using updateDoc is safer as it won't overwrite the whole document
-    // It will create the nested fields if they don't exist.
     await updateDoc(mealPlanRef, {
         [updatePath]: recipe
     }).catch(async (error) => {
-        // If update fails because the document doesn't exist, create it with setDoc
         if (error.code === 'not-found') {
             await setDoc(mealPlanRef, {
-                [updatePath]: recipe
+                meals: {
+                    [day]: {
+                        [meal]: {
+                            [mealEntryId]: recipe
+                        }
+                    }
+                }
             });
         } else {
             console.error("Error adding recipe to plan:", error);
@@ -487,6 +492,7 @@ async function discoverNewRecipes() {
     try {
         const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
         const result = await discoverRecipesFunc({ mealType: selectedMealType });
+        console.log("Recipes from Cloud Function:", result.data); // DEBUG LOG
         displayRecipeResults(result.data, selectedMealType);
     } catch (error) {
         console.error("Error discovering recipes:", error);
@@ -499,6 +505,7 @@ async function generateRecipes(items) {
     try {
         const suggestRecipesFunc = httpsCallable(functions, 'suggestRecipes');
         const result = await suggestRecipesFunc({ pantryItems: items, mealType: selectedMealType });
+        console.log("Recipes from Cloud Function:", result.data); // DEBUG LOG
         displayRecipeResults(result.data, selectedMealType);
     } catch (error) {
         console.error("Error getting recipes:", error);
@@ -517,6 +524,8 @@ function displayRecipeResults(recipes, mealType) {
         recipeCard.className = 'recipe-card';
         recipeCard.draggable = true;
 
+        const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/EEE/31343C?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+
         let ingredientsHTML = '<ul>';
         if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
             recipe.ingredients.forEach(ing => {
@@ -534,12 +543,13 @@ function displayRecipeResults(recipes, mealType) {
         }
         ingredientsHTML += '</ul>';
 
-        const recipeDataForStorage = { id: null, title: recipe.title, description: recipe.description, ingredients: recipe.ingredients };
+        const recipeDataForStorage = { ...recipe, id: null };
         recipeCard.dataset.recipe = JSON.stringify(recipeDataForStorage);
 
         const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
         const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
         recipeCard.innerHTML = `
+            <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
             <div class="recipe-card-header">
                 <h3><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h3>
                 <button class="save-recipe-btn" title="Save to Favorites">⭐</button>
@@ -771,7 +781,13 @@ async function handleSaveRecipe(event) {
     const recipeData = JSON.parse(card.dataset.recipe);
     const favoritesRef = getFavoritesRef();
     if (favoritesRef && recipeData) {
-        await addDoc(favoritesRef, recipeData);
+        // Ensure the imageQuery and imageUrl fields exist before saving
+        const dataToSave = {
+            ...recipeData,
+            imageQuery: recipeData.imageQuery || recipeData.title,
+            imageUrl: recipeData.imageUrl 
+        };
+        await addDoc(favoritesRef, dataToSave);
         alert(`"${recipeData.title}" saved to favorites!`);
         displayFavoriteRecipes();
     }
@@ -845,7 +861,7 @@ async function handleRemoveFromPlanClick(event) {
         [updatePath]: deleteField()
     });
 
-    mealPlanModal.style.display = 'none';
+    modalPlanModal.style.display = 'none';
 }
 
 function toggleEditMode() {
