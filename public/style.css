@@ -16,7 +16,8 @@ hr { border: none; border-top: 1px solid var(--border-color); margin: 20px 0; }
 video, img { max-width: 100%; border-radius: var(--border-radius); margin-top: 10px; }
 ul { list-style-type: none; padding: 0; }
 p { overflow-wrap: break-word; }
-li { background-color: var(--light-bg); padding: 12px; border-radius: var(--border-radius); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border-color); }
+/* This is the corrected generic rule for all list items */
+li { background-color: var(--light-bg); padding: 12px; border-radius: var(--border-radius); margin-bottom: 8px; border: 1px solid var(--border-color); }
 input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius); box-sizing: border-box; font-size: 1em; }
 .form-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr auto; gap: 10px; align-items: flex-end; margin-bottom: 10px; }
 .confirmation-item { display: grid; grid-template-columns: 2fr 1fr 1fr 1.5fr auto; gap: 10px; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
@@ -69,6 +70,8 @@ input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color
 #recipe-results, #favorite-recipes-list { display: flex; gap: 16px; overflow-x: auto; padding: 4px 4px 16px 4px; }
 #recipe-results .recipe-card, #favorite-recipes-list .recipe-card { flex: 0 0 320px; margin-top: 0; }
 #generate-grocery-list-btn { display: block; margin: 24px auto 0; background-image: linear-gradient(to bottom, #28a745, #218838); }
+/* This is the new, corrected rule for pantry and grocery items */
+.pantry-item, .grocery-item { display: flex; justify-content: space-between; align-items: center; }
 .pantry-item-checkbox { margin-left: 15px; transform: scale(1.5); flex-shrink: 0; }
 .pantry-header { display: flex; justify-content: space-between; align-items: center; }
 #bulk-edit-controls { margin-top: 15px; display: flex; gap: 10px; }
@@ -79,7 +82,6 @@ input, select { width: 100%; padding: 10px; border: 1px solid var(--border-color
 .remove-item-btn { padding: 2px 8px !important; font-size: 0.8em !important; }
 .add-item-container { border-top: 1px solid var(--border-color); margin-top: 24px; padding-top: 24px; }
 .add-to-list-btn { font-size: 0.7em; padding: 2px 6px; margin-left: 8px; }
-.grocery-item { display: flex; align-items: center; }
 .grocery-item .item-info { display: flex; align-items: center; flex-grow: 1; }
 .grocery-item input[type="checkbox"] { width: 1.25rem; height: 1.25rem; margin-right: 12px; flex-shrink: 0; }
 .grocery-item-category { font-size: 0.8em; color: var(--secondary-color); margin-left: 8px; }

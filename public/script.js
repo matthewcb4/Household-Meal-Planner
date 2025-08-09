@@ -14,6 +14,7 @@ const firebaseConfig = {
   appId: "1:665272276696:web:599165b284256c907e69ad",
   measurementId: "G-YLVBPLNDWF"
 };
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -156,16 +157,26 @@ async function displayPantryItems() {
             list.style.display = 'none';
             groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
                 const listItem = document.createElement('li');
-                const itemText = `<span class="pantry-item-text">${item.name} (${item.quantity} ${item.unit})</span>`;
-                const interactiveElement = isInEditMode
-                    ? `<input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}">`
-                    : '';
-                listItem.innerHTML = `${itemText}${interactiveElement}`;
+                listItem.className = 'pantry-item';
+                listItem.innerHTML = `
+                    <div class="pantry-item-name">${item.name} (${item.quantity} ${item.unit})</div>
+                    <div class="pantry-checkbox-container">
+                        ${isInEditMode ? `<input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}">` : ''}
+                    </div>
+                `;
                 list.appendChild(listItem);
             });
             pantryListDiv.appendChild(list);
         }
     });
+}
+
+function toggleEditMode() {
+    isInEditMode = !isInEditMode;
+    pantryListDiv.classList.toggle('edit-mode', isInEditMode);
+    editPantryBtn.textContent = isInEditMode ? 'Done Editing' : 'Edit Pantry';
+    bulkEditControls.style.display = isInEditMode ? 'flex' : 'none';
+    displayPantryItems(); // Re-render to add/remove checkboxes from the DOM
 }
 
 function updateWeekView() {
@@ -492,7 +503,6 @@ async function discoverNewRecipes() {
     try {
         const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
         const result = await discoverRecipesFunc({ mealType: selectedMealType });
-        console.log("Recipes from Cloud Function:", result.data); // DEBUG LOG
         displayRecipeResults(result.data, selectedMealType);
     } catch (error) {
         console.error("Error discovering recipes:", error);
@@ -505,7 +515,6 @@ async function generateRecipes(items) {
     try {
         const suggestRecipesFunc = httpsCallable(functions, 'suggestRecipes');
         const result = await suggestRecipesFunc({ pantryItems: items, mealType: selectedMealType });
-        console.log("Recipes from Cloud Function:", result.data); // DEBUG LOG
         displayRecipeResults(result.data, selectedMealType);
     } catch (error) {
         console.error("Error getting recipes:", error);
@@ -861,14 +870,7 @@ async function handleRemoveFromPlanClick(event) {
         [updatePath]: deleteField()
     });
 
-    modalPlanModal.style.display = 'none';
-}
-
-function toggleEditMode() {
-    isInEditMode = !isInEditMode;
-    editPantryBtn.textContent = isInEditMode ? 'Done Editing' : 'Edit Pantry';
-    bulkEditControls.style.display = isInEditMode ? 'flex' : 'none';
-    displayPantryItems();
+    mealPlanModal.style.display = 'none';
 }
 
 async function handleBulkDelete() {
