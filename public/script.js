@@ -31,7 +31,7 @@ let selectedDates = [];
 let currentHowToSlide = 0;
 
 const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"];
-const CUISINE_OPTIONS = ["Italian", "Mexican", "Asian", "American", "Mediterranean", "Indian"];
+const CUISINE_OPTIONS = ["American", "Asian", "French", "Greek", "Indian", "Italian", "Mediterranean", "Mexican", "Spanish", "Thai"];
 
 
 // --- DOM ELEMENT REFERENCES ---
@@ -126,6 +126,12 @@ const emailSignupForm = document.getElementById('email-signup-form');
 const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
 const authError = document.getElementById('auth-error');
 const upgradeBtnHeader = document.getElementById('upgrade-btn-header');
+const expandAllGroceryBtn = document.getElementById('expand-all-grocery-btn');
+const collapseAllGroceryBtn = document.getElementById('collapse-all-grocery-btn');
+const feedbackBtn = document.getElementById('feedback-btn');
+const feedbackModal = document.getElementById('feedback-modal');
+const feedbackModalCloseBtn = document.getElementById('feedback-modal-close-btn');
+const feedbackForm = document.getElementById('feedback-form');
 
 
 // --- HELPER FUNCTIONS ---
@@ -179,6 +185,29 @@ function populateCategoryDropdown(selectElement) {
         selectElement.appendChild(option);
     });
 }
+
+function populateCuisineDropdowns() {
+    const selects = [cuisineSelect, householdCuisineSelect];
+    selects.forEach(select => {
+        if (select) {
+            const currentValue = select.value;
+            // Keep the "Any" option if it exists
+            const anyOption = select.querySelector('option[value=""]');
+            select.innerHTML = '';
+            if (anyOption) {
+                select.appendChild(anyOption);
+            }
+            CUISINE_OPTIONS.forEach(cuisine => {
+                const option = document.createElement('option');
+                option.value = cuisine;
+                option.textContent = cuisine;
+                select.appendChild(option);
+            });
+            select.value = currentValue;
+        }
+    });
+}
+
 
 function showLoadingState(message, container = recipeResultsDiv) {
     container.innerHTML = `
@@ -242,33 +271,57 @@ function updateWeekView() {
 async function displayGroceryList() {
     const groceryRef = getGroceryListRef();
     if (!groceryRef) return;
+    groceryList.innerHTML = '<p>Loading grocery list...</p>';
     const q = query(groceryRef, orderBy("createdAt"));
     const snapshot = await getDocs(q);
-    groceryList.innerHTML = '';
+
     if (snapshot.empty) {
-        groceryList.innerHTML = '<li>Your grocery list is empty!</li>';
+        groceryList.innerHTML = '<p>Your grocery list is empty!</p>';
         groceryBulkControls.style.display = 'none';
-    } else {
-        groceryBulkControls.style.display = 'flex';
-        snapshot.forEach(doc => {
-            const item = doc.data();
-            const li = document.createElement('li');
-            li.className = `grocery-item ${item.checked ? 'checked' : ''}`;
-            li.innerHTML = `
-                <div class="item-info">
-                    <input type="checkbox" data-id="${doc.id}" ${item.checked ? 'checked' : ''}>
-                    <label>${item.name}<span class="grocery-item-category">(${item.category || 'Other'})</span></label>
-                </div>
-                <div class="grocery-item-controls">
-                    <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>Walmart</span></a>
-                    <button class="delete-grocery-btn" data-id="${doc.id}">X</button>
-                </div>
-            `;
-            groceryList.appendChild(li);
-        });
+        return;
     }
+
+    groceryBulkControls.style.display = 'flex';
+    const groupedItems = {};
+    snapshot.forEach(doc => {
+        const item = { id: doc.id, ...doc.data() };
+        const category = item.category || 'Other';
+        if (!groupedItems[category]) { groupedItems[category] = []; }
+        groupedItems[category].push(item);
+    });
+
+    groceryList.innerHTML = '';
+    PANTRY_CATEGORIES.forEach(category => {
+        if (groupedItems[category]) {
+            const categoryHeader = document.createElement('h4');
+            categoryHeader.className = 'category-header';
+            categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
+            groceryList.appendChild(categoryHeader);
+
+            const list = document.createElement('ul');
+            list.style.display = 'none';
+
+            groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+                const listItem = document.createElement('li');
+                listItem.className = `grocery-item ${item.checked ? 'checked' : ''}`;
+                listItem.innerHTML = `
+                    <div class="item-info">
+                        <input type="checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
+                        <label>${item.name}</label>
+                    </div>
+                    <div class="grocery-item-controls">
+                        <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>Walmart</span></a>
+                        <button class="delete-grocery-btn" data-id="${item.id}">X</button>
+                    </div>
+                `;
+                list.appendChild(listItem);
+            });
+            groceryList.appendChild(list);
+        }
+    });
     handleGroceryItemCheck();
 }
+
 
 async function displayFavoriteRecipes() {
     const favoritesRef = getFavoritesRef();
@@ -956,6 +1009,20 @@ async function handleGroceryListClick(event) {
     const groceryRef = getGroceryListRef();
     if (!groceryRef) return;
 
+    // Handle category expand/collapse
+    const header = event.target.closest('.category-header');
+    if (header) {
+        const list = header.nextElementSibling;
+        const toggle = header.querySelector('.category-toggle');
+        if (list && list.tagName === 'UL') {
+            const isVisible = list.style.display !== 'none';
+            list.style.display = isVisible ? 'none' : 'block';
+            toggle.textContent = isVisible ? '+' : '−';
+        }
+        return;
+    }
+
+    // Handle checkbox click
     if (event.target.type === 'checkbox') {
         const itemId = event.target.dataset.id;
         const isChecked = event.target.checked;
@@ -966,6 +1033,7 @@ async function handleGroceryListClick(event) {
         handleGroceryItemCheck();
     }
 
+    // Handle delete button click
     if (event.target.classList.contains('delete-grocery-btn')) {
         const itemId = event.target.dataset.id;
         if (itemId) {
@@ -976,6 +1044,7 @@ async function handleGroceryListClick(event) {
         }
     }
 }
+
 
 async function moveSelectedItemsToPantryDirectly() {
     const checkedItems = groceryList.querySelectorAll('input[type="checkbox"]:checked');
@@ -1283,6 +1352,14 @@ function handleExpandCollapseAll(expand) {
     allToggles.forEach(toggle => toggle.textContent = expand ? '−' : '+');
 }
 
+function handleExpandCollapseAllGrocery(expand) {
+    const allLists = groceryList.querySelectorAll('ul');
+    const allToggles = groceryList.querySelectorAll('.category-toggle');
+    allLists.forEach(list => list.style.display = expand ? 'block' : 'none');
+    allToggles.forEach(toggle => toggle.textContent = expand ? '−' : '+');
+}
+
+
 function handleRemoveConfirmedItem(event) {
     if (event.target.classList.contains('remove-item-btn')) {
         event.target.closest('.confirmation-item').remove();
@@ -1478,6 +1555,7 @@ async function handlePlanSingleDayClick(event) {
 function startApp() {
     populateCategoryDropdown(manualCategorySelect);
     populateCategoryDropdown(groceryItemCategorySelect);
+    populateCuisineDropdowns();
 
     selectAllGroceryCheckbox = document.getElementById('select-all-grocery-checkbox');
     selectAllPantryCheckbox = document.getElementById('select-all-pantry-checkbox');
@@ -1925,11 +2003,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     planMyWeekBtn.addEventListener('click', handlePlanMyWeek);
     window.addEventListener('click', (event) => {
-        if (event.target == mealPlanModal || event.target == addToPlanModal || event.target == createHouseholdModal || event.target == howToModal) {
+        if (event.target == mealPlanModal || event.target == addToPlanModal || event.target == createHouseholdModal || event.target == howToModal || event.target == feedbackModal) {
             mealPlanModal.style.display = 'none';
             addToPlanModal.style.display = 'none';
             createHouseholdModal.style.display = 'none';
             howToModal.style.display = 'none';
+            feedbackModal.style.display = 'none';
         }
     });
 
@@ -2008,6 +2087,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     expandAllBtn.addEventListener('click', () => handleExpandCollapseAll(true));
     collapseAllBtn.addEventListener('click', () => handleExpandCollapseAll(false));
+    expandAllGroceryBtn.addEventListener('click', () => handleExpandCollapseAllGrocery(true));
+    collapseAllGroceryBtn.addEventListener('click', () => handleExpandCollapseAllGrocery(false));
+
 
     document.querySelectorAll('.collapsible-header').forEach(header => {
         header.addEventListener('click', () => {
@@ -2039,5 +2121,36 @@ document.addEventListener('DOMContentLoaded', () => {
     howToCloseBtn.addEventListener('click', () => {
         howToModal.style.display = 'none';
         markHowToAsSeen();
+    });
+
+    // Feedback Modal Listeners
+    feedbackBtn.addEventListener('click', () => {
+        feedbackModal.style.display = 'block';
+    });
+
+    feedbackModalCloseBtn.addEventListener('click', () => {
+        feedbackModal.style.display = 'none';
+    });
+
+    feedbackForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const textarea = document.getElementById('feedback-textarea');
+        const feedbackText = textarea.value.trim();
+        if (feedbackText) {
+            try {
+                await addDoc(collection(db, 'feedback'), {
+                    text: feedbackText,
+                    userId: currentUser ? currentUser.uid : 'anonymous',
+                    email: currentUser ? currentUser.email : 'anonymous',
+                    submittedAt: serverTimestamp()
+                });
+                textarea.value = '';
+                feedbackModal.style.display = 'none';
+                alert('Thank you for your feedback!');
+            } catch (error) {
+                console.error("Error submitting feedback:", error);
+                alert('Sorry, there was an issue submitting your feedback. Please try again.');
+            }
+        }
     });
 });

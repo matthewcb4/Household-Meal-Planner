@@ -102,15 +102,24 @@
                                         <label><input type="checkbox" name="plannerCriteria" value="Pescetarian"><span>Pescetarian</span></label>
                                         <label><input type="checkbox" name="plannerCriteria" value="Keto"><span>Keto</span></label>
                                         <label><input type="checkbox" name="plannerCriteria" value="Paleo"><span>Paleo</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Low Carb"><span>Low Carb</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Low Fat"><span>Low Fat</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="High Protein"><span>High Protein</span></label>
                                     </div>
                                 </div>
                             </div>
                             <div class="criteria-group">
-                                <div class="sub-criteria-group premium-feature">
-                                    <h4>Other <span class="premium-tag">Premium</span></h4>
+                                <div class="sub-criteria-group">
+                                    <h4>Other</h4>
                                      <div class="checkbox-group">
-                                        <label><input type="checkbox" name="plannerCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
-                                        <label><input type="checkbox" name="plannerCriteria" value="Spicy"><span>Spicy</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Budget-Friendly" class="premium-feature"><span>Budget-Friendly <span class="premium-tag">Premium</span></span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Spicy" class="premium-feature"><span>Spicy <span class="premium-tag">Premium</span></span></label>
+                                    </div>
+                                    <div class="disabled-feature-teaser" style="margin-top: 1rem;">
+                                        <h5>Filter Ingredients <span class="v2-tag">V2</span></h5>
+                                        <select disabled>
+                                            <option>Include/Exclude (Coming Soon)</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
@@ -150,12 +159,6 @@
                                     <label for="cuisine-select">Cuisine</label>
                                     <select id="cuisine-select">
                                         <option value="">Any</option>
-                                        <option value="Italian">Italian</option>
-                                        <option value="Mexican">Mexican</option>
-                                        <option value="Asian">Asian</option>
-                                        <option value="American">American</option>
-                                        <option value="Mediterranean">Mediterranean</option>
-                                        <option value="Indian">Indian</option>
                                     </select>
                                     <button id="update-cuisine-btn" style="display:none;">Update Cuisine</button>
                                 </div>
@@ -187,13 +190,22 @@
                                             <label><input type="checkbox" name="recipeCriteria" value="Pescetarian"><span>Pescetarian</span></label>
                                             <label><input type="checkbox" name="recipeCriteria" value="Keto"><span>Keto</span></label>
                                             <label><input type="checkbox" name="recipeCriteria" value="Paleo"><span>Paleo</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Low Carb"><span>Low Carb</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Low Fat"><span>Low Fat</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="High Protein"><span>High Protein</span></label>
                                         </div>
                                     </div>
-                                    <div class="sub-criteria-group premium-feature">
-                                        <h4>Other <span class="premium-tag">Premium</span></h4>
+                                    <div class="sub-criteria-group">
+                                        <h4>Other</h4>
                                          <div class="checkbox-group">
-                                            <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
-                                            <label><input type="checkbox" name="plannerCriteria" value="Spicy"><span>Spicy</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly" class="premium-feature"><span>Budget-Friendly <span class="premium-tag">Premium</span></span></label>
+                                            <label><input type="checkbox" name="plannerCriteria" value="Spicy" class="premium-feature"><span>Spicy <span class="premium-tag">Premium</span></span></label>
+                                        </div>
+                                        <div class="disabled-feature-teaser" style="margin-top: 1rem;">
+                                            <h5>Filter Ingredients <span class="v2-tag">V2</span></h5>
+                                            <select disabled>
+                                                <option>Include/Exclude (Coming Soon)</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -271,12 +283,20 @@
                     <button type="submit">Add</button>
                 </form>
                 <div id="grocery-scan-ui-placeholder"></div>
+                <!-- Controls for the new categorized list -->
+                <div class="pantry-header" style="margin-top: 24px;">
+                    <h3>Your Items</h3>
+                    <div class="pantry-controls">
+                        <button id="expand-all-grocery-btn" class="secondary">Expand All</button>
+                        <button id="collapse-all-grocery-btn" class="secondary">Collapse All</button>
+                    </div>
+                </div>
                 <div id="grocery-bulk-controls" class="bulk-controls" style="display: none;">
                     <label><input type="checkbox" id="select-all-grocery-checkbox"> Select All</label>
                     <button id="delete-selected-grocery-btn" class="danger">Delete Selected</button>
                     <button id="move-to-pantry-btn" class="secondary">Move to Pantry</button>
                 </div>
-                <ul id="grocery-list"></ul>
+                <div id="grocery-list"></div>
                 <div id="move-to-pantry-form-container" style="display: none; margin-top: 20px;">
                     <h3>Confirm Items to Add to Pantry</h3>
                     <form id="move-to-pantry-form"></form>
@@ -343,12 +363,6 @@
                  <form id="create-household-form">
                     <label for="household-cuisine-select">Cuisine Preference</label>
                      <select id="household-cuisine-select" required>
-                        <option value="American">American</option>
-                        <option value="Italian">Italian</option>
-                        <option value="Mexican">Mexican</option>
-                        <option value="Asian">Asian</option>
-                        <option value="Mediterranean">Mediterranean</option>
-                        <option value="Indian">Indian</option>
                          <option value="">Any</option>
                     </select>
                     <button type="submit">Create Household</button>
@@ -389,6 +403,23 @@
                 </div>
             </div>
         </div>
+
+        <!-- Feedback Modal -->
+        <div id="feedback-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" id="feedback-modal-close-btn">&times;</span>
+                <h3>Share Your Feedback</h3>
+                <p>Have a suggestion or found a bug? Let us know!</p>
+                <form id="feedback-form">
+                    <textarea id="feedback-textarea" placeholder="Your feedback..." required></textarea>
+                    <button type="submit">Submit Feedback</button>
+                </form>
+            </div>
+        </div>
+        
+        <button id="feedback-btn" title="Send Feedback">
+            <i class="fas fa-comment-dots"></i>
+        </button>
 
     </main>
     <script type="module" src="script.js"></script>

@@ -41,7 +41,7 @@ h1 {
     font-size: 2.5rem;
     margin-bottom: 2rem;
 }
-h2, h3, h4 {
+h2, h3, h4, h5 {
     font-family: var(--font-primary);
     color: var(--primary-color);
     font-weight: 700;
@@ -56,6 +56,12 @@ h4 {
     padding-bottom: 0.5rem;
     font-weight: 500;
     color: var(--text-secondary-color);
+}
+h5 {
+    font-size: 1rem;
+    color: var(--text-secondary-color);
+    margin-bottom: 0.5rem;
+    border-bottom: none;
 }
 p { overflow-wrap: break-word; color: var(--text-secondary-color); }
 hr { border: none; border-top: 1px solid var(--border-color); margin: 2rem 0; }
@@ -106,21 +112,26 @@ button:disabled {
 button.secondary { background-color: var(--secondary-color); }
 button.danger { background-color: var(--danger-color); }
 
-input[type="text"], input[type="number"], input[type="email"], input[type="password"], select {
+input[type="text"], input[type="number"], input[type="email"], input[type="password"], select, textarea {
     width: 100%;
     padding: 12px;
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     box-sizing: border-box;
     font-size: 1em;
+    font-family: var(--font-primary);
     margin-bottom: 10px;
     background-color: #fff;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
-input:focus, select:focus {
+input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.2);
+}
+textarea {
+    min-height: 120px;
+    resize: vertical;
 }
 
 video, img { max-width: 100%; border-radius: var(--border-radius); margin-top: 1rem; }
@@ -844,6 +855,44 @@ video, img { max-width: 100%; border-radius: var(--border-radius); margin-top: 1
     font-size: 0.9em;
     margin-top: 0.5rem;
     text-align: center;
+}
+
+/* --- V2 Teaser & Feedback Button --- */
+.disabled-feature-teaser {
+    opacity: 0.6;
+    cursor: not-allowed;
+    position: relative;
+}
+.v2-tag {
+    background-color: var(--accent-color);
+    color: var(--text-color);
+    font-size: 0.7em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 0.5rem;
+    font-weight: bold;
+}
+#feedback-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--primary-color);
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    transition: transform 0.2s ease-in-out, background-color 0.2s;
+    z-index: 1001;
+}
+#feedback-btn:hover {
+    transform: scale(1.1);
+    background-color: #3d6b4c; /* Darker shade of primary */
 }
 
 
