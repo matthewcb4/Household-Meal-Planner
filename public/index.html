@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Dinner Organizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Font Awesome for social icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <main>
+        <div id="auth-container">
+            <span id="welcome-message" style="display: none;"></span>
+            <div id="household-details">
+                <p id="household-info" style="display: none;"></p>
+                <p id="household-status-info" style="display: none;"></p>
+                <button id="upgrade-btn-header" class="upgrade-button" style="display: none;">Upgrade</button>
+            </div>
+            <div id="sign-in-options" class="sign-in-options">
+                 <button id="sign-in-btn" class="social-signin-btn google"><i class="fab fa-google"></i> Sign in with Google</button>
+                 <hr class="auth-divider">
+                 <div id="email-auth-container">
+                    <form id="email-signin-form">
+                        <input type="email" id="email-input" placeholder="Email" required>
+                        <input type="password" id="password-input" placeholder="Password" required>
+                        <button type="submit" id="email-signin-btn">Sign In</button>
+                    </form>
+                     <form id="email-signup-form" style="display: none;">
+                        <input type="email" id="signup-email-input" placeholder="Email" required>
+                        <input type="password" id="signup-password-input" placeholder="Password" required>
+                        <input type="text" id="signup-display-name-input" placeholder="Display Name" required>
+                        <button type="submit" id="email-signup-btn">Sign Up</button>
+                    </form>
+                    <p id="auth-error" class="auth-error-message" style="display: none;"></p>
+                    <button id="toggle-auth-mode" class="link-button">Need an account? Sign Up</button>
+                 </div>
+            </div>
+            <button id="sign-out-btn" class="danger" style="display: none;">Sign Out</button>
+        </div>
+        <h1>Household Meal Planner</h1>
+        <div id="household-manager" style="display: none;">
+            <section>
+                <h2>Welcome! Join or Create a Household</h2>
+                <p>To share a pantry, create a new household or join one using an invite code.</p>
+                <div class="household-action"><h3>Create a New Household</h3><button id="create-household-btn">Create</button></div>
+                <hr>
+                <div class="household-action"><h3>Join an Existing Household</h3><input type="text" id="household-code-input" placeholder="Enter Invite Code"><button id="join-household-btn">Join</button></div>
+            </section>
+        </div>
+        
+        <div id="app-content" style="display: none;">
+            <!-- Tab Navigation -->
+            <div class="app-tabs">
+                <button class="tab-link active" data-tab="meal-plan-section">Meal Planner</button>
+                <button class="tab-link" data-tab="recipe-section">Recipes</button>
+                <button class="tab-link" data-tab="pantry-section">Pantry</button>
+                <button class="tab-link" data-tab="grocery-list-section">Grocery List</button>
+            </div>
+
+            <!-- Tab Content -->
+            <section id="meal-plan-section" class="tab-content active">
+                <h2>Weekly Meal Planner</h2>
+                <div class="week-navigation">
+                    <button id="prev-week-btn" class="secondary">&lt; Prev</button>
+                    <h3 id="week-range-display"></h3>
+                    <button id="next-week-btn" class="secondary">Next &gt;</button>
+                </div>
+                
+                <div id="planner-criteria" class="recipe-criteria">
+                    <h3 class="collapsible-header">Planning Preferences</h3>
+                    <div class="collapsible-content">
+                        <div class="criteria-controls">
+                            <div class="criteria-group">
+                                 <div class="sub-criteria-group">
+                                    <h4>Main Preference</h4>
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" id="use-pantry-items-checkbox" class="premium-feature"><span>Use Pantry Items</span></label>
+                                    </div>
+                                </div>
+                                <div class="sub-criteria-group">
+                                    <h4>Allergies & Restrictions</h4>
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" name="plannerCriteria" value="Gluten-Free"><span>Gluten-Free</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Dairy-Free"><span>Dairy-Free</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Lactose-Intolerance"><span>Lactose-Intolerance</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Kosher"><span>Kosher</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Halal"><span>Halal</span></label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="criteria-group">
+                                 <div class="sub-criteria-group premium-feature">
+                                    <h4>Common Diets <span class="premium-tag">Premium</span></h4>
+                                    <div class="checkbox-group">
+                                        <label><input type="checkbox" name="plannerCriteria" value="Vegetarian"><span>Vegetarian</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Vegan"><span>Vegan</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Pescetarian"><span>Pescetarian</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Keto"><span>Keto</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Paleo"><span>Paleo</span></label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="criteria-group">
+                                <div class="sub-criteria-group premium-feature">
+                                    <h4>Other <span class="premium-tag">Premium</span></h4>
+                                     <div class="checkbox-group">
+                                        <label><input type="checkbox" name="plannerCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Spicy"><span>Spicy</span></label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="button-group" style="margin-top: 1rem;">
+                    <button id="plan-my-week-btn" class="premium-feature">✨ Complete My Week (Premium)</button>
+                </div>
+                <div class="meal-plan-container">
+                    <div id="meal-planner-grid">
+                        <!-- Calendar grid will be generated here by JS -->
+                    </div>
+                </div>
+                <button id="generate-grocery-list-btn">Generate Grocery List for this Week</button>
+            </section>
+
+            <section id="recipe-section" class="tab-content">
+                <h2>Meal Sources</h2>
+                <div class="source-tabs">
+                    <button id="show-ideas-tab" class="active">Meal Ideas</button>
+                    <button id="show-favorites-tab">Favorites</button>
+                </div>
+                <div id="ideas-content">
+                    <div class="meal-type-selector" id="meal-type-selector">
+                        <label><input type="radio" name="mealType" value="breakfast"><span>Breakfast</span></label>
+                        <label><input type="radio" name="mealType" value="lunch"><span>Lunch</span></label>
+                        <label><input type="radio" name="mealType" value="dinner" checked><span>Dinner</span></label>
+                        <label><input type="radio" name="mealType" value="snack"><span>Snack</span></label>
+                    </div>
+                    <div class="recipe-criteria">
+                        <h3 class="collapsible-header">Refine Your Search</h3>
+                        <div class="collapsible-content">
+                            <div class="criteria-controls">
+                                <div class="criteria-group">
+                                    <label for="cuisine-select">Cuisine</label>
+                                    <select id="cuisine-select">
+                                        <option value="">Any</option>
+                                        <option value="Italian">Italian</option>
+                                        <option value="Mexican">Mexican</option>
+                                        <option value="Asian">Asian</option>
+                                        <option value="American">American</option>
+                                        <option value="Mediterranean">Mediterranean</option>
+                                        <option value="Indian">Indian</option>
+                                    </select>
+                                    <button id="update-cuisine-btn" style="display:none;">Update Cuisine</button>
+                                </div>
+                                <div class="criteria-group">
+                                    <label>Unit System</label>
+                                    <div class="toggle-switch">
+                                        <input type="radio" id="imperial-units" name="unitSystem" value="imperial" checked>
+                                        <label for="imperial-units">Imperial</label>
+                                        <input type="radio" id="metric-units" name="unitSystem" value="metric">
+                                        <label for="metric-units">Metric</label>
+                                    </div>
+                                </div>
+                                <div class="criteria-group">
+                                    <div class="sub-criteria-group">
+                                        <h4>Allergies & Restrictions</h4>
+                                        <div class="checkbox-group">
+                                            <label><input type="checkbox" name="recipeCriteria" value="Gluten-Free"><span>Gluten-Free</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Dairy-Free"><span>Dairy-Free</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Lactose-Intolerance"><span>Lactose-Intolerance</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Kosher"><span>Kosher</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Halal"><span>Halal</span></label>
+                                        </div>
+                                    </div>
+                                    <div class="sub-criteria-group premium-feature">
+                                        <h4>Common Diets <span class="premium-tag">Premium</span></h4>
+                                        <div class="checkbox-group">
+                                            <label><input type="checkbox" name="recipeCriteria" value="Vegetarian"><span>Vegetarian</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Vegan"><span>Vegan</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Pescetarian"><span>Pescetarian</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Keto"><span>Keto</span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Paleo"><span>Paleo</span></label>
+                                        </div>
+                                    </div>
+                                    <div class="sub-criteria-group premium-feature">
+                                        <h4>Other <span class="premium-tag">Premium</span></h4>
+                                         <div class="checkbox-group">
+                                            <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
+                                            <label><input type="checkbox" name="plannerCriteria" value="Spicy"><span>Spicy</span></label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="ask-the-chef-section" class="recipe-criteria premium-feature">
+                        <h3>Ask the Chef <span class="premium-tag">Premium</span></h3>
+                        <form id="ask-the-chef-form" class="inline-form">
+                            <input type="text" id="chef-query-input" placeholder="e.g., 'Classic Cheeseburger' or 'Spicy Chicken Tacos'">
+                            <button type="submit">Get Recipe</button>
+                        </form>
+                    </div>
+                    <div id="recipe-scan-ui-placeholder"></div>
+                    <div class="button-group">
+                        <button id="suggest-recipe-btn">Suggest from Pantry</button>
+                        <button id="quick-meal-btn">Quick Meal from Photo</button>
+                        <button id="discover-recipes-btn" class="secondary">Discover New Recipes</button>
+                    </div>
+                </div>
+                <div id="recipe-results"></div>
+                <div id="favorite-recipes-list" style="display: none;"></div>
+            </section>
+
+            <section id="pantry-section" class="tab-content">
+                <div class="pantry-header">
+                    <h2>My Pantry</h2>
+                    <div class="pantry-controls">
+                        <button id="show-manual-add-btn" class="secondary">Add Manually</button>
+                        <button id="show-scan-item-btn" class="secondary">Scan Item</button>
+                        <button id="show-scan-receipt-btn" class="secondary premium-feature">Scan Receipt</button>
+                    </div>
+                </div>
+                <div id="add-item-container" class="add-item-container" style="display: none;">
+                    <div id="manual-add-container" style="display: none;">
+                        <h3>Add Item Manually</h3>
+                        <form id="manual-add-form" class="form-grid">
+                            <input type="text" id="manual-name" placeholder="Item Name" required>
+                            <input type="number" id="manual-quantity" placeholder="Quantity" value="1" required>
+                            <input type="text" id="manual-unit" placeholder="Unit (e.g., lbs)" value="units" required>
+                            <select id="manual-category"></select>
+                            <button type="submit">Add</button>
+                        </form>
+                    </div>
+                    <div id="confirmation-section" style="display: none;">
+                        <h3>Confirm Scanned Items</h3>
+                        <div id="item-confirmation-list"></div>
+                        <button id="add-to-pantry-btn">Add Items to Pantry</button>
+                    </div>
+                </div>
+                <div class="pantry-header" style="margin-top: 24px;">
+                    <h3>Pantry Items</h3>
+                    <div class="pantry-controls">
+                        <button id="expand-all-btn" class="secondary">Expand All</button>
+                        <button id="collapse-all-btn" class="secondary">Collapse All</button>
+                    </div>
+                </div>
+                <div id="pantry-bulk-controls" class="bulk-controls" style="display: none;">
+                    <label><input type="checkbox" id="select-all-pantry-checkbox"> Select All</label>
+                    <button id="delete-selected-pantry-btn" class="danger">Delete Selected</button>
+                </div>
+                <div id="pantry-list"></div>
+            </section>
+
+            <section id="grocery-list-section" class="tab-content">
+                <h2>Grocery List</h2>
+                <div class="button-group">
+                    <button id="show-add-grocery-form-btn" class="secondary">Add to List Manually</button>
+                    <button id="show-scan-grocery-btn" class="secondary">Scan Item(s)</button>
+                    <button id="show-scan-receipt-grocery-btn" class="secondary premium-feature">Scan Receipt</button>
+                </div>
+                <form id="add-grocery-item-form" class="inline-form" style="display: none;">
+                    <input type="text" id="grocery-item-name" placeholder="e.g., Milk" required>
+                    <select id="grocery-item-category"></select>
+                    <button type="submit">Add</button>
+                </form>
+                <div id="grocery-scan-ui-placeholder"></div>
+                <div id="grocery-bulk-controls" class="bulk-controls" style="display: none;">
+                    <label><input type="checkbox" id="select-all-grocery-checkbox"> Select All</label>
+                    <button id="delete-selected-grocery-btn" class="danger">Delete Selected</button>
+                    <button id="move-to-pantry-btn" class="secondary">Move to Pantry</button>
+                </div>
+                <ul id="grocery-list"></ul>
+                <div id="move-to-pantry-form-container" style="display: none; margin-top: 20px;">
+                    <h3>Confirm Items to Add to Pantry</h3>
+                    <form id="move-to-pantry-form"></form>
+                    <button id="confirm-move-btn" style="margin-top: 10px;">Confirm and Move</button>
+                </div>
+            </section>
+        </div>
+        
+        <div id="scan-item-container" style="display: none;">
+            <h3>Scan New Items</h3>
+            <div id="camera-container" style="display: none;"><video id="camera-stream" autoplay playsinline></video><canvas id="capture-canvas" style="display:none;"></canvas></div>
+            <img id="captured-image" alt="Captured from pantry" style="display: none;">
+            <div id="camera-controls">
+                <button id="start-camera-btn">Start Camera</button>
+                <button id="capture-btn" style="display: none;">Capture & Scan</button>
+                <div class="tooltip-container">
+                    <button id="capture-video-btn" class="secondary" disabled>Capture Video</button>
+                    <span class="tooltip-text">Coming in V2! Video scanning will be a premium feature.</span>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Modals -->
+        <div id="meal-plan-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" id="modal-close-btn">&times;</span>
+                <h3 id="modal-slot-title"></h3>
+                <div id="modal-recipe-list"></div>
+            </div>
+        </div>
+
+        <div id="add-to-plan-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn" id="add-to-plan-modal-close-btn">&times;</span>
+                <h3>Add Recipe to Meal Plan</h3>
+                <p>Select dates and mealtime for: <strong id="add-to-plan-recipe-title"></strong></p>
+                <form id="add-to-plan-form">
+                    <div id="calendar-container">
+                        <div id="calendar-header">
+                            <button type="button" id="calendar-prev-month" class="secondary">&lt;</button>
+                            <h4 id="calendar-month-year"></h4>
+                            <button type="button" id="calendar-next-month" class="secondary">&gt;</button>
+                        </div>
+                        <div id="calendar-grid"></div>
+                    </div>
+
+                    <label for="meal-select">Mealtime:</label>
+                    <select id="meal-select" required>
+                        <option value="breakfast">Breakfast</option>
+                        <option value="lunch">Lunch</option>
+                        <option value="dinner">Dinner</option>
+                    </select>
+                    <button type="submit">Add to Plan</button>
+                </form>
+            </div>
+        </div>
+        
+        <div id="create-household-modal" class="modal">
+            <div class="modal-content">
+                 <span class="close-btn" id="create-household-modal-close-btn">&times;</span>
+                <h3>Create Your Household</h3>
+                <p>Select your household's primary cuisine preference to get started.</p>
+                 <form id="create-household-form">
+                    <label for="household-cuisine-select">Cuisine Preference</label>
+                     <select id="household-cuisine-select" required>
+                        <option value="American">American</option>
+                        <option value="Italian">Italian</option>
+                        <option value="Mexican">Mexican</option>
+                        <option value="Asian">Asian</option>
+                        <option value="Mediterranean">Mediterranean</option>
+                        <option value="Indian">Indian</option>
+                         <option value="">Any</option>
+                    </select>
+                    <button type="submit">Create Household</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- How-To Modal -->
+        <div id="how-to-modal" class="modal">
+            <div class="modal-content">
+                <div class="how-to-slider">
+                    <div class="how-to-slide active">
+                        <h3>Welcome to the Household Meal Planner!</h3>
+                        <p>Let's quickly walk through the main features to get you started.</p>
+                    </div>
+                    <div class="how-to-slide">
+                        <h3>1. Your Pantry</h3>
+                        <p>Use the 'Pantry' tab to add ingredients you have at home. You can add them manually or scan them with your camera!</p>
+                    </div>
+                    <div class="how-to-slide">
+                        <h3>2. Get Recipes</h3>
+                        <p>In the 'Recipes' tab, get meal ideas based on what's in your pantry or discover brand new recipes.</p>
+                    </div>
+                    <div class="how-to-slide">
+                        <h3>3. Plan Your Week</h3>
+                        <p>Assign recipes from the 'Recipes' tab onto your 'Meal Planner' to build your weekly schedule.</p>
+                    </div>
+                     <div class="how-to-slide">
+                        <h3>4. Create a Grocery List</h3>
+                        <p>Once your week is planned, click 'Generate Grocery List' to automatically see what you need to buy.</p>
+                    </div>
+                </div>
+                <div class="how-to-navigation">
+                    <button id="how-to-prev-btn" class="secondary" style="display: none;">Previous</button>
+                    <div class="how-to-dots"></div>
+                    <button id="how-to-next-btn">Next</button>
+                    <button id="how-to-close-btn" style="display: none;">Got it!</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+    <script type="module" src="script.js"></script>
+</body>
+</html>
