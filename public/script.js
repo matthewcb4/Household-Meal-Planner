@@ -79,7 +79,7 @@ const moveToPantryForm = document.getElementById('move-to-pantry-form');
 const confirmMoveBtn = document.getElementById('confirm-move-btn');
 const groceryScanUIPlaceholder = document.getElementById('grocery-scan-ui-placeholder');
 const recipeScanUIPlaceholder = document.getElementById('recipe-scan-ui-placeholder');
-const favoriteRecipesList = document.getElementById('favorite-recipes-list');
+const favoriteRecipesContainer = document.getElementById('favorite-recipes-container');
 const groceryItemCategorySelect = document.getElementById('grocery-item-category');
 const mealPlannerGrid = document.getElementById('meal-planner-grid');
 const generateGroceryListBtn = document.getElementById('generate-grocery-list-btn');
@@ -326,17 +326,39 @@ async function displayGroceryList() {
 async function displayFavoriteRecipes() {
     const favoritesRef = getFavoritesRef();
     if (!favoritesRef) return;
-    favoriteRecipesList.innerHTML = '<p>Loading favorites...</p>';
+    favoriteRecipesContainer.innerHTML = '<p>Loading favorites...</p>';
     const snapshot = await getDocs(favoritesRef);
     if (snapshot.empty) {
-        favoriteRecipesList.innerHTML = '<p>You haven\'t saved any favorite recipes yet.</p>';
+        favoriteRecipesContainer.innerHTML = '<p>You haven\'t saved any favorite recipes yet.</p>';
         return;
     }
-    favoriteRecipesList.innerHTML = '';
+    
+    const groupedByMealType = {};
     snapshot.forEach(doc => {
         const recipe = { id: doc.id, ...doc.data() };
-        const recipeCard = createRecipeCard(recipe, true);
-        favoriteRecipesList.appendChild(recipeCard);
+        const mealType = recipe.mealType || 'uncategorized';
+        if (!groupedByMealType[mealType]) {
+            groupedByMealType[mealType] = [];
+        }
+        groupedByMealType[mealType].push(recipe);
+    });
+
+    favoriteRecipesContainer.innerHTML = '';
+    Object.keys(groupedByMealType).sort().forEach(mealType => {
+        const mealTypeTitle = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+        const categoryHeader = document.createElement('h4');
+        categoryHeader.className = 'favorite-category-title';
+        categoryHeader.textContent = mealTypeTitle;
+        favoriteRecipesContainer.appendChild(categoryHeader);
+
+        const list = document.createElement('div');
+        list.className = 'recipe-card-row';
+
+        groupedByMealType[mealType].forEach(recipe => {
+            const recipeCard = createRecipeCard(recipe, true);
+            list.appendChild(recipeCard);
+        });
+        favoriteRecipesContainer.appendChild(list);
     });
 }
 
@@ -620,7 +642,7 @@ function handlePantryClick(event) {
     if (header) {
         const list = header.nextElementSibling;
         const toggle = header.querySelector('.category-toggle');
-        if (list && list.tagName === 'UL') {
+        if (list && (list.tagName === 'UL' || list.classList.contains('favorite-recipe-grid') || list.classList.contains('recipe-card-row'))) {
             const isVisible = list.style.display !== 'none';
             list.style.display = isVisible ? 'none' : 'block';
             toggle.textContent = isVisible ? '+' : '−';
@@ -667,7 +689,10 @@ async function handleManualAdd(event) {
 
 async function addItemsToPantry() {
     const pantryRef = getPantryRef();
-    if (!pantryRef) return;
+    if (!pantryRef) {
+        alert("Error: Not in a household. Cannot add items to pantry.");
+        return;
+    }
     const confirmedItems = itemConfirmationList.querySelectorAll('.confirmation-item');
     if (confirmedItems.length === 0) {
         alert("No items to add!");
@@ -769,7 +794,10 @@ function displayRecipeResults(recipes, mealType) {
         if(isFavorite) {
             recipe.id = querySnapshot.docs[0].id;
         }
-
+        // Add mealType to the recipe object if it's not there, for favoriting
+        if (!recipe.mealType) {
+            recipe.mealType = mealType;
+        }
         const recipeCard = createRecipeCard(recipe, isFavorite);
         recipeResultsDiv.appendChild(recipeCard);
     });
@@ -786,19 +814,26 @@ function createRecipeCard(recipe, isFavorite) {
 
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/EEE/31343C?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
 
-    let ingredientsHTML = '<ul>';
-    if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-        recipe.ingredients.forEach(ing => {
+    const ingredientsList = (recipe.ingredients && Array.isArray(recipe.ingredients)) 
+        ? recipe.ingredients.map(ing => {
             const ingredientText = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name || ''}`.trim();
             const ingredientName = ing.name || '';
             const ingredientCategory = ing.category || 'Other';
-            
-            if (ingredientName) { 
-                ingredientsHTML += `<li>${ingredientText} <button class="add-to-list-btn secondary" data-item-name="${escapeAttr(ingredientName)}" data-item-category="${escapeAttr(ingredientCategory)}">+ List</button></li>`;
+            if (ingredientName) {
+                return `<li>${ingredientText} <button class="add-to-list-btn secondary" data-item-name="${escapeAttr(ingredientName)}" data-item-category="${escapeAttr(ingredientCategory)}">+ List</button></li>`;
             }
-        });
-    }
-    ingredientsHTML += '</ul>';
+            return '';
+        }).join('')
+        : '';
+
+    const ingredientsHTML = `
+        <div class="ingredients-container">
+            <button class="ingredients-toggle secondary">Ingredients</button>
+            <div class="ingredients-list" style="display: none;">
+                <ul>${ingredientsList}</ul>
+            </div>
+        </div>
+    `;
 
     const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
     const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
@@ -849,7 +884,6 @@ function createRecipeCard(recipe, isFavorite) {
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${cardActionsHTML}
-        <strong>Ingredients Used:</strong>
         ${ingredientsHTML}
     `;
 
@@ -1135,6 +1169,9 @@ async function toggleFavorite(recipeData, buttonElement) {
 
     if (querySnapshot.empty) {
         const dataToSave = { ...recipeData };
+        if (!dataToSave.mealType) {
+            dataToSave.mealType = document.querySelector('input[name="mealType"]:checked').value || 'uncategorized';
+        }
         delete dataToSave.id;
         const docRef = await addDoc(favoritesRef, dataToSave);
         alert(`"${recipeData.title}" saved to favorites!`);
@@ -1155,7 +1192,7 @@ async function toggleFavorite(recipeData, buttonElement) {
             buttonElement.title = 'Save to Favorites';
         }
     }
-    if (favoriteRecipesList.style.display !== 'none') {
+    if (favoriteRecipesContainer.style.display !== 'none') {
         displayFavoriteRecipes();
     }
 }
@@ -1179,13 +1216,13 @@ function handleCardClick(event) {
         calendarDate = new Date(); 
         renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
         addToPlanModal.style.display = 'block';
-    } else if (target.closest('.instructions-toggle')) {
-        const button = target.closest('.instructions-toggle');
-        const list = button.closest('.instructions-container').querySelector('.instructions-list');
+    } else if (target.closest('.instructions-toggle') || target.closest('.ingredients-toggle')) {
+        const button = target.closest('button');
+        const list = button.nextElementSibling;
         if (list) {
             const isVisible = list.style.display === 'block';
             list.style.display = isVisible ? 'none' : 'block';
-            button.textContent = isVisible ? 'Show Instructions' : 'Hide Instructions';
+            button.textContent = isVisible ? button.textContent.replace('Hide', 'Show') : button.textContent.replace('Show', 'Hide');
         }
     } else if (target.closest('.star')) {
         const recipeId = target.closest('.star-rating').querySelector('.star').dataset.id;
@@ -1463,7 +1500,11 @@ async function initializeAppUI(user) {
 
         householdManager.style.display = 'none';
         appContent.style.display = 'block';
-        householdInfo.textContent = `Invite Code: ${householdId}`;
+        householdInfo.innerHTML = `
+            <span>Invite Code: <strong id="household-code-text">${householdId}</strong></span>
+            <button id="copy-household-code-btn" title="Copy Code"><i class="far fa-copy"></i></button>
+        `;
+        householdInfo.style.display = 'flex';
         householdStatusInfo.style.display = 'block';
         startApp();
         if (!userDoc.data().hasSeenHowToGuide) {
@@ -1868,8 +1909,10 @@ toggleAuthModeBtn.addEventListener('click', () => {
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.tab-link').forEach(button => button.addEventListener('click', switchTab));
     pantryListDiv.addEventListener('click', handlePantryClick);
+    favoriteRecipesContainer.addEventListener('click', handlePantryClick); // Re-use for collapse/expand
     manualAddForm.addEventListener('submit', handleManualAdd);
     addToPantryBtn.addEventListener('click', addItemsToPantry);
+    itemConfirmationList.addEventListener('click', handleRemoveConfirmedItem);
     suggestRecipeBtn.addEventListener('click', getRecipeSuggestions);
     discoverRecipesBtn.addEventListener('click', discoverNewRecipes);
     
@@ -1932,7 +1975,7 @@ document.addEventListener('DOMContentLoaded', () => {
     groceryList.addEventListener('click', handleGroceryListClick);
     moveToPantryBtn.addEventListener('click', moveSelectedItemsToPantryDirectly);
     recipeResultsDiv.addEventListener('click', handleCardClick);
-    favoriteRecipesList.addEventListener('click', handleCardClick);
+    favoriteRecipesContainer.addEventListener('click', handleCardClick);
     showAddGroceryFormBtn.addEventListener('click', () => {
         addGroceryItemForm.style.display = addGroceryItemForm.style.display === 'none' ? 'flex' : 'none';
     });
@@ -1962,14 +2005,14 @@ document.addEventListener('DOMContentLoaded', () => {
     showIdeasTab.addEventListener('click', () => {
         ideasContent.style.display = 'block';
         recipeResultsDiv.style.display = 'flex';
-        favoriteRecipesList.style.display = 'none';
+        favoriteRecipesContainer.style.display = 'none';
         showIdeasTab.classList.add('active');
         showFavoritesTab.classList.remove('active');
     });
     showFavoritesTab.addEventListener('click', () => {
         ideasContent.style.display = 'none';
         recipeResultsDiv.style.display = 'none';
-        favoriteRecipesList.style.display = 'flex';
+        favoriteRecipesContainer.style.display = 'block';
         showFavoritesTab.classList.add('active');
         showIdeasTab.classList.remove('active');
     });
@@ -2151,6 +2194,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Error submitting feedback:", error);
                 alert('Sorry, there was an issue submitting your feedback. Please try again.');
             }
+        }
+    });
+
+    document.body.addEventListener('click', function(event) {
+        const copyBtn = event.target.closest('#copy-household-code-btn');
+        if (copyBtn) {
+            const code = document.getElementById('household-code-text').textContent;
+            const textArea = document.createElement("textarea");
+            textArea.value = code;
+            textArea.style.position = "fixed"; // Avoid scrolling to bottom
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                alert('Household code copied to clipboard!');
+            } catch (err) {
+                console.error('Fallback: Oops, unable to copy', err);
+                alert('Could not copy code. Please select it manually.');
+            }
+            document.body.removeChild(textArea);
         }
     });
 });
