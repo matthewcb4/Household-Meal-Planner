@@ -143,6 +143,11 @@ button.btn-accent {
     font-weight: 700;
 }
 
+/* Override for premium sync button to match other premium buttons */
+#sync-calendar-btn.premium-feature {
+    background-color: var(--primary-color);
+}
+
 
 input[type="text"], input[type="number"], input[type="email"], input[type="password"], select, textarea {
     width: 100%;
@@ -978,6 +983,34 @@ video, img { max-width: 100%; border-radius: var(--border-radius); margin-top: 1
     transform: scale(1.1);
     background-color: #3d6b4c; /* Darker shade of primary */
 }
+
+/* --- NEW: Sync Calendar Modal Styles --- */
+.calendar-url-container {
+    display: flex;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+.calendar-url-container input {
+    flex-grow: 1;
+    background-color: var(--light-bg);
+    font-family: monospace;
+    font-size: 0.9em;
+}
+#copy-calendar-url-btn {
+    flex-shrink: 0;
+    padding: 0 16px;
+}
+.instructions-list-modal li {
+    background: none;
+    border: none;
+    padding: 0.5rem 0;
+    list-style-type: disc;
+    margin-left: 1.5rem;
+}
+.instructions-list-modal li::marker {
+    color: var(--primary-color);
+}
+
 
 /* --- Responsive Styles --- */
 @media (max-width: 992px) {

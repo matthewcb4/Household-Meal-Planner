@@ -20,11 +20,11 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app);
-const stripe = Stripe('pk_test_51RwOd6BUsDNfnENv0mtyJjaK1DBMG3UKHGKgdcHQ34ZrdTNli9UVpWbZAmksP3kwrsTZaARSJcPFE8llpNMPVloT008eEcwyqd');
+const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
 
 
 // --- GLOBAL VARIABLES ---
-let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeMealPlan = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null;
+let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
 let unitSystem = 'imperial';
 let calendarDate = new Date(); 
 let selectedDates = []; 
@@ -132,7 +132,11 @@ const feedbackBtn = document.getElementById('feedback-btn');
 const feedbackModal = document.getElementById('feedback-modal');
 const feedbackModalCloseBtn = document.getElementById('feedback-modal-close-btn');
 const feedbackForm = document.getElementById('feedback-form');
-
+const syncCalendarBtn = document.getElementById('sync-calendar-btn');
+const syncCalendarModal = document.getElementById('sync-calendar-modal');
+const syncCalendarModalCloseBtn = document.getElementById('sync-calendar-modal-close-btn');
+const calendarUrlInput = document.getElementById('calendar-url-input');
+const copyCalendarUrlBtn = document.getElementById('copy-calendar-url-btn');
 
 // --- HELPER FUNCTIONS ---
 
@@ -323,18 +327,18 @@ async function displayGroceryList() {
 }
 
 
-async function displayFavoriteRecipes() {
-    const favoritesRef = getFavoritesRef();
-    if (!favoritesRef) return;
-    favoriteRecipesContainer.innerHTML = '<p>Loading favorites...</p>';
-    const snapshot = await getDocs(favoritesRef);
-    if (snapshot.empty) {
+function displayFavoriteRecipes(docs) {
+    if (!docs) {
+        favoriteRecipesContainer.innerHTML = '<p>Loading favorites...</p>';
+        return;
+    }
+    if (docs.length === 0) {
         favoriteRecipesContainer.innerHTML = '<p>You haven\'t saved any favorite recipes yet.</p>';
         return;
     }
     
     const groupedByMealType = {};
-    snapshot.forEach(doc => {
+    docs.forEach(doc => {
         const recipe = { id: doc.id, ...doc.data() };
         const mealType = recipe.mealType || 'uncategorized';
         if (!groupedByMealType[mealType]) {
@@ -1173,15 +1177,11 @@ async function toggleFavorite(recipeData, buttonElement) {
             dataToSave.mealType = document.querySelector('input[name="mealType"]:checked').value || 'uncategorized';
         }
         delete dataToSave.id;
-        const docRef = await addDoc(favoritesRef, dataToSave);
+        await addDoc(favoritesRef, dataToSave);
         alert(`"${recipeData.title}" saved to favorites!`);
         if (buttonElement) {
             buttonElement.classList.add('is-favorite');
             buttonElement.title = 'Remove from Favorites';
-            const card = buttonElement.closest('.recipe-card');
-            const currentData = JSON.parse(card.dataset.recipe);
-            currentData.id = docRef.id;
-            card.dataset.recipe = JSON.stringify(currentData);
         }
     } else {
         const docId = querySnapshot.docs[0].id;
@@ -1191,9 +1191,6 @@ async function toggleFavorite(recipeData, buttonElement) {
             buttonElement.classList.remove('is-favorite');
             buttonElement.title = 'Save to Favorites';
         }
-    }
-    if (favoriteRecipesContainer.style.display !== 'none') {
-        displayFavoriteRecipes();
     }
 }
 
@@ -1229,13 +1226,7 @@ function handleCardClick(event) {
         const newRating = parseInt(target.dataset.rating, 10);
         const favoritesRef = getFavoritesRef();
         if (favoritesRef && recipeId) {
-            updateDoc(doc(favoritesRef, recipeId), { rating: newRating }).then(() => {
-                const starContainer = target.parentElement;
-                const stars = starContainer.querySelectorAll('.star');
-                stars.forEach(star => {
-                    star.classList.toggle('filled', parseInt(star.dataset.rating, 10) <= newRating);
-                });
-            });
+            updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
         }
     }
 }
@@ -1452,7 +1443,11 @@ function configurePaywallUI() {
 
     if (householdData.subscriptionTier === 'free') {
         upgradeBtnHeader.style.display = 'block';
-        premiumFeatures.forEach(el => el.classList.add('disabled'));
+        premiumFeatures.forEach(el => {
+            el.classList.add('disabled');
+            // Also disable inputs inside premium features
+            el.querySelectorAll('input, button, select').forEach(input => input.disabled = true);
+        });
         
         const lastUpdate = householdData.lastCuisineUpdate.toDate();
         const now = new Date();
@@ -1472,7 +1467,10 @@ function configurePaywallUI() {
 
     } else { // Paid tier
         upgradeBtnHeader.style.display = 'none';
-        premiumFeatures.forEach(el => el.classList.remove('disabled'));
+        premiumFeatures.forEach(el => {
+            el.classList.remove('disabled');
+            el.querySelectorAll('input, button, select').forEach(input => input.disabled = false);
+        });
         updateCuisineBtn.style.display = 'block'; 
         updateCuisineBtn.disabled = false;
         updateCuisineBtn.textContent = 'Update Cuisine';
@@ -1492,29 +1490,53 @@ async function initializeAppUI(user) {
     const userDocRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userDocRef);
 
-    if (userDoc.exists() && userDoc.data().householdId) {
-        householdId = userDoc.data().householdId;
-        const householdRef = doc(db, 'households', householdId);
-        const householdDoc = await getDoc(householdRef);
-        householdData = householdDoc.data();
+    if (userDoc.exists()) {
+        userPreferences = userDoc.data().preferences || {};
+        if (userDoc.data().householdId) {
+            householdId = userDoc.data().householdId;
+            const householdRef = doc(db, 'households', householdId);
+            const householdDoc = await getDoc(householdRef);
+            householdData = householdDoc.data();
 
-        householdManager.style.display = 'none';
-        appContent.style.display = 'block';
-        householdInfo.innerHTML = `
-            <span>Invite Code: <strong id="household-code-text">${householdId}</strong></span>
-            <button id="copy-household-code-btn" title="Copy Code"><i class="far fa-copy"></i></button>
-        `;
-        householdInfo.style.display = 'flex';
-        householdStatusInfo.style.display = 'block';
-        startApp();
-        if (!userDoc.data().hasSeenHowToGuide) {
-            showHowToModal();
+            householdManager.style.display = 'none';
+            appContent.style.display = 'block';
+            householdInfo.innerHTML = `
+                <span>Invite Code: <strong id="household-code-text">${householdId}</strong></span>
+                <button id="copy-household-code-btn" title="Copy Code"><i class="far fa-copy"></i></button>
+            `;
+            householdInfo.style.display = 'flex';
+            householdStatusInfo.style.display = 'block';
+            startApp();
+            if (!userDoc.data().hasSeenHowToGuide) {
+                showHowToModal();
+            }
+        } else {
+            householdManager.style.display = 'block';
+            appContent.style.display = 'none';
+            householdInfo.style.display = 'none';
+            householdStatusInfo.style.display = 'none';
         }
-    } else {
-        householdManager.style.display = 'block';
-        appContent.style.display = 'none';
-        householdInfo.style.display = 'none';
-        householdStatusInfo.style.display = 'none';
+    }
+}
+
+async function saveUserPreferences() {
+    if (!currentUser) return;
+    const allergies = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked, input[name="recipeCriteria"]:checked'))
+                           .map(cb => cb.value);
+    
+    userPreferences.allergies = [...new Set(allergies)]; // Remove duplicates
+    
+    const userDocRef = doc(db, 'users', currentUser.uid);
+    await updateDoc(userDocRef, { preferences: userPreferences });
+}
+
+function loadUserPreferences() {
+    if (userPreferences.allergies) {
+        document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]').forEach(checkbox => {
+            if (userPreferences.allergies.includes(checkbox.value)) {
+                checkbox.checked = true;
+            }
+        });
     }
 }
 
@@ -1523,7 +1545,7 @@ async function initializeAppUI(user) {
 
 async function handlePlanSingleDayClick(event) {
     const button = event.target.closest('.plan-day-btn');
-    if (!button) return;
+    if (!button || button.disabled) return;
 
     const dayAbbr = button.dataset.day;
     const dayFullName = button.dataset.dayFullName;
@@ -1592,12 +1614,21 @@ async function handlePlanSingleDayClick(event) {
     }
 }
 
+function listenToFavorites() {
+    const favoritesRef = getFavoritesRef();
+    if (!favoritesRef) return;
+    
+    unsubscribeFavorites(); // Unsubscribe from any previous listener
+    unsubscribeFavorites = onSnapshot(query(favoritesRef), (snapshot) => {
+        displayFavoriteRecipes(snapshot.docs);
+    });
+}
+
 
 function startApp() {
     populateCategoryDropdown(manualCategorySelect);
     populateCategoryDropdown(groceryItemCategorySelect);
-    populateCuisineDropdowns();
-
+    
     selectAllGroceryCheckbox = document.getElementById('select-all-grocery-checkbox');
     selectAllPantryCheckbox = document.getElementById('select-all-pantry-checkbox');
     
@@ -1612,8 +1643,9 @@ function startApp() {
     displayPantryItems();
     updateWeekView();
     displayGroceryList();
-    displayFavoriteRecipes();
+    listenToFavorites(); // Use the real-time listener
     configurePaywallUI();
+    loadUserPreferences();
 }
 
 async function handlePlanMyWeek() {
@@ -1785,6 +1817,8 @@ onAuthStateChanged(auth, async user => {
         await initializeAppUI(user);
     } else {
         currentUser = null; householdId = null; 
+        unsubscribeMealPlan();
+        unsubscribeFavorites();
         signInOptions.style.display = 'flex';
         signOutBtn.style.display = 'none';
         welcomeMessage.style.display = 'none';
@@ -1826,7 +1860,7 @@ createHouseholdForm.addEventListener('submit', async (e) => {
         subscriptionTier: 'free',
         lastCuisineUpdate: serverTimestamp()
     });
-    batch.set(userRef, { email: currentUser.email, householdId: newHouseholdId, hasSeenHowToGuide: false });
+    batch.set(userRef, { email: currentUser.email, householdId: newHouseholdId, hasSeenHowToGuide: false, preferences: {} });
     
     await batch.commit();
     createHouseholdModal.style.display = 'none';
@@ -1907,6 +1941,7 @@ toggleAuthModeBtn.addEventListener('click', () => {
 
 // --- Initialize Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
+    populateCuisineDropdowns(); // **FIX**: Populate dropdowns on page load
     document.querySelectorAll('.tab-link').forEach(button => button.addEventListener('click', switchTab));
     pantryListDiv.addEventListener('click', handlePantryClick);
     favoriteRecipesContainer.addEventListener('click', handlePantryClick); // Re-use for collapse/expand
@@ -2046,12 +2081,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     planMyWeekBtn.addEventListener('click', handlePlanMyWeek);
     window.addEventListener('click', (event) => {
-        if (event.target == mealPlanModal || event.target == addToPlanModal || event.target == createHouseholdModal || event.target == howToModal || event.target == feedbackModal) {
+        if (event.target == mealPlanModal || event.target == addToPlanModal || event.target == createHouseholdModal || event.target == howToModal || event.target == feedbackModal || event.target == syncCalendarModal) {
             mealPlanModal.style.display = 'none';
             addToPlanModal.style.display = 'none';
             createHouseholdModal.style.display = 'none';
             howToModal.style.display = 'none';
             feedbackModal.style.display = 'none';
+            syncCalendarModal.style.display = 'none';
         }
     });
 
@@ -2196,6 +2232,32 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    
+    // Calendar Sync Listeners
+    syncCalendarBtn.addEventListener('click', () => {
+        if (syncCalendarBtn.classList.contains('disabled')) {
+            alert('This is a premium feature! Please upgrade to use calendar sync.');
+            return;
+        }
+        if (householdId) {
+            const functionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/calendarFeed?householdId=${householdId}`;
+            calendarUrlInput.value = functionUrl;
+            syncCalendarModal.style.display = 'block';
+        } else {
+            alert('Could not generate calendar link. Household not found.');
+        }
+    });
+
+    syncCalendarModalCloseBtn.addEventListener('click', () => {
+        syncCalendarModal.style.display = 'none';
+    });
+    
+    copyCalendarUrlBtn.addEventListener('click', () => {
+        calendarUrlInput.select();
+        document.execCommand('copy');
+        alert('Calendar URL copied to clipboard!');
+    });
+
 
     document.body.addEventListener('click', function(event) {
         const copyBtn = event.target.closest('#copy-household-code-btn');
@@ -2216,5 +2278,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             document.body.removeChild(textArea);
         }
+    });
+
+    // Listen for changes on all allergy/restriction checkboxes
+    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]').forEach(checkbox => {
+        checkbox.addEventListener('change', saveUserPreferences);
     });
 });

@@ -2,12 +2,13 @@
 
 const functions = require("firebase-functions");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onRequest } = require("firebase-functions/v2/https"); // Added for webhook
+const { onRequest } = require("firebase-functions/v2/https"); // Added for webhook and calendar
 const { defineString } = require("firebase-functions/params");
 const { GoogleAuth } = require("google-auth-library");
 const admin = require("firebase-admin");
 const { DocumentProcessorServiceClient } = require('@google-cloud/documentai').v1;
 const stripePackage = require('stripe'); // Import the package
+const ics = require('ics'); // Import the ics library
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -77,9 +78,54 @@ const fetchWithTimeout = async (url, options, timeout = 530000) => {
 // --- HELPER: Delay function ---
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
+// --- NEW HELPER: Scan Quota Management ---
+const checkAndIncrementScanUsage = async (householdId) => {
+    const householdRef = db.collection('households').doc(householdId);
+    const householdDoc = await householdRef.get();
+    const householdData = householdDoc.data();
+
+    if (householdData.subscriptionTier === 'paid') {
+        return { allowed: true };
+    }
+
+    const usage = householdData.scanUsage || { count: 0, resetDate: new Date(0) };
+    const now = new Date();
+    const resetDate = usage.resetDate.toDate();
+
+    if (now > resetDate) {
+        usage.count = 0;
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        usage.resetDate = admin.firestore.Timestamp.fromDate(nextMonth);
+    }
+
+    const FREE_SCAN_LIMIT = 10;
+    if (usage.count >= FREE_SCAN_LIMIT) {
+        return { allowed: false, limit: FREE_SCAN_LIMIT };
+    }
+
+    usage.count += 1;
+    await householdRef.update({ scanUsage: usage });
+
+    return { allowed: true };
+};
+
 
 // --- CLOUD FUNCTION (V2): identifyItems ---
 exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1" }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+    const userDoc = await db.collection('users').doc(request.auth.uid).get();
+    const householdId = userDoc.data()?.householdId;
+    if (!householdId) {
+        throw new HttpsError('failed-precondition', 'User is not part of a household.');
+    }
+
+    const quotaCheck = await checkAndIncrementScanUsage(householdId);
+    if (!quotaCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${quotaCheck.limit} of your free scans for the month.`);
+    }
+    
     const base64ImageData = request.data.image;
     
     try {
@@ -461,6 +507,20 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
 
 
 exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1" }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+    const userDoc = await db.collection('users').doc(request.auth.uid).get();
+    const householdId = userDoc.data()?.householdId;
+    if (!householdId) {
+        throw new HttpsError('failed-precondition', 'User is not part of a household.');
+    }
+
+    const quotaCheck = await checkAndIncrementScanUsage(householdId);
+    if (!quotaCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${quotaCheck.limit} of your free scans for the month.`);
+    }
+
     const { image } = request.data;
     const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
     const location = documentAiLocation.value(); 
@@ -522,6 +582,98 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1" }, asy
     }
 });
 
+// --- NEW/UPDATED FUNCTION: calendarFeed ---
+const getWeekId = (date = new Date()) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+};
+
+const getStartOfWeek = (date = new Date()) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day;
+    return new Date(d.setDate(diff));
+};
+
+
+exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
+    const { householdId } = req.query;
+
+    if (!householdId) {
+        res.status(400).send("Missing required query parameter: householdId");
+        return;
+    }
+
+    try {
+        const events = [];
+        const today = new Date();
+        const numberOfWeeks = 5; // Current week + next 4 weeks
+
+        for (let i = 0; i < numberOfWeeks; i++) {
+            const targetDate = new Date(today);
+            targetDate.setDate(today.getDate() + (i * 7));
+            
+            const weekId = getWeekId(targetDate);
+            const weekStartDate = getStartOfWeek(targetDate);
+
+            const mealPlanRef = db.collection('households').doc(householdId).collection('mealPlan').doc(weekId);
+            const mealPlanDoc = await mealPlanRef.get();
+
+            if (mealPlanDoc.exists) {
+                const plan = mealPlanDoc.data().meals || {};
+                const dayIndexMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+                const mealTimes = { breakfast: 8, lunch: 13, dinner: 19 };
+
+                for (const day in plan) {
+                    const dayOffset = dayIndexMap[day];
+                    if (dayOffset === undefined) continue;
+
+                    const eventDate = new Date(weekStartDate);
+                    eventDate.setDate(eventDate.getDate() + dayOffset);
+
+                    for (const meal in plan[day]) {
+                        const hour = mealTimes[meal];
+                        if (hour === undefined) continue;
+
+                        for (const recipeId in plan[day][meal]) {
+                            const recipe = plan[day][meal][recipeId];
+                            const event = {
+                                title: `${meal.charAt(0).toUpperCase() + meal.slice(1)}: ${recipe.title}`,
+                                start: [eventDate.getFullYear(), eventDate.getMonth() + 1, eventDate.getDate(), hour, 0],
+                                duration: { hours: 1 },
+                                description: `Recipe: ${recipe.title}\n\n${recipe.description || ''}`,
+                                calName: 'Household Meal Plan',
+                                productId: 'household-meal-planner/ics'
+                            };
+                            events.push(event);
+                        }
+                    }
+                }
+            }
+        }
+
+        const { error, value } = ics.createEvents(events);
+
+        if (error) {
+            console.error("Error creating ICS file:", error);
+            res.status(500).send("Could not generate calendar file.");
+            return;
+        }
+
+        res.setHeader('Content-Type', 'text/calendar');
+        res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate'); // Cache for 1 hour
+        res.status(200).send(value);
+
+    } catch (error) {
+        console.error("Error in calendarFeed function:", error);
+        res.status(500).send("An internal error occurred.");
+    }
+});
+
+
 // --- Stripe Cloud Functions ---
 
 exports.createStripeCheckout = onCall(async (request) => {
@@ -555,13 +707,13 @@ exports.createStripeCheckout = onCall(async (request) => {
                         name: 'Premium Household Plan',
                         description: 'Unlock all premium features for your household.',
                     },
-                    unit_amount: 999, // e.g., $9.99
+                    unit_amount: 399, // e.g., $3.99
                 },
                 quantity: 1,
             }],
             mode: 'payment',
-            success_url: `https://family-dinner-app-79249.web.app?payment_success=true`,
-            cancel_url: `https://family-dinner-app-79249.web.app?payment_cancel=true`,
+            success_url: `https://householdmealplanner.online?payment_success=true`,
+            cancel_url: `https://householdmealplanner.online?payment_cancel=true`,
             metadata: {
                 householdId: householdId
             }
