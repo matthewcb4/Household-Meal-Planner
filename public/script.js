@@ -24,7 +24,7 @@ const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna
 
 
 // --- GLOBAL VARIABLES ---
-let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
+let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeHousehold = () => {}, unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
 let unitSystem = 'imperial';
 let calendarDate = new Date(); 
 let selectedDates = []; 
@@ -139,6 +139,13 @@ const calendarUrlInput = document.getElementById('calendar-url-input');
 const copyCalendarUrlBtn = document.getElementById('copy-calendar-url-btn');
 
 // --- HELPER FUNCTIONS ---
+
+function showToast(message) {
+    const toast = document.getElementById('toast-notification');
+    toast.textContent = message;
+    toast.className = 'show';
+    setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+}
 
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
@@ -706,7 +713,7 @@ async function addItemsToPantry() {
     const pantrySnapshot = await getDocs(pantryRef);
     const existingPantryItems = {};
     pantrySnapshot.forEach(doc => {
-        existingPantryItems[doc.data().name] = { id: doc.id, ...doc.data() };
+        existingPantryItems[doc.data().name.toLowerCase()] = { id: doc.id, ...doc.data() };
     });
 
     const batch = writeBatch(db);
@@ -723,8 +730,8 @@ async function addItemsToPantry() {
                 const itemRef = doc(pantryRef, existingItem.id);
                 batch.update(itemRef, { quantity: newQuantity });
             } else {
-                const newItemRef = doc(collection(pantryRef));
-                batch.set(newItemRef, { name, quantity, unit, category, addedBy: currentUser.email });
+                const newItemRef = doc(pantryRef);
+                batch.set(newItemRef, { name, quantity, unit, category, addedBy: currentUser.email, createdAt: serverTimestamp() });
             }
         }
     });
@@ -1398,6 +1405,11 @@ function openCameraFor(mode, placeholderElement) {
     scanMode = mode;
     placeholderElement.appendChild(scanItemContainer);
     scanItemContainer.style.display = 'block';
+    // **FIX**: Reset the UI to prevent showing old images
+    capturedImageElement.style.display = 'none';
+    capturedImageElement.src = '';
+    itemConfirmationList.innerHTML = '';
+    confirmationSection.style.display = 'none';
 }
 
 function navigateWeek(direction) {
@@ -1488,34 +1500,62 @@ async function initializeAppUI(user) {
     welcomeMessage.style.display = 'inline';
 
     const userDocRef = doc(db, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
+    let userDoc = await getDoc(userDocRef);
 
-    if (userDoc.exists()) {
-        userPreferences = userDoc.data().preferences || {};
-        if (userDoc.data().householdId) {
-            householdId = userDoc.data().householdId;
-            const householdRef = doc(db, 'households', householdId);
-            const householdDoc = await getDoc(householdRef);
-            householdData = householdDoc.data();
+    if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+            email: user.email,
+            householdId: null,
+            hasSeenHowToGuide: false,
+            preferences: {}
+        });
+        userDoc = await getDoc(userDocRef); 
+    }
 
-            householdManager.style.display = 'none';
-            appContent.style.display = 'block';
-            householdInfo.innerHTML = `
-                <span>Invite Code: <strong id="household-code-text">${householdId}</strong></span>
-                <button id="copy-household-code-btn" title="Copy Code"><i class="far fa-copy"></i></button>
-            `;
-            householdInfo.style.display = 'flex';
-            householdStatusInfo.style.display = 'block';
-            startApp();
-            if (!userDoc.data().hasSeenHowToGuide) {
-                showHowToModal();
+    userPreferences = userDoc.data().preferences || {};
+    if (userDoc.data().householdId) {
+        householdId = userDoc.data().householdId;
+        const householdRef = doc(db, 'households', householdId);
+
+        // **FIX**: Set up a real-time listener for the household document.
+        unsubscribeHousehold(); // Unsubscribe from any previous listener
+        unsubscribeHousehold = onSnapshot(householdRef, (householdDoc) => {
+            if (householdDoc.exists()) {
+                householdData = householdDoc.data();
+
+                householdManager.style.display = 'none';
+                appContent.style.display = 'block';
+                householdInfo.innerHTML = `
+                    <span>Invite Code: <strong id="household-code-text">${householdId}</strong></span>
+                    <button id="copy-household-code-btn" title="Copy Code"><i class="far fa-copy"></i></button>
+                `;
+                householdInfo.style.display = 'flex';
+                householdStatusInfo.style.display = 'block';
+                
+                const scanQuotaInfo = document.getElementById('scan-quota-info');
+                if (householdData.subscriptionTier === 'free') {
+                    const scansUsed = householdData.scanUsage?.count || 0;
+                    const scansLeft = 20 - scansUsed;
+                    scanQuotaInfo.textContent = `Free Scans Left: ${scansLeft} / 20`;
+                    scanQuotaInfo.style.display = 'block';
+                } else {
+                    scanQuotaInfo.style.display = 'none';
+                }
+                
+                // Re-configure UI elements that depend on subscription status
+                configurePaywallUI();
             }
-        } else {
-            householdManager.style.display = 'block';
-            appContent.style.display = 'none';
-            householdInfo.style.display = 'none';
-            householdStatusInfo.style.display = 'none';
+        });
+
+        startApp();
+        if (!userDoc.data().hasSeenHowToGuide) {
+            showHowToModal();
         }
+    } else {
+        householdManager.style.display = 'block';
+        appContent.style.display = 'none';
+        householdInfo.style.display = 'none';
+        householdStatusInfo.style.display = 'none';
     }
 }
 
@@ -1601,7 +1641,7 @@ async function handlePlanSingleDayClick(event) {
         });
         const dayPlan = result.data;
 
-        if (dayPlan && Object.keys(dayPlan).length > 0) {
+        if (dayPlan && Object.keys(newDayPlan).length > 0) {
             await setDoc(mealPlanRef, { meals: { [dayAbbr]: dayPlan } }, { merge: true });
         }
 
@@ -1817,6 +1857,7 @@ onAuthStateChanged(auth, async user => {
         await initializeAppUI(user);
     } else {
         currentUser = null; householdId = null; 
+        unsubscribeHousehold();
         unsubscribeMealPlan();
         unsubscribeFavorites();
         signInOptions.style.display = 'flex';
@@ -2255,7 +2296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     copyCalendarUrlBtn.addEventListener('click', () => {
         calendarUrlInput.select();
         document.execCommand('copy');
-        alert('Calendar URL copied to clipboard!');
+        showToast('Calendar URL copied!');
     });
 
 
@@ -2271,10 +2312,10 @@ document.addEventListener('DOMContentLoaded', () => {
             textArea.select();
             try {
                 document.execCommand('copy');
-                alert('Household code copied to clipboard!');
+                showToast('Household code copied!');
             } catch (err) {
                 console.error('Fallback: Oops, unable to copy', err);
-                alert('Could not copy code. Please select it manually.');
+                showToast('Could not copy code.');
             }
             document.body.removeChild(textArea);
         }

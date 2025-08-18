@@ -57,7 +57,7 @@ const getPexelsImage = async (query) => {
 };
 
 // --- CONSTANT: Define the AI model name ---
-const GEMINI_MODEL_NAME = "gemini-2.5-flash-lite";
+const GEMINI_MODEL_NAME = "gemini-2.5-flash";
 
 // Helper function to add a timeout to fetch calls
 const fetchWithTimeout = async (url, options, timeout = 530000) => {
@@ -78,8 +78,8 @@ const fetchWithTimeout = async (url, options, timeout = 530000) => {
 // --- HELPER: Delay function ---
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// --- NEW HELPER: Scan Quota Management ---
-const checkAndIncrementScanUsage = async (householdId) => {
+// --- SCAN QUOTA MANAGEMENT ---
+const checkScanQuota = async (householdId) => {
     const householdRef = db.collection('households').doc(householdId);
     const householdDoc = await householdRef.get();
     const householdData = householdDoc.data();
@@ -90,23 +90,41 @@ const checkAndIncrementScanUsage = async (householdId) => {
 
     const usage = householdData.scanUsage || { count: 0, resetDate: new Date(0) };
     const now = new Date();
-    const resetDate = usage.resetDate.toDate();
+    const resetDate = usage.resetDate.toDate ? usage.resetDate.toDate() : usage.resetDate;
 
     if (now > resetDate) {
         usage.count = 0;
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        usage.resetDate = admin.firestore.Timestamp.fromDate(nextMonth);
     }
 
-    const FREE_SCAN_LIMIT = 10;
+    const FREE_SCAN_LIMIT = 20; // Updated limit
     if (usage.count >= FREE_SCAN_LIMIT) {
         return { allowed: false, limit: FREE_SCAN_LIMIT };
     }
-
-    usage.count += 1;
-    await householdRef.update({ scanUsage: usage });
-
     return { allowed: true };
+};
+
+const incrementScanUsage = async (householdId) => {
+    const householdRef = db.collection('households').doc(householdId);
+    const householdDoc = await householdRef.get();
+    const householdData = householdDoc.data();
+
+    if (householdData.subscriptionTier === 'paid') {
+        return; // Don't increment for paid users
+    }
+    
+    const usage = householdData.scanUsage || { count: 0, resetDate: new Date(0) };
+    const now = new Date();
+    const resetDate = usage.resetDate.toDate ? usage.resetDate.toDate() : usage.resetDate;
+
+    if (now > resetDate) {
+        usage.count = 1; // Reset and set to 1
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        usage.resetDate = admin.firestore.Timestamp.fromDate(nextMonth);
+    } else {
+        usage.count += 1;
+    }
+    
+    await householdRef.update({ scanUsage: usage });
 };
 
 
@@ -121,7 +139,7 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1" }, a
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const quotaCheck = await checkAndIncrementScanUsage(householdId);
+    const quotaCheck = await checkScanQuota(householdId);
     if (!quotaCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${quotaCheck.limit} of your free scans for the month.`);
     }
@@ -154,10 +172,26 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1" }, a
         }
 
         const responseData = await aiResponse.json();
-        const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
-        return JSON.parse(jsonTextResponse);
+        
+        if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
+            const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
+            const items = JSON.parse(jsonTextResponse);
+            if (items.length > 0) {
+                await incrementScanUsage(householdId);
+            }
+            return items;
+        } else {
+            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
+            if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].finishReason === 'SAFETY') {
+                 throw new HttpsError('invalid-argument', 'The request was blocked due to safety concerns. Please try a different image.');
+            }
+            throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
+        }
     } catch (error) {
         console.error("Internal Function Error in identifyItems:", error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
         throw new HttpsError('internal', "AI processing failed due to an internal error.");
     }
 });
@@ -193,14 +227,19 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, 
             throw new HttpsError('internal', `AI API request failed with status ${aiResponse.status}`);
         }
         const responseData = await aiResponse.json();
-        const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
-        const recipes = JSON.parse(jsonTextResponse);
-
-        for (const recipe of recipes) {
-            recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+        
+        if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
+            const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
+            const recipes = JSON.parse(jsonTextResponse);
+            for (const recipe of recipes) {
+                recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+            }
+            return recipes;
+        } else {
+            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
+            throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }
 
-        return recipes;
     } catch (error) {
         console.error("Internal Recipe Function Error:", error);
         throw new HttpsError('internal', "AI recipe generation failed.");
@@ -238,14 +277,19 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" },
             throw new HttpsError('internal', `AI API request failed with status ${aiResponse.status}`);
         }
         const responseData = await aiResponse.json();
-        const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
-        const recipes = JSON.parse(jsonTextResponse);
-
-        for (const recipe of recipes) {
-            recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+        
+        if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
+            const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
+            const recipes = JSON.parse(jsonTextResponse);
+            for (const recipe of recipes) {
+                recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+            }
+            return recipes;
+        } else {
+            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
+            throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }
 
-        return recipes;
     } catch (error) {
         console.error("Internal Discover Function Error:", error);
         throw new HttpsError('internal', "AI recipe discovery failed.");
@@ -289,12 +333,17 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1" }, asyn
         }
 
         const responseData = await aiResponse.json();
-        const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
-        const recipe = JSON.parse(jsonTextResponse);
+        
+        if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
+            const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
+            const recipe = JSON.parse(jsonTextResponse);
+            recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+            return recipe;
+        } else {
+            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
+            throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
+        }
 
-        recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
-
-        return recipe;
     } catch (error) {
         console.error("Internal Ask the Chef Function Error:", error);
         throw new HttpsError('internal', "AI recipe generation failed for the specified query.");
@@ -478,6 +527,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
         }
 
         const responseData = await aiResponse.json();
+        
         if (!responseData.candidates || !responseData.candidates[0].content || !responseData.candidates[0].content.parts[0].text) {
             console.error(`Invalid AI response structure for ${day}:`, responseData);
             throw new HttpsError('internal', `Invalid AI response for ${day}`);
@@ -516,7 +566,7 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1" }, asy
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const quotaCheck = await checkAndIncrementScanUsage(householdId);
+    const quotaCheck = await checkScanQuota(householdId);
     if (!quotaCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${quotaCheck.limit} of your free scans for the month.`);
     }
@@ -574,7 +624,17 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1" }, asy
         }
 
         const responseData = await aiResponse.json();
-        return JSON.parse(responseData.candidates[0].content.parts[0].text);
+        
+        if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
+            const items = JSON.parse(responseData.candidates[0].content.parts[0].text);
+            if (items.length > 0) {
+                await incrementScanUsage(householdId);
+            }
+            return items;
+        } else {
+             console.error("Unexpected AI API response structure in scanReceipt:", JSON.stringify(responseData));
+             throw new HttpsError('internal', 'Failed to parse the categorization response from the AI service.');
+        }
 
     } catch (error) {
         console.error("Error in scanReceipt function:", error);
