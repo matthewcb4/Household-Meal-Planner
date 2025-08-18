@@ -971,7 +971,10 @@ async function captureAndScan() {
             }
             const batch = writeBatch(db);
             identifiedItems.forEach(item => {
-                const newItemRef = doc(collection(groceryRef));
+                // FIX: The collection() function was being used incorrectly here.
+                // To create a new document in a collection, you pass the CollectionReference
+                // directly to the doc() function.
+                const newItemRef = doc(groceryRef);
                 batch.set(newItemRef, { name: item.name.toLowerCase(), category: item.category || 'Other', checked: false, createdAt: serverTimestamp() });
             });
             await batch.commit();
