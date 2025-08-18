@@ -59,8 +59,7 @@ const cameraContainer = document.getElementById('camera-container');
 const videoElement = document.getElementById('camera-stream');
 const canvasElement = document.getElementById('capture-canvas');
 const capturedImageElement = document.getElementById('captured-image');
-const expandAllBtn = document.getElementById('expand-all-btn');
-const collapseAllBtn = document.getElementById('collapse-all-btn');
+const toggleAllPantryBtn = document.getElementById('toggle-all-pantry-btn');
 const showManualAddBtn = document.getElementById('show-manual-add-btn');
 const showScanItemBtn = document.getElementById('show-scan-item-btn');
 const showScanReceiptBtn = document.getElementById('show-scan-receipt-btn');
@@ -126,8 +125,7 @@ const emailSignupForm = document.getElementById('email-signup-form');
 const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
 const authError = document.getElementById('auth-error');
 const upgradeBtnHeader = document.getElementById('upgrade-btn-header');
-const expandAllGroceryBtn = document.getElementById('expand-all-grocery-btn');
-const collapseAllGroceryBtn = document.getElementById('collapse-all-grocery-btn');
+const toggleAllGroceryBtn = document.getElementById('toggle-all-grocery-btn');
 const feedbackBtn = document.getElementById('feedback-btn');
 const feedbackModal = document.getElementById('feedback-modal');
 const feedbackModalCloseBtn = document.getElementById('feedback-modal-close-btn');
@@ -971,9 +969,6 @@ async function captureAndScan() {
             }
             const batch = writeBatch(db);
             identifiedItems.forEach(item => {
-                // FIX: The collection() function was being used incorrectly here.
-                // To create a new document in a collection, you pass the CollectionReference
-                // directly to the doc() function.
                 const newItemRef = doc(groceryRef);
                 batch.set(newItemRef, { name: item.name.toLowerCase(), category: item.category || 'Other', checked: false, createdAt: serverTimestamp() });
             });
@@ -1383,18 +1378,17 @@ async function handleBulkDelete(collectionRef, checkedItemsSelector) {
     }
 }
 
-function handleExpandCollapseAll(expand) {
-    const allLists = pantryListDiv.querySelectorAll('ul');
-    const allToggles = pantryListDiv.querySelectorAll('.category-toggle');
-    allLists.forEach(list => list.style.display = expand ? 'block' : 'none');
-    allToggles.forEach(toggle => toggle.textContent = expand ? '−' : '+');
-}
+function handleToggleAll(listElement, buttonElement) {
+    const allLists = listElement.querySelectorAll('ul');
+    if (allLists.length === 0) return;
 
-function handleExpandCollapseAllGrocery(expand) {
-    const allLists = groceryList.querySelectorAll('ul');
-    const allToggles = groceryList.querySelectorAll('.category-toggle');
-    allLists.forEach(list => list.style.display = expand ? 'block' : 'none');
-    allToggles.forEach(toggle => toggle.textContent = expand ? '−' : '+');
+    // Determine if we should expand or collapse based on the first list's state
+    const shouldExpand = allLists[0].style.display === 'none';
+
+    const allToggles = listElement.querySelectorAll('.category-toggle');
+    allLists.forEach(list => list.style.display = shouldExpand ? 'block' : 'none');
+    allToggles.forEach(toggle => toggle.textContent = shouldExpand ? '−' : '+');
+    buttonElement.textContent = shouldExpand ? 'Collapse All' : 'Expand All';
 }
 
 
@@ -1454,9 +1448,16 @@ function switchTab(event) {
 function configurePaywallUI() {
     if (!householdData) return;
     const premiumFeatures = document.querySelectorAll('.premium-feature');
-    householdStatusInfo.textContent = `Status: ${householdData.subscriptionTier.charAt(0).toUpperCase() + householdData.subscriptionTier.slice(1)}`;
+    const scanQuotaInfo = document.getElementById('scan-quota-info');
+    
+    let statusText = `Status: ${householdData.subscriptionTier.charAt(0).toUpperCase() + householdData.subscriptionTier.slice(1)}`;
 
     if (householdData.subscriptionTier === 'free') {
+        const scansUsed = householdData.scanUsage?.count || 0;
+        const scansLeft = 20 - scansUsed;
+        statusText += ` (${scansLeft} / 20 Scans Left)`;
+        scanQuotaInfo.style.display = 'none'; // Hide the old element
+
         upgradeBtnHeader.style.display = 'block';
         premiumFeatures.forEach(el => {
             el.classList.add('disabled');
@@ -1481,6 +1482,7 @@ function configurePaywallUI() {
         cuisineSelect.value = householdData.cuisine || "";
 
     } else { // Paid tier
+        scanQuotaInfo.style.display = 'none'; // Also hide for paid users
         upgradeBtnHeader.style.display = 'none';
         premiumFeatures.forEach(el => {
             el.classList.remove('disabled');
@@ -1492,6 +1494,8 @@ function configurePaywallUI() {
         cuisineSelect.disabled = false;
         cuisineSelect.value = householdData.cuisine || "";
     }
+
+    householdStatusInfo.textContent = statusText;
 }
 
 
@@ -1520,7 +1524,7 @@ async function initializeAppUI(user) {
         householdId = userDoc.data().householdId;
         const householdRef = doc(db, 'households', householdId);
 
-        // **FIX**: Set up a real-time listener for the household document.
+        // Set up a real-time listener for the household document.
         unsubscribeHousehold(); // Unsubscribe from any previous listener
         unsubscribeHousehold = onSnapshot(householdRef, (householdDoc) => {
             if (householdDoc.exists()) {
@@ -1534,16 +1538,6 @@ async function initializeAppUI(user) {
                 `;
                 householdInfo.style.display = 'flex';
                 householdStatusInfo.style.display = 'block';
-                
-                const scanQuotaInfo = document.getElementById('scan-quota-info');
-                if (householdData.subscriptionTier === 'free') {
-                    const scansUsed = householdData.scanUsage?.count || 0;
-                    const scansLeft = 20 - scansUsed;
-                    scanQuotaInfo.textContent = `Free Scans Left: ${scansLeft} / 20`;
-                    scanQuotaInfo.style.display = 'block';
-                } else {
-                    scanQuotaInfo.style.display = 'none';
-                }
                 
                 // Re-configure UI elements that depend on subscription status
                 configurePaywallUI();
@@ -1642,10 +1636,12 @@ async function handlePlanSingleDayClick(event) {
             pantryItems: pantryItems,
             existingMeals: existingMealsForDay
         });
-        const dayPlan = result.data;
+        const newDayPlan = result.data;
 
-        if (dayPlan && Object.keys(newDayPlan).length > 0) {
-            await setDoc(mealPlanRef, { meals: { [dayAbbr]: dayPlan } }, { merge: true });
+        if (newDayPlan && Object.keys(newDayPlan).length > 0) {
+            // Correctly merge new meals with existing ones for the day
+            const dayUpdate = { ...currentMeals[dayAbbr], ...newDayPlan };
+            await setDoc(mealPlanRef, { meals: { [dayAbbr]: dayUpdate } }, { merge: true });
         }
 
     } catch (error) {
@@ -2208,10 +2204,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    expandAllBtn.addEventListener('click', () => handleExpandCollapseAll(true));
-    collapseAllBtn.addEventListener('click', () => handleExpandCollapseAll(false));
-    expandAllGroceryBtn.addEventListener('click', () => handleExpandCollapseAllGrocery(true));
-    collapseAllGroceryBtn.addEventListener('click', () => handleExpandCollapseAllGrocery(false));
+    toggleAllPantryBtn.addEventListener('click', () => handleToggleAll(pantryListDiv, toggleAllPantryBtn));
+    toggleAllGroceryBtn.addEventListener('click', () => handleToggleAll(groceryList, toggleAllGroceryBtn));
 
 
     document.querySelectorAll('.collapsible-header').forEach(header => {

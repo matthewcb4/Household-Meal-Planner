@@ -87,7 +87,7 @@
                                  <div class="sub-criteria-group">
                                     <h4>Main Preference</h4>
                                     <div class="checkbox-group">
-                                        <label><input type="checkbox" id="use-pantry-items-checkbox" class="premium-feature"><span>Use Pantry Items</span></label>
+                                        <label><input type="checkbox" id="use-pantry-items-checkbox"><span>Use Pantry Items</span></label>
                                     </div>
                                 </div>
                                 <div class="sub-criteria-group">
@@ -117,11 +117,11 @@
                                 </div>
                             </div>
                             <div class="criteria-group">
-                                <div class="sub-criteria-group">
-                                    <h4>Other</h4>
+                                <div class="sub-criteria-group premium-feature">
+                                    <h4>Other <span class="premium-tag">Premium</span></h4>
                                      <div class="checkbox-group">
-                                        <label><input type="checkbox" name="plannerCriteria" value="Budget-Friendly" class="premium-feature"><span>Budget-Friendly <span class="premium-tag">Premium</span></span></label>
-                                        <label><input type="checkbox" name="plannerCriteria" value="Spicy" class="premium-feature"><span>Spicy <span class="premium-tag">Premium</span></span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
+                                        <label><input type="checkbox" name="plannerCriteria" value="Spicy"><span>Spicy</span></label>
                                     </div>
                                     <div class="disabled-feature-teaser" style="margin-top: 1rem;">
                                         <h5>Filter Ingredients <span class="v2-tag">V2</span></h5>
@@ -206,11 +206,11 @@
                                             <label><input type="checkbox" name="recipeCriteria" value="High Protein"><span>High Protein</span></label>
                                         </div>
                                     </div>
-                                    <div class="sub-criteria-group">
-                                        <h4>Other</h4>
+                                    <div class="sub-criteria-group premium-feature">
+                                        <h4>Other <span class="premium-tag">Premium</span></h4>
                                          <div class="checkbox-group">
-                                            <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly" class="premium-feature"><span>Budget-Friendly <span class="premium-tag">Premium</span></span></label>
-                                            <label><input type="checkbox" name="plannerCriteria" value="Spicy" class="premium-feature"><span>Spicy <span class="premium-tag">Premium</span></span></label>
+                                            <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly"><span>Budget-Friendly <span class="premium-tag">Premium</span></span></label>
+                                            <label><input type="checkbox" name="plannerCriteria" value="Spicy"><span>Spicy <span class="premium-tag">Premium</span></span></label>
                                         </div>
                                         <div class="disabled-feature-teaser" style="margin-top: 1rem;">
                                             <h5>Filter Ingredients <span class="v2-tag">V2</span></h5>
@@ -272,8 +272,7 @@
                 <div class="pantry-header" style="margin-top: 24px;">
                     <h3>Pantry Items</h3>
                     <div class="pantry-controls">
-                        <button id="expand-all-btn" class="secondary">Expand All</button>
-                        <button id="collapse-all-btn" class="secondary">Collapse All</button>
+                        <button id="toggle-all-pantry-btn" class="secondary">Expand All</button>
                     </div>
                 </div>
                 <div id="pantry-bulk-controls" class="bulk-controls" style="display: none;">
@@ -300,8 +299,7 @@
                 <div class="pantry-header" style="margin-top: 24px;">
                     <h3>Your Items</h3>
                     <div class="pantry-controls">
-                        <button id="expand-all-grocery-btn" class="secondary">Expand All</button>
-                        <button id="collapse-all-grocery-btn" class="secondary">Collapse All</button>
+                        <button id="toggle-all-grocery-btn" class="secondary">Expand All</button>
                     </div>
                 </div>
                 <div id="grocery-bulk-controls" class="bulk-controls" style="display: none;">
