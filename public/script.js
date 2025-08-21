@@ -1445,6 +1445,25 @@ function switchTab(event) {
     event.target.classList.add('active');
 }
 
+async function grantTrial(householdIdToGrant) {
+  if (!householdIdToGrant) {
+    console.error("Household ID is required.");
+    return;
+  }
+  console.log(`Attempting to grant trial for household: ${householdIdToGrant}`);
+  try {
+    const grantTrialAccessFunc = httpsCallable(functions, 'grantTrialAccess');
+    const result = await grantTrialAccessFunc({ householdIdToGrant: householdIdToGrant });
+    console.log("Trial grant successful:", result.data.message);
+    alert(`Successfully granted trial access to household ${householdIdToGrant}!`);
+  } catch (error) {
+    console.error("Error granting trial access:", error);
+    alert(`Failed to grant trial: ${error.message}`);
+  }
+}
+// FIX: Make the grantTrial function globally accessible for the console
+window.grantTrial = grantTrial;
+
 function configurePaywallUI() {
     if (!householdData) return;
     const premiumFeatures = document.querySelectorAll('.premium-feature');

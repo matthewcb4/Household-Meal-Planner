@@ -1,14 +1,15 @@
-// index.js (Cloud Functions) - Updated to V2 Syntax
+// index.js (Cloud Functions) - Updated to V2 Syntax with Trial Logic
 
 const functions = require("firebase-functions");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onRequest } = require("firebase-functions/v2/https"); // Added for webhook and calendar
+const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler"); // Import for scheduled function
 const { defineString } = require("firebase-functions/params");
 const { GoogleAuth } = require("google-auth-library");
 const admin = require("firebase-admin");
 const { DocumentProcessorServiceClient } = require('@google-cloud/documentai').v1;
-const stripePackage = require('stripe'); // Import the package
-const ics = require('ics'); // Import the ics library
+const stripePackage = require('stripe');
+const ics = require('ics');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -17,6 +18,30 @@ const db = admin.firestore();
 const pexelsKey = defineString("PEXELS_KEY");
 const documentAiProcessorId = defineString("DOCUMENT_AI_PROCESSOR_ID");
 const documentAiLocation = defineString("DOCUMENT_AI_LOCATION");
+
+// --- NEW HELPER: Check for Premium Status (Handles Trials) ---
+/**
+ * Checks if a household has an active premium subscription or trial.
+ * @param {object} householdData The household document data.
+ * @returns {boolean} True if the household is considered premium.
+ */
+const isPremium = (householdData) => {
+    if (!householdData || householdData.subscriptionTier !== 'paid') {
+        return false;
+    }
+    // If it's 'paid', check if there's an expiry date that has passed
+    if (householdData.premiumAccessUntil) {
+        const now = new Date();
+        const expiryDate = householdData.premiumAccessUntil.toDate();
+        // If the expiry date is in the past, they are not premium
+        if (now >= expiryDate) {
+            return false;
+        }
+    }
+    // If subscriptionTier is 'paid' and there's no expiry or the expiry is in the future, they are premium.
+    return true;
+};
+
 
 // --- HELPER: Pexels Image Fetching Function ---
 const getPexelsImage = async (query) => {
@@ -34,7 +59,7 @@ const getPexelsImage = async (query) => {
 
         if (!response.ok) {
             const errorBody = await response.text();
-            console.error(`Pexels API error: ${response.statusText} for query "${query}"`, errorBody); // Enhanced logging
+            console.error(`Pexels API error: ${response.statusText} for query "${query}"`, errorBody);
             return null;
         }
 
@@ -78,13 +103,13 @@ const fetchWithTimeout = async (url, options, timeout = 530000) => {
 // --- HELPER: Delay function ---
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// --- SCAN QUOTA MANAGEMENT ---
+// --- SCAN QUOTA MANAGEMENT (UPDATED to use isPremium helper) ---
 const checkScanQuota = async (householdId) => {
     const householdRef = db.collection('households').doc(householdId);
     const householdDoc = await householdRef.get();
     const householdData = householdDoc.data();
 
-    if (householdData.subscriptionTier === 'paid') {
+    if (isPremium(householdData)) {
         return { allowed: true };
     }
 
@@ -96,7 +121,7 @@ const checkScanQuota = async (householdId) => {
         usage.count = 0;
     }
 
-    const FREE_SCAN_LIMIT = 20; // Updated limit
+    const FREE_SCAN_LIMIT = 20;
     if (usage.count >= FREE_SCAN_LIMIT) {
         return { allowed: false, limit: FREE_SCAN_LIMIT };
     }
@@ -108,8 +133,8 @@ const incrementScanUsage = async (householdId) => {
     const householdDoc = await householdRef.get();
     const householdData = householdDoc.data();
 
-    if (householdData.subscriptionTier === 'paid') {
-        return; // Don't increment for paid users
+    if (isPremium(householdData)) {
+        return; // Don't increment for premium users
     }
     
     const usage = householdData.scanUsage || { count: 0, resetDate: new Date(0) };
@@ -117,7 +142,7 @@ const incrementScanUsage = async (householdId) => {
     const resetDate = usage.resetDate.toDate ? usage.resetDate.toDate() : usage.resetDate;
 
     if (now > resetDate) {
-        usage.count = 1; // Reset and set to 1
+        usage.count = 1;
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
         usage.resetDate = admin.firestore.Timestamp.fromDate(nextMonth);
     } else {
@@ -741,7 +766,6 @@ exports.createStripeCheckout = onCall(async (request) => {
         throw new HttpsError('unauthenticated', 'You must be logged in to make a purchase.');
     }
 
-    // Initialize Stripe inside the function using process.env
     const stripe = stripePackage(process.env.STRIPE_SECRET_KEY);
 
     try {
@@ -767,7 +791,7 @@ exports.createStripeCheckout = onCall(async (request) => {
                         name: 'Premium Household Plan',
                         description: 'Unlock all premium features for your household.',
                     },
-                    unit_amount: 399, // e.g., $3.99
+                    unit_amount: 399,
                 },
                 quantity: 1,
             }],
@@ -789,7 +813,6 @@ exports.createStripeCheckout = onCall(async (request) => {
 
 
 exports.stripeWebhook = onRequest(async (req, res) => {
-    // Initialize Stripe inside the function using process.env
     const stripe = stripePackage(process.env.STRIPE_SECRET_KEY);
     const signature = req.headers['stripe-signature'];
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -808,14 +831,95 @@ exports.stripeWebhook = onRequest(async (req, res) => {
 
         if (householdId) {
             const householdRef = db.collection('households').doc(householdId);
+            // UPDATED: On successful payment, ensure permanent access by removing any trial expiration date.
             await householdRef.update({
-                subscriptionTier: 'paid'
+                subscriptionTier: 'paid',
+                premiumAccessUntil: admin.firestore.FieldValue.delete()
             });
-            console.log(`Successfully upgraded household ${householdId} to premium.`);
+            console.log(`Successfully upgraded household ${householdId} to permanent premium.`);
         }
     }
 
     res.status(200).send();
+});
+
+// --- NEW CLOUD FUNCTION (V2): grantTrialAccess ---
+// This function is for you to manually grant trial access to beta testers.
+exports.grantTrialAccess = onCall(async (request) => {
+    // SECURITY NOTE: In a real app, you would add checks here to ensure only an admin can run this.
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+
+    const { householdIdToGrant } = request.data;
+    if (!householdIdToGrant) {
+        throw new HttpsError('invalid-argument', 'The function must be called with a "householdIdToGrant".');
+    }
+
+    try {
+        const householdRef = db.collection('households').doc(householdIdToGrant);
+        const householdDoc = await householdRef.get();
+
+        // **FIX**: Changed householdDoc.exists() to householdDoc.exists
+        if (!householdDoc.exists) {
+            throw new HttpsError('not-found', `Household with ID ${householdIdToGrant} not found.`);
+        }
+
+        const now = new Date();
+        const trialEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+        await householdRef.update({
+            subscriptionTier: 'paid', // Treat them as 'paid' during the trial
+            premiumAccessUntil: admin.firestore.Timestamp.fromDate(trialEndDate)
+        });
+
+        console.log(`Granted 30-day premium trial to household ${householdIdToGrant}. Expires on ${trialEndDate.toISOString()}`);
+        return { success: true, message: `Trial granted until ${trialEndDate.toLocaleDateString()}.` };
+
+    } catch (error) {
+        console.error("Error in grantTrialAccess function:", error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', 'An unexpected error occurred while granting trial access.');
+    }
+});
+
+
+// --- NEW CLOUD FUNCTION (V2): checkTrialExpirations (Scheduled) ---
+// This function will run automatically every 24 hours to check for and revoke expired trials.
+exports.checkTrialExpirations = onSchedule('every 24 hours', async (event) => {
+    console.log("Running scheduled job to check for expired premium trials...");
+
+    const now = admin.firestore.Timestamp.now();
+    const expiredTrialsQuery = db.collection('households')
+        .where('premiumAccessUntil', '<=', now);
+
+    try {
+        const snapshot = await expiredTrialsQuery.get();
+        if (snapshot.empty) {
+            console.log("No expired trials found.");
+            return null;
+        }
+
+        const batch = db.batch();
+        snapshot.forEach(doc => {
+            console.log(`Trial expired for household ${doc.id}. Reverting to free tier.`);
+            const householdRef = db.collection('households').doc(doc.id);
+            batch.update(householdRef, {
+                subscriptionTier: 'free',
+                premiumAccessUntil: admin.firestore.FieldValue.delete() // Remove the field
+            });
+        });
+
+        await batch.commit();
+        console.log(`Successfully processed ${snapshot.size} expired trials.`);
+        return { success: true, processedCount: snapshot.size };
+
+    } catch (error) {
+        console.error("Error in checkTrialExpirations scheduled function:", error);
+        return null;
+    }
 });
 
 // --- NEW: Test Function for Stripe Secret ---
