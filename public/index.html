@@ -12,6 +12,32 @@
     <!-- Font Awesome for social icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        /* Simple footer styles */
+        .app-footer {
+            text-align: center;
+            padding: 2rem;
+            margin-top: 2rem;
+            background-color: var(--light-bg);
+            border-top: 1px solid var(--border-color);
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            list-style: none;
+            padding: 0;
+            margin: 0 0 0.5rem 0;
+        }
+        .footer-links a {
+            color: var(--text-secondary-color);
+            font-weight: 500;
+        }
+        .footer-copyright {
+            font-size: 0.9em;
+            color: var(--secondary-color);
+        }
+    </style>
 </head>
 <body>
     <header class="app-header">
@@ -144,7 +170,7 @@
                     </div>
                 </div>
                 <button id="generate-grocery-list-btn">Generate Grocery List for this Week</button>
-                <div class="button-group" style="margin-top: 1rem;">
+                <div class="button-group" style="margin-top: 2rem;">
                     <button id="sync-calendar-btn" class="secondary premium-feature"><i class="far fa-calendar-alt"></i> Sync with Calendar</button>
                 </div>
             </section>
@@ -458,6 +484,17 @@
         <div id="toast-notification"></div>
 
     </main>
+
+    <!-- ADD THIS FOOTER SECTION -->
+    <footer class="app-footer">
+        <ul class="footer-links">
+            <li><a href="/terms.html" target="_blank">Terms & Conditions</a></li>
+            <li><a href="/privacy.html" target="_blank">Privacy Policy</a></li>
+        </ul>
+        <p class="footer-copyright">&copy; 2025 HouseholdMealPlanner.online. All rights reserved.</p>
+    </footer>
+    <!-- END OF FOOTER SECTION -->
+
     <script type="module" src="script.js"></script>
 </body>
 </html>
