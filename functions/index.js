@@ -1,9 +1,9 @@
-// index.js (Cloud Functions) - Updated to V2 Syntax with Trial Logic
+// index.js (Cloud Functions) - Updated to V2 Syntax with Subscription Logic
 
 const functions = require("firebase-functions");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onRequest } = require("firebase-functions/v2/https");
-const { onSchedule } = require("firebase-functions/v2/scheduler"); // Import for scheduled function
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineString } = require("firebase-functions/params");
 const { GoogleAuth } = require("google-auth-library");
 const admin = require("firebase-admin");
@@ -18,27 +18,23 @@ const db = admin.firestore();
 const pexelsKey = defineString("PEXELS_KEY");
 const documentAiProcessorId = defineString("DOCUMENT_AI_PROCESSOR_ID");
 const documentAiLocation = defineString("DOCUMENT_AI_LOCATION");
+// --- NEW: Add your Stripe Price ID as a secret/param ---
+const stripePriceId = defineString("STRIPE_PRICE_ID");
 
-// --- NEW HELPER: Check for Premium Status (Handles Trials) ---
-/**
- * Checks if a household has an active premium subscription or trial.
- * @param {object} householdData The household document data.
- * @returns {boolean} True if the household is considered premium.
- */
+
+// --- HELPER: Check for Premium Status (Handles Trials & Subscriptions) ---
 const isPremium = (householdData) => {
     if (!householdData || householdData.subscriptionTier !== 'paid') {
         return false;
     }
-    // If it's 'paid', check if there's an expiry date that has passed
     if (householdData.premiumAccessUntil) {
         const now = new Date();
         const expiryDate = householdData.premiumAccessUntil.toDate();
-        // If the expiry date is in the past, they are not premium
         if (now >= expiryDate) {
             return false;
         }
     }
-    // If subscriptionTier is 'paid' and there's no expiry or the expiry is in the future, they are premium.
+    // If subscriptionTier is 'paid' but there's no expiration, it's a legacy permanent plan.
     return true;
 };
 
@@ -759,7 +755,7 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
 });
 
 
-// --- Stripe Cloud Functions ---
+// --- Stripe Cloud Functions (UPDATED FOR SUBSCRIPTIONS) ---
 
 exports.createStripeCheckout = onCall(async (request) => {
     if (!request.auth) {
@@ -781,21 +777,19 @@ exports.createStripeCheckout = onCall(async (request) => {
         if (!householdId) {
             throw new HttpsError('failed-precondition', 'User is not part of a household.');
         }
+        
+        const price = stripePriceId.value();
+        if (!price) {
+            throw new HttpsError('internal', 'Stripe Price ID is not configured.');
+        }
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [{
-                price_data: {
-                    currency: 'usd',
-                    product_data: {
-                        name: 'Premium Household Plan',
-                        description: 'Unlock all premium features for your household.',
-                    },
-                    unit_amount: 399,
-                },
+                price: price,
                 quantity: 1,
             }],
-            mode: 'payment',
+            mode: 'subscription', 
             success_url: `https://householdmealplanner.online?payment_success=true`,
             cancel_url: `https://householdmealplanner.online?payment_cancel=true`,
             metadata: {
@@ -824,19 +818,26 @@ exports.stripeWebhook = onRequest(async (req, res) => {
         console.log(`⚠️  Webhook signature verification failed.`, err.message);
         return res.sendStatus(400);
     }
-
-    if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
-        const householdId = session.metadata.householdId;
+    
+    if (event.type === 'invoice.payment_succeeded') {
+        const invoice = event.data.object;
+        const customerId = invoice.customer;
+        
+        const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+        const householdId = subscription.metadata.householdId;
 
         if (householdId) {
             const householdRef = db.collection('households').doc(householdId);
-            // UPDATED: On successful payment, ensure permanent access by removing any trial expiration date.
+            const now = new Date();
+            const accessEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
             await householdRef.update({
                 subscriptionTier: 'paid',
-                premiumAccessUntil: admin.firestore.FieldValue.delete()
+                premiumAccessUntil: admin.firestore.Timestamp.fromDate(accessEndDate),
+                stripeCustomerId: customerId,
+                stripeSubscriptionId: subscription.id
             });
-            console.log(`Successfully upgraded household ${householdId} to permanent premium.`);
+            console.log(`Successfully granted 30-day premium access to household ${householdId}.`);
         }
     }
 
@@ -860,7 +861,6 @@ exports.grantTrialAccess = onCall(async (request) => {
         const householdRef = db.collection('households').doc(householdIdToGrant);
         const householdDoc = await householdRef.get();
 
-        // **FIX**: Changed householdDoc.exists() to householdDoc.exists
         if (!householdDoc.exists) {
             throw new HttpsError('not-found', `Household with ID ${householdIdToGrant} not found.`);
         }
@@ -881,7 +881,7 @@ exports.grantTrialAccess = onCall(async (request) => {
         if (error instanceof HttpsError) {
             throw error;
         }
-        throw new HttpsError('internal', 'An unexpected error occurred while granting trial access.');
+        throw new HttpsError('internal', 'An error occurred while granting trial access.');
     }
 });
 
