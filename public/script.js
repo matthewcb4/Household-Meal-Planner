@@ -1462,6 +1462,29 @@ async function initializeAppUI(user) {
         appContent.style.display = 'none';
         householdInfo.style.display = 'none';
         householdStatusInfo.style.display = 'none';
+
+        createHouseholdBtn = document.getElementById('create-household-btn');
+        joinHouseholdBtn = document.getElementById('join-household-btn');
+        householdCodeInput = document.getElementById('household-code-input');
+
+        createHouseholdBtn.addEventListener('click', () => {
+             createHouseholdModal.style.display = 'block';
+        });
+
+        joinHouseholdBtn.addEventListener('click', async () => {
+            const code = householdCodeInput.value.trim();
+            if (code) {
+                const householdRef = doc(db, 'households', code);
+                const householdDoc = await getDoc(householdRef);
+                if (householdDoc.exists()) {
+                    await updateDoc(doc(db, 'users', currentUser.uid), { householdId: code });
+                    householdId = code;
+                    initializeAppUI(currentUser); // Re-initialize UI
+                } else {
+                    alert("Household not found. Please check the code.");
+                }
+            }
+        });
     }
 }
 
@@ -1753,6 +1776,21 @@ async function markHowToAsSeen() {
     }
 }
 
+// Helper function to generate a 6-digit code
+async function generateUniqueHouseholdCode() {
+    let newHouseholdId;
+    let householdExists = true;
+    while (householdExists) {
+        newHouseholdId = Math.floor(100000 + Math.random() * 900000).toString();
+        const householdRef = doc(db, 'households', newHouseholdId);
+        const householdDoc = await getDoc(householdRef);
+        if (!householdDoc.exists()) {
+            householdExists = false;
+        }
+    }
+    return newHouseholdId;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Assign DOM elements to variables
     signInBtn = document.getElementById('sign-in-btn');
@@ -1760,9 +1798,6 @@ document.addEventListener('DOMContentLoaded', () => {
     welcomeMessage = document.getElementById('welcome-message');
     appContent = document.getElementById('app-content');
     householdManager = document.getElementById('household-manager');
-    createHouseholdBtn = document.getElementById('create-household-btn');
-    joinHouseholdBtn = document.getElementById('join-household-btn');
-    householdCodeInput = document.getElementById('household-code-input');
     householdInfo = document.getElementById('household-info');
     householdStatusInfo = document.getElementById('household-status-info');
     startCameraBtn = document.getElementById('start-camera-btn');
@@ -1856,16 +1891,149 @@ document.addEventListener('DOMContentLoaded', () => {
     calendarUrlInput = document.getElementById('calendar-url-input');
     copyCalendarUrlBtn = document.getElementById('copy-calendar-url-btn');
 
+    populateCuisineDropdowns();
+
     // Attach Event Listeners
     signInBtn.addEventListener('click', () => {
         const provider = new GoogleAuthProvider();
         signInWithPopup(auth, provider).catch(error => console.error("Sign in error", error));
     });
+    
+    createHouseholdForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const selectedCuisine = householdCuisineSelect.value;
+        const newHouseholdId = await generateUniqueHouseholdCode();
+        const newHouseholdRef = doc(db, 'households', newHouseholdId);
+    
+        try {
+            await setDoc(newHouseholdRef, {
+                createdAt: serverTimestamp(),
+                createdBy: currentUser.uid,
+                members: [currentUser.uid],
+                subscriptionTier: 'free',
+                cuisine: selectedCuisine,
+                lastCuisineUpdate: serverTimestamp(),
+                scanUsage: { count: 0, resetDate: serverTimestamp() }
+            });
+    
+            const userDocRef = doc(db, 'users', currentUser.uid);
+            await updateDoc(userDocRef, {
+                householdId: newHouseholdId
+            });
+    
+            householdId = newHouseholdId;
+            createHouseholdModal.style.display = 'none';
+            await initializeAppUI(currentUser);
+        } catch (error) {
+            console.error("Error creating household:", error);
+            alert("There was an error creating your household. Please try again.");
+        }
+    });
 
     signOutBtn.addEventListener('click', () => signOut(auth));
     planMyWeekBtn.addEventListener('click', handlePlanMyWeek);
-    // ... (add all other event listeners here)
+    
+    // How-To Modal Navigation
+    howToNextBtn.addEventListener('click', () => {
+        if (currentHowToSlide < howToSlides.length - 1) {
+            currentHowToSlide++;
+            updateHowToSlider();
+        }
+    });
 
+    howToPrevBtn.addEventListener('click', () => {
+        if (currentHowToSlide > 0) {
+            currentHowToSlide--;
+            updateHowToSlider();
+        }
+    });
+
+    howToCloseBtn.addEventListener('click', () => {
+        howToModal.style.display = 'none';
+        markHowToAsSeen();
+    });
+
+    // General App Event Listeners
+    document.querySelectorAll('.tab-link').forEach(button => {
+        button.addEventListener('click', switchTab);
+    });
+
+    // Recipe Tab Listeners
+    showIdeasTab.addEventListener('click', () => {
+        ideasContent.style.display = 'block';
+        favoriteRecipesContainer.style.display = 'none';
+        showIdeasTab.classList.add('active');
+        showFavoritesTab.classList.remove('active');
+    });
+
+    showFavoritesTab.addEventListener('click', () => {
+        ideasContent.style.display = 'none';
+        favoriteRecipesContainer.style.display = 'block';
+        showIdeasTab.classList.remove('active');
+        showFavoritesTab.classList.add('active');
+    });
+
+    document.querySelectorAll('.collapsible-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const content = header.nextElementSibling;
+            header.classList.toggle('active');
+            if (content.style.maxHeight) {
+                content.style.maxHeight = null;
+            } else {
+                content.style.maxHeight = content.scrollHeight + "px";
+            }
+        });
+    });
+
+    suggestRecipeBtn.addEventListener('click', getRecipeSuggestions);
+    discoverRecipesBtn.addEventListener('click', discoverNewRecipes);
+    recipeResultsDiv.addEventListener('click', handleCardClick);
+    favoriteRecipesContainer.addEventListener('click', handleCardClick);
+    
+    // Pantry Tab Listeners
+    showManualAddBtn.addEventListener('click', () => {
+        addItemContainer.style.display = 'block';
+        manualAddContainer.style.display = 'block';
+        scanItemContainer.style.display = 'none';
+        confirmationSection.style.display = 'none';
+    });
+    showScanItemBtn.addEventListener('click', () => openCameraFor('pantry', addItemContainer));
+    showScanReceiptBtn.addEventListener('click', () => openCameraFor('receipt', addItemContainer));
+    pantryListDiv.addEventListener('click', handlePantryClick);
+    manualAddForm.addEventListener('submit', handleManualAdd);
+    addToPantryBtn.addEventListener('click', addItemsToPantry);
+    toggleAllPantryBtn.addEventListener('click', () => handleToggleAll(pantryListDiv, toggleAllPantryBtn));
+
+    // Grocery List Tab Listeners
+    showAddGroceryFormBtn.addEventListener('click', () => {
+        addGroceryItemForm.style.display = addGroceryItemForm.style.display === 'none' ? 'flex' : 'none';
+    });
+    showScanGroceryBtn.addEventListener('click', () => openCameraFor('grocery', groceryScanUIPlaceholder));
+    showScanReceiptGroceryBtn.addEventListener('click', () => openCameraFor('groceryReceipt', groceryScanUIPlaceholder));
+    addGroceryItemForm.addEventListener('submit', handleAddGroceryItem);
+    groceryList.addEventListener('click', handleGroceryListClick);
+    moveToPantryBtn.addEventListener('click', moveSelectedItemsToPantryDirectly);
+    toggleAllGroceryBtn.addEventListener('click', () => handleToggleAll(groceryList, toggleAllGroceryBtn));
+
+
+    // Meal Planner Listeners
+    startCameraBtn.addEventListener('click', startCamera);
+    captureBtn.addEventListener('click', captureAndScan);
+    itemConfirmationList.addEventListener('click', handleRemoveConfirmedItem);
+    prevWeekBtn.addEventListener('click', () => navigateWeek('prev'));
+    nextWeekBtn.addEventListener('click', () => navigateWeek('next'));
+    generateGroceryListBtn.addEventListener('click', generateAutomatedGroceryList);
+    mealPlannerGrid.addEventListener('click', (e) => {
+        handleMealSlotClick(e);
+        handlePlanSingleDayClick(e);
+    });
+    modalRecipeList.addEventListener('click', handleModalClick);
+
+    // Modal Close Buttons
+    modalCloseBtn.addEventListener('click', () => mealPlanModal.style.display = 'none');
+    addToPlanModalCloseBtn.addEventListener('click', () => addToPlanModal.style.display = 'none');
+    createHouseholdModalCloseBtn.addEventListener('click', () => createHouseholdModal.style.display = 'none');
+    
     // Set up Auth State Listener
     onAuthStateChanged(auth, async user => {
         if (user) {
