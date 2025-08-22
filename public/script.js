@@ -9,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCylczs2HKlIKQTiikGFFnF9cB60jEXLUo",
   authDomain: "family-dinner-app-dev.firebaseapp.com",
   projectId: "family-dinner-app-dev",
-  storageBucket: "family-dinner-app-dev.appspot.com",
+  storageBucket: "family-dinner-app-dev.firebasestorage.app",
   messagingSenderId: "1065607981746",
   appId: "1:1065607981746:web:99124a92a45287bc35b7ab",
   measurementId: "G-XPPVQ8S73W"
