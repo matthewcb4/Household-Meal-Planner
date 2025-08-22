@@ -20,7 +20,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app);
-const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
+// IMPORTANT: Replace with your Stripe TEST publishable key (pk_test_...)
+const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD'); 
 
 
 // --- GLOBAL VARIABLES ---
@@ -2204,8 +2205,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
             
-            // Call the function without arguments.
-            const result = await createStripeCheckout();
+            // Call the function with an empty object as data.
+            const result = await createStripeCheckout({});
     
             // Add a check to ensure the response is valid before using it.
             if (result && result.data && result.data.id) {

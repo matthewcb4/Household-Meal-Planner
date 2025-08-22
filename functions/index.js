@@ -819,26 +819,50 @@ exports.stripeWebhook = onRequest(async (req, res) => {
         return res.sendStatus(400);
     }
     
-    if (event.type === 'invoice.payment_succeeded') {
-        const invoice = event.data.object;
-        const customerId = invoice.customer;
-        
-        const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
-        const householdId = subscription.metadata.householdId;
-
+    // --- Helper function to grant premium access ---
+    const grantAccess = async (householdId, customerId, subscriptionId) => {
         if (householdId) {
             const householdRef = db.collection('households').doc(householdId);
             const now = new Date();
-            const accessEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+            // Grant access for 31 days to be safe
+            const accessEndDate = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000);
 
             await householdRef.update({
                 subscriptionTier: 'paid',
                 premiumAccessUntil: admin.firestore.Timestamp.fromDate(accessEndDate),
                 stripeCustomerId: customerId,
-                stripeSubscriptionId: subscription.id
+                stripeSubscriptionId: subscriptionId
             });
-            console.log(`Successfully granted 30-day premium access to household ${householdId}.`);
+            console.log(`Successfully granted premium access to household ${householdId}.`);
         }
+    };
+
+    // --- Handle different event types ---
+    switch (event.type) {
+        case 'checkout.session.completed': {
+            const session = event.data.object;
+            const householdId = session.metadata.householdId;
+            const customerId = session.customer;
+            const subscriptionId = session.subscription;
+            console.log(`Checkout session completed for household ${householdId}.`);
+            await grantAccess(householdId, customerId, subscriptionId);
+            break;
+        }
+        case 'invoice.payment_succeeded': {
+            const invoice = event.data.object;
+            // For recurring payments, we need to get metadata from the subscription
+            if (invoice.subscription) {
+                 const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+                 const householdId = subscription.metadata.householdId;
+                 const customerId = subscription.customer;
+                 console.log(`Recurring payment successful for household ${householdId}.`);
+                 await grantAccess(householdId, customerId, subscription.id);
+            }
+            break;
+        }
+        // TODO: Handle other events like 'customer.subscription.deleted' to downgrade users.
+        default:
+            console.log(`Unhandled event type ${event.type}`);
     }
 
     res.status(200).send();
