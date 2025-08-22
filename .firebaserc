@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "family-dinner-app-79249"
-  }
+    "default": "family-dinner-app-79249",
+    "prod": "default",
+    "dev": "family-dinner-app-dev"
+  },
+  "targets": {},
+  "etags": {}
 }
