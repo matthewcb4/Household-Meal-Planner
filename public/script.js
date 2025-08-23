@@ -1,3 +1,4 @@
+// public/script.js
 // Import all necessary functions from the Firebase SDKs at the top
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -29,6 +30,10 @@ let unitSystem = 'imperial';
 let calendarDate = new Date();
 let selectedDates = [];
 let currentHowToSlide = 0;
+// New variables for camera state management
+let isCameraOpen = false;
+let currentScanPlaceholder = null;
+
 
 const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"];
 const CUISINE_OPTIONS = ["American", "Asian", "French", "Greek", "Indian", "Italian", "Mediterranean", "Mexican", "Spanish", "Thai"];
@@ -680,7 +685,7 @@ async function handleManualAdd(event) {
 
         displayPantryItems();
         document.getElementById('manual-add-form').reset();
-        document.getElementById('add-item-container').style.display = 'none';
+        document.getElementById('pantry-forms-container').style.display = 'none';
     }
 }
 
@@ -725,7 +730,7 @@ async function addItemsToPantry() {
     await batch.commit();
     displayPantryItems();
     document.getElementById('confirmation-section').style.display = 'none';
-    document.getElementById('add-item-container').style.display = 'none';
+    document.getElementById('pantry-forms-container').style.display = 'none';
 }
 
 // --- RECIPE FUNCTIONS (FIXED) ---
@@ -901,7 +906,7 @@ async function captureAndScan() {
     const itemConfirmationList = document.getElementById('item-confirmation-list');
     const confirmationSection = document.getElementById('confirmation-section');
     const recipeResultsDiv = document.getElementById('recipe-results');
-    const groceryScanUIPlaceholder = document.getElementById('grocery-scan-ui-placeholder');
+    const pantryFormsContainer = document.getElementById('pantry-forms-container');
 
     const context = canvasElement.getContext('2d');
     canvasElement.width = videoElement.videoWidth;
@@ -910,7 +915,11 @@ async function captureAndScan() {
     const base64ImageData = canvasElement.toDataURL('image/jpeg').split(',')[1];
     capturedImageElement.src = `data:image/jpeg;base64,${base64ImageData}`;
     capturedImageElement.style.display = 'block';
-    stopCamera();
+    
+    // Stop the camera stream but keep the UI visible for a moment
+    if (stream) { stream.getTracks().forEach(track => track.stop()); }
+    stream = null; // Clear the stream
+    document.getElementById('camera-container').style.display = 'none';
     
     let targetContainer;
     let scanFunction;
@@ -923,23 +932,25 @@ async function captureAndScan() {
             break;
         case 'receipt': // For Pantry
             targetContainer = itemConfirmationList;
+            pantryFormsContainer.style.display = 'block';
             confirmationSection.style.display = 'block';
             targetContainer.innerHTML = '<p>🧠 Reading receipt for Pantry...</p>';
             scanFunction = httpsCallable(functions, 'scanReceipt');
             break;
         case 'groceryReceipt': // For Grocery List
-            targetContainer = groceryScanUIPlaceholder;
+            targetContainer = document.getElementById('grocery-scan-ui-placeholder');
             showLoadingState("Reading receipt for Grocery List...", targetContainer);
             scanFunction = httpsCallable(functions, 'scanReceipt');
             break;
         case 'grocery': // For Grocery List (single items)
-             targetContainer = groceryScanUIPlaceholder;
+             targetContainer = document.getElementById('grocery-scan-ui-placeholder');
              showLoadingState("Scanning items for Grocery List...", targetContainer);
              scanFunction = httpsCallable(functions, 'identifyItems');
              break;
         case 'pantry':
         default:
             targetContainer = itemConfirmationList;
+            pantryFormsContainer.style.display = 'block';
             confirmationSection.style.display = 'block';
             targetContainer.innerHTML = '<p>🧠 Identifying items...</p>';
             scanFunction = httpsCallable(functions, 'identifyItems');
@@ -969,15 +980,16 @@ async function captureAndScan() {
             });
             await batch.commit();
             displayGroceryList();
-            targetContainer.innerHTML = '';
         }
 
     } catch (error) {
         console.error('Error calling scan function:', error);
-        targetContainer.innerHTML = `<p>Sorry, the AI scan failed. Please try again.</p>`;
+        if (targetContainer) {
+            targetContainer.innerHTML = `<p>Sorry, the AI scan failed. Please try again.</p>`;
+        }
     } finally {
-        scanItemContainer.style.display = 'none'; // Hide the scan modal after processing
-        scanMode = 'pantry'; // Reset to default
+        // The stopCamera function will handle hiding the main container now
+        stopCamera();
     }
 }
 
@@ -1022,18 +1034,72 @@ async function startCamera() {
         videoElement.srcObject = stream;
         startCameraBtn.style.display = 'none';
         captureBtn.style.display = 'block';
-    } catch (err) { console.error("Error accessing camera: ", err); }
+        isCameraOpen = true;
+    } catch (err) { 
+        console.error("Error accessing camera: ", err); 
+        isCameraOpen = false;
+    }
 }
 
 function stopCamera() {
     const videoElement = document.getElementById('camera-stream');
-    const cameraContainer = document.getElementById('camera-container');
+    const scanItemContainer = document.getElementById('scan-item-container');
+
+    if (stream) { 
+        stream.getTracks().forEach(track => track.stop()); 
+        stream = null;
+    }
+    videoElement.srcObject = null;
+    isCameraOpen = false;
+
+    // Reset and hide the main scan UI
+    if (currentScanPlaceholder) {
+        currentScanPlaceholder.style.display = 'none';
+        currentScanPlaceholder = null;
+    }
+    document.body.appendChild(scanItemContainer);
+    scanItemContainer.style.display = 'none';
+}
+
+function toggleScanView(mode, placeholderId) {
+    const placeholder = document.getElementById(placeholderId);
+    
+    // If the camera is already open and this button was clicked again, close it.
+    if (isCameraOpen && currentScanPlaceholder === placeholder) {
+        stopCamera();
+        return;
+    }
+
+    // If any other camera is open, close it first.
+    if (isCameraOpen) {
+        stopCamera();
+    }
+
+    // Hide all manual forms before opening a camera view
+    document.getElementById('pantry-forms-container').style.display = 'none';
+    document.getElementById('add-grocery-item-form').style.display = 'none';
+
+    // Set up and open the new camera view
+    currentScanPlaceholder = placeholder;
+    placeholder.style.display = 'block';
+    openCameraFor(mode, placeholder);
+}
+
+function openCameraFor(mode, placeholderElement) {
+    const scanItemContainer = document.getElementById('scan-item-container');
     const startCameraBtn = document.getElementById('start-camera-btn');
     const captureBtn = document.getElementById('capture-btn');
+    const capturedImage = document.getElementById('captured-image');
 
-    if (stream) { stream.getTracks().forEach(track => track.stop()); }
-    videoElement.srcObject = null;
-    cameraContainer.style.display = 'none';
+    scanMode = mode;
+    placeholderElement.appendChild(scanItemContainer);
+    scanItemContainer.style.display = 'flex';
+    
+    // Reset UI state
+    capturedImage.style.display = 'none';
+    capturedImage.src = '';
+    document.getElementById('item-confirmation-list').innerHTML = '';
+    document.getElementById('confirmation-section').style.display = 'none';
     startCameraBtn.style.display = 'block';
     captureBtn.style.display = 'none';
 }
@@ -1403,18 +1469,6 @@ function handleRemoveConfirmedItem(event) {
     if (event.target.classList.contains('remove-item-btn')) {
         event.target.closest('.confirmation-item').remove();
     }
-}
-
-function openCameraFor(mode, placeholderElement) {
-    const scanItemContainer = document.getElementById('scan-item-container');
-    scanMode = mode;
-    placeholderElement.appendChild(scanItemContainer);
-    scanItemContainer.style.display = 'flex'; // Use flex for centering
-    document.getElementById('captured-image').style.display = 'none';
-    document.getElementById('captured-image').src = '';
-    document.getElementById('item-confirmation-list').innerHTML = '';
-    document.getElementById('confirmation-section').style.display = 'none';
-    startCamera();
 }
 
 function navigateWeek(direction) {
@@ -2140,29 +2194,38 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('item-confirmation-list')?.addEventListener('click', handleRemoveConfirmedItem);
     document.getElementById('suggest-recipe-btn')?.addEventListener('click', getRecipeSuggestions);
     document.getElementById('discover-recipes-btn')?.addEventListener('click', discoverNewRecipes);
-    document.getElementById('quick-meal-btn')?.addEventListener('click', () => openCameraFor('quickMeal', document.getElementById('recipe-scan-ui-placeholder')));
-    document.getElementById('show-scan-item-btn')?.addEventListener('click', () => openCameraFor('pantry', document.getElementById('add-item-container')));
-    document.getElementById('show-scan-receipt-btn')?.addEventListener('click', () => openCameraFor('receipt', document.getElementById('add-item-container')));
-    document.getElementById('show-manual-add-btn')?.addEventListener('click', () => {
-        document.getElementById('add-item-container').style.display = 'block';
-        document.getElementById('manual-add-container').style.display = 'block';
-        document.getElementById('confirmation-section').style.display = 'none';
-        stopCamera();
-    });
     document.getElementById('start-camera-btn')?.addEventListener('click', startCamera);
     document.getElementById('capture-btn')?.addEventListener('click', captureAndScan);
-    document.getElementById('close-scan-btn')?.addEventListener('click', () => {
-        stopCamera();
-        document.getElementById('scan-item-container').style.display = 'none';
-    });
     document.getElementById('add-grocery-item-form')?.addEventListener('submit', handleAddGroceryItem);
     document.getElementById('move-to-pantry-btn')?.addEventListener('click', moveSelectedItemsToPantryDirectly);
-    document.getElementById('show-add-grocery-form-btn')?.addEventListener('click', () => {
+    
+    // UPDATED: Manual Add Buttons
+    document.getElementById('show-manual-add-btn').addEventListener('click', () => {
+        if (isCameraOpen) stopCamera();
+        const container = document.getElementById('pantry-forms-container');
+        const manualContainer = document.getElementById('manual-add-container');
+        const isVisible = container.style.display === 'block' && manualContainer.style.display === 'block';
+        container.style.display = isVisible ? 'none' : 'block';
+        manualContainer.style.display = 'block';
+        document.getElementById('confirmation-section').style.display = 'none';
+    });
+
+    document.getElementById('show-add-grocery-form-btn').addEventListener('click', () => {
+        if (isCameraOpen) stopCamera();
         const form = document.getElementById('add-grocery-item-form');
         form.style.display = form.style.display === 'none' ? 'flex' : 'none';
     });
-    document.getElementById('show-scan-grocery-btn')?.addEventListener('click', () => openCameraFor('grocery', document.getElementById('grocery-scan-ui-placeholder')));
-    document.getElementById('show-scan-receipt-grocery-btn')?.addEventListener('click', () => openCameraFor('groceryReceipt', document.getElementById('grocery-scan-ui-placeholder')));
+
+    // UPDATED: Scan Buttons
+    document.getElementById('show-scan-item-btn').addEventListener('click', () => toggleScanView('pantry', 'pantry-scan-ui-placeholder'));
+    document.getElementById('show-scan-receipt-btn').addEventListener('click', () => toggleScanView('receipt', 'pantry-scan-ui-placeholder'));
+    document.getElementById('show-scan-grocery-btn').addEventListener('click', () => toggleScanView('grocery', 'grocery-scan-ui-placeholder'));
+    document.getElementById('show-scan-receipt-grocery-btn').addEventListener('click', () => toggleScanView('groceryReceipt', 'grocery-scan-ui-placeholder'));
+    document.getElementById('quick-meal-btn').addEventListener('click', () => toggleScanView('quickMeal', 'recipe-scan-ui-placeholder'));
+    
+    // UPDATED: Close Button
+    document.getElementById('close-scan-btn').addEventListener('click', stopCamera);
+
     document.getElementById('generate-grocery-list-btn')?.addEventListener('click', generateAutomatedGroceryList);
     document.getElementById('prev-week-btn')?.addEventListener('click', () => navigateWeek('prev'));
     document.getElementById('next-week-btn')?.addEventListener('click', () => navigateWeek('next'));

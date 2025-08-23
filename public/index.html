@@ -1,3 +1,4 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -148,20 +149,18 @@
                                 <h3 class="collapsible-header">Refine Your Search</h3>
                                 <div class="collapsible-content">
                                     <div class="criteria-controls">
-                                        <div class="criteria-row">
-                                            <div class="criteria-group">
-                                                <label for="cuisine-select">Cuisine</label>
-                                                <select id="cuisine-select"><option value="">Any</option></select>
-                                                <button id="update-cuisine-btn" style="display:none;">Update Cuisine</button>
-                                            </div>
-                                            <div class="criteria-group">
-                                                <label>Unit System</label>
-                                                <div class="toggle-switch">
-                                                    <input type="radio" id="imperial-units" name="unitSystem" value="imperial" checked>
-                                                    <label for="imperial-units">Imperial</label>
-                                                    <input type="radio" id="metric-units" name="unitSystem" value="metric">
-                                                    <label for="metric-units">Metric</label>
-                                                </div>
+                                        <div class="criteria-group">
+                                            <label for="cuisine-select">Cuisine</label>
+                                            <select id="cuisine-select"><option value="">Any</option></select>
+                                            <button id="update-cuisine-btn" style="display:none;">Update Cuisine</button>
+                                        </div>
+                                        <div class="criteria-group">
+                                            <label>Unit System</label>
+                                            <div class="toggle-switch">
+                                                <input type="radio" id="imperial-units" name="unitSystem" value="imperial" checked>
+                                                <label for="imperial-units">Imperial</label>
+                                                <input type="radio" id="metric-units" name="unitSystem" value="metric">
+                                                <label for="metric-units">Metric</label>
                                             </div>
                                         </div>
                                         <div class="criteria-group">
@@ -207,7 +206,7 @@
                                     <button type="submit">Get Recipe</button>
                                 </form>
                             </div>
-                            <div id="recipe-scan-ui-placeholder"></div>
+                            <div id="recipe-scan-ui-placeholder" style="display: none;"></div>
                             <div class="button-group">
                                 <button id="suggest-recipe-btn">Suggest from Pantry</button>
                                 <button id="quick-meal-btn">Quick Meal from Photo</button>
@@ -227,7 +226,7 @@
                                 <button id="show-scan-receipt-btn" class="secondary premium-feature">Scan Receipt</button>
                             </div>
                         </div>
-                        <div id="add-item-container" class="add-item-container" style="display: none;">
+                        <div id="pantry-forms-container" style="display: none;">
                              <div id="manual-add-container" style="display: none;">
                                 <h3>Add Item Manually</h3>
                                 <form id="manual-add-form" class="form-grid">
@@ -244,6 +243,7 @@
                                 <button id="add-to-pantry-btn">Add Items to Pantry</button>
                             </div>
                         </div>
+                        <div id="pantry-scan-ui-placeholder" style="display: none;"></div>
                         <div class="pantry-header" style="margin-top: 24px;">
                             <h3>Pantry Items</h3>
                             <div class="pantry-controls">
@@ -258,18 +258,20 @@
                     </section>
 
                     <section id="grocery-list-section" class="content-section">
-                        <h2>Grocery List</h2>
-                        <div class="button-group">
-                            <button id="show-add-grocery-form-btn" class="secondary">Add Manually</button>
-                            <button id="show-scan-grocery-btn" class="secondary">Scan Item(s)</button>
-                            <button id="show-scan-receipt-grocery-btn" class="secondary premium-feature">Scan Receipt</button>
+                        <div class="pantry-header">
+                            <h2>Grocery List</h2>
+                            <div class="pantry-controls">
+                                <button id="show-add-grocery-form-btn" class="secondary">Add Manually</button>
+                                <button id="show-scan-grocery-btn" class="secondary">Scan Item(s)</button>
+                                <button id="show-scan-receipt-grocery-btn" class="secondary premium-feature">Scan Receipt</button>
+                            </div>
                         </div>
                         <form id="add-grocery-item-form" class="inline-form" style="display: none;">
                             <input type="text" id="grocery-item-name" placeholder="e.g., Milk" required>
                             <select id="grocery-item-category"></select>
                             <button type="submit">Add</button>
                         </form>
-                        <div id="grocery-scan-ui-placeholder"></div>
+                        <div id="grocery-scan-ui-placeholder" style="display: none;"></div>
                         <div class="pantry-header" style="margin-top: 24px;">
                             <h3>Your Items</h3>
                             <div class="pantry-controls">
@@ -294,7 +296,7 @@
     </div>
 
     <!-- Modals and other floating elements -->
-    <div id="scan-item-container">
+    <div id="scan-item-container" style="display: none;">
         <h3>Scan New Items</h3>
         <div id="scan-quota-display" style="display: none; text-align: center; margin-bottom: 1rem; font-weight: 500;"></div>
         <div id="camera-container" style="display: none;"><video id="camera-stream" autoplay playsinline></video><canvas id="capture-canvas" style="display:none;"></canvas></div>
