@@ -148,56 +148,51 @@
                             <div class="recipe-criteria">
                                 <h3 class="collapsible-header">Refine Your Search</h3>
                                 <div class="collapsible-content">
-                                    <div class="criteria-controls">
-                                        <div class="criteria-group">
-                                            <label for="cuisine-select">Cuisine</label>
-                                            <select id="cuisine-select"><option value="">Any</option></select>
-                                            <button id="update-cuisine-btn" style="display:none;">Update Cuisine</button>
+                                    <div class="criteria-group">
+                                        <label for="cuisine-select">Cuisine</label>
+                                        <select id="cuisine-select"><option value="">Any</option></select>
+                                        <button id="update-cuisine-btn" style="display:none;">Update Cuisine</button>
+                                        
+                                        <label>Unit System</label>
+                                        <div class="toggle-switch">
+                                            <input type="radio" id="imperial-units" name="unitSystem" value="imperial" checked>
+                                            <label for="imperial-units">Imperial</label>
+                                            <input type="radio" id="metric-units" name="unitSystem" value="metric">
+                                            <label for="metric-units">Metric</label>
                                         </div>
-                                        <div class="criteria-group">
-                                            <label>Unit System</label>
-                                            <div class="toggle-switch">
-                                                <input type="radio" id="imperial-units" name="unitSystem" value="imperial" checked>
-                                                <label for="imperial-units">Imperial</label>
-                                                <input type="radio" id="metric-units" name="unitSystem" value="metric">
-                                                <label for="metric-units">Metric</label>
+                                        
+                                        <div class="sub-criteria-group">
+                                            <h4>Allergies & Restrictions</h4>
+                                            <div class="checkbox-group">
+                                                <label><input type="checkbox" name="recipeCriteria" value="Gluten-Free"><span>Gluten-Free</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Dairy-Free"><span>Dairy-Free</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Lactose-Intolerance"><span>Lactose-Intolerance</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Kosher"><span>Kosher</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Halal"><span>Halal</span></label>
                                             </div>
                                         </div>
-                                        <div class="criteria-group">
-                                            <div class="sub-criteria-group">
-                                                <h4>Allergies & Restrictions</h4>
-                                                <div class="checkbox-group">
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Gluten-Free"><span>Gluten-Free</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Dairy-Free"><span>Dairy-Free</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Lactose-Intolerance"><span>Lactose-Intolerance</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Kosher"><span>Kosher</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Halal"><span>Halal</span></label>
-                                                </div>
+                                        <div class="sub-criteria-group premium-feature">
+                                            <h4>Common Diets <span class="premium-tag">Premium</span></h4>
+                                            <div class="checkbox-group">
+                                                <label><input type="checkbox" name="recipeCriteria" value="Vegetarian"><span>Vegetarian</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Vegan"><span>Vegan</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Pescetarian"><span>Pescetarian</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Keto"><span>Keto</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Paleo"><span>Paleo</span></label>
+                                                <label><input type="checkbox" name="recipeCrite_ria" value="Low Carb"><span>Low Carb</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Low Fat"><span>Low Fat</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="High Protein"><span>High Protein</span></label>
                                             </div>
-                                            <div class="sub-criteria-group premium-feature">
-                                                <h4>Common Diets <span class="premium-tag">Premium</span></h4>
-                                                <div class="checkbox-group">
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Vegetarian"><span>Vegetarian</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Vegan"><span>Vegan</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Pescetarian"><span>Pescetarian</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Keto"><span>Keto</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Paleo"><span>Paleo</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Low Carb"><span>Low Carb</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Low Fat"><span>Low Fat</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="High Protein"><span>High Protein</span></label>
-                                                </div>
-                                            </div>
-                                            <div class="sub-criteria-group premium-feature">
-                                                <h4>Other <span class="premium-tag">Premium</span></h4>
-                                                 <div class="checkbox-group">
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Spicy"><span>Spicy</span></label>
-                                                    <label><input type="checkbox" name="recipeCriteria" value="Quick Meal (<30 minutes)"><span>&lt; 30 min</span></label>
-                                                </div>
+                                        </div>
+                                        <div class="sub-criteria-group premium-feature">
+                                            <h4>Other <span class="premium-tag">Premium</span></h4>
+                                             <div class="checkbox-group">
+                                                <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Spicy"><span>Spicy</span></label>
+                                                <label><input type="checkbox" name="recipeCriteria" value="Quick Meal (<30 minutes)"><span>&lt; 30 min</span></label>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
                             </div>
                             <div id="ask-the-chef-section" class="recipe-criteria premium-feature">
                                 <h3>Ask the Chef <span class="premium-tag">Premium</span></h3>

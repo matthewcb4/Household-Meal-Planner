@@ -20,11 +20,15 @@
 
 /* --- Base & Typography --- */
 *, *::before, *::after { box-sizing: border-box; }
-html { overflow-x: hidden; scroll-behavior: smooth; }
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent scrolling on the body itself on mobile */
+}
 body {
     font-family: var(--font-primary);
     line-height: 1.5; /* Reduced line-height */
-    margin: 0;
     background-color: var(--bg-color);
     color: var(--text-color);
     -webkit-font-smoothing: antialiased;
@@ -167,7 +171,8 @@ a:hover { color: var(--primary-accent-color); }
 .content-section.active { display: block; }
 
 /* --- Auth & Household --- */
-#auth-container { display: flex; align-items: center; gap: 0.75rem; }
+#auth-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem 1rem; }
+#auth-container span {overflow-wrap: break-word; text-align: right; flex-grow: 1;}
 .auth-view { max-width: 400px; margin: 3rem auto; padding: 1.5rem; background-color: var(--surface-color); border-radius: var(--border-radius); text-align: center; }
 .user-profile { display: flex; align-items: center; gap: 0.75rem; background-color: var(--sidebar-bg-color); padding: 4px; border-radius: 50px; }
 .user-profile #welcome-message { font-weight: 700; font-size: 0.9rem; padding: 0 0.5rem; }
@@ -335,6 +340,16 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 
 /* --- Specific Component Styles (Adapted) --- */
+.inline-form {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+.inline-form > input,
+.inline-form > select {
+    flex: 1; /* Allows the element to grow and fill available space */
+    min-width: 0; /* Prevents overflow in flex containers */
+}
 .pantry-header {
     display: flex;
     justify-content: space-between;
@@ -396,14 +411,41 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 .checkbox-group {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap; /* CHANGED: from nowrap to wrap for better mobile compatibility */
     gap: 1rem;
-    overflow-x: auto;
-    padding-bottom: 10px; /* For scrollbar */
+    /* REMOVED: overflow-x: auto and padding-bottom */
 }
-.checkbox-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; white-space: nowrap; }
+.checkbox-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
 .premium-feature.disabled { opacity: 0.5; pointer-events: none; }
 .premium-tag { background-color: var(--primary-accent-color); color: #000; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin-left: 0.5rem; font-weight: bold; }
+.toggle-switch {
+    display: flex;
+    border: 1px solid var(--surface-highlight-color);
+    border-radius: 50px;
+    overflow: hidden; /* Ensures children conform to the rounded corners */
+    background-color: var(--surface-highlight-color);
+}
+.toggle-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.toggle-switch label {
+    flex: 1; /* Each label takes up equal space */
+    padding: 6px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 0; /* Override global input/label margins */
+    font-size: 0.9rem;
+}
+.toggle-switch input:checked + label {
+    background-color: var(--primary-accent-color);
+    color: #000;
+    font-weight: 700;
+    border-radius: 50px;
+}
 
 /* --- Scan Modal --- */
 #scan-item-container {
@@ -464,9 +506,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 @media (max-width: 768px) {
     #app-container {
-        display: flex;
-        flex-direction: column;
-        height: 100vh; /* Use vh for the main container */
+        display: block; /* Revert to default block display */
+        height: 100%;
+        grid-template-columns: 1fr; /* This is redundant with flex, but harmless */
     }
     .sidebar { 
         position: fixed; 
@@ -480,19 +522,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         justify-content: space-around; 
         padding: 0; 
         z-index: 1000; 
-        border-top: 1px solid var(--border-color); 
+        border-top: 1px solid var(--border-color);
+        flex-shrink: 0; /* Prevent the sidebar from shrinking */
     }
     .sidebar-header, .sidebar-footer { display: none; }
     .sidebar-nav { display: flex; justify-content: space-around; width: 100%; }
     .sidebar-nav li a { flex-direction: column; gap: 2px; font-size: 0.65rem; padding: 0.4rem; }
     .sidebar-nav li a.active { background: none; }
     .sidebar-nav li a i { font-size: 1.1rem; }
+
     .main-content { 
-        flex: 1; /* This is the key change */
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto; /* Make this part scrollable, not the body */
-        padding-bottom: 55px; /* Space for the nav bar */
+        height: 100vh; /* Make this container fill the app-container */
+        overflow-y: auto; /* This becomes the single scrollable area */
+        padding-bottom: 55px; /* Space for the fixed nav bar */
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
     }
     .content-wrapper {
         flex-grow: 1; /* Allows this to grow */
