@@ -231,12 +231,19 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, 
         
         let prompt = `You are a helpful chef. Given the following list of pantry ingredients, suggest about 5 ${mealType} recipes.`;
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
+        
+        const otherCriteria = [];
         if (criteria && criteria.length > 0) {
              if (criteria.includes("Quick Meal (<30 minutes)")) {
                 prompt += ` The recipes should also be quick to make, taking less than 30 minutes.`;
+            } else {
+                otherCriteria.push(criteria.filter(c => c !== "Quick Meal (<30 minutes)"));
             }
-            prompt += ` The recipes should also meet the following criteria: ${criteria.join(', ')}.`;
+            if(otherCriteria.length > 0) {
+                prompt += ` The recipes should also meet the following criteria: ${otherCriteria.join(', ')}.`;
+            }
         }
+
         prompt += ` Include a mix of 2-3 simple recipes and 2-3 more complex recipes. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", and "instructions" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
 
         const aiRequest = {
@@ -286,11 +293,17 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" },
 
         let prompt = `You are a helpful chef. Suggest 5 popular and delicious ${mealType} recipes.`;
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
+        
+        const otherCriteria = [];
         if (criteria && criteria.length > 0) {
              if (criteria.includes("Quick Meal (<30 minutes)")) {
                 prompt += ` The recipes should also be quick to make, taking less than 30 minutes.`;
+            } else {
+                otherCriteria.push(criteria.filter(c => c !== "Quick Meal (<30 minutes)"));
             }
-            prompt += ` The recipes should also meet the following criteria: ${criteria.join(', ')}.`;
+            if(otherCriteria.length > 0) {
+                prompt += ` The recipes should also meet the following criteria: ${otherCriteria.join(', ')}.`;
+            }
         }
         prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", and "instructions" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
 
@@ -531,7 +544,10 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
             if (otherCriteria.includes("Quick Meal (<30 minutes)")) {
                 prompt += ` The recipes must also be quick to make, taking less than 30 minutes.`;
             }
-            prompt += ` The recipes must also meet the following criteria: ${otherCriteria.join(', ')}.`;
+            const filteredCriteria = otherCriteria.filter(c => c !== "Quick Meal (<30 minutes)");
+            if (filteredCriteria.length > 0) {
+                prompt += ` The recipes must also meet the following criteria: ${filteredCriteria.join(', ')}.`;
+            }
         }
         
         if (pantryItems && pantryItems.length > 0) {

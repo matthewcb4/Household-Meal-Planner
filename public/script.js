@@ -238,6 +238,7 @@ async function displayPantryItems() {
 function updateWeekView() {
     displayWeekRange();
     displayMealPlan();
+    renderSidebarCalendar();
 }
 
 async function displayGroceryList() {
@@ -376,6 +377,15 @@ function renderMealPlanner() {
             <span>${day}</span>
             <button class="plan-day-btn secondary" data-day="${day.toLowerCase()}" data-day-full-name="${fullDayNames[index]}">✨</button>
         `;
+        
+        // Add click listener for collapsing
+        dayHeader.addEventListener('click', (e) => {
+            // Don't collapse if the plan button itself was clicked
+            if (!e.target.closest('.plan-day-btn')) {
+                dayCard.classList.toggle('collapsed');
+            }
+        });
+        
         dayCard.appendChild(dayHeader);
 
         const dailyCuisineSelector = document.createElement('div');
@@ -457,6 +467,7 @@ async function displayMealPlan() {
                 }
             });
         }
+        renderSidebarCalendar(); // Re-render calendar to update meal indicators
     });
 }
 
@@ -825,6 +836,9 @@ function displayRecipeResults(recipes, mealType) {
             recipe.mealType = mealType;
         }
         const recipeCard = createRecipeCard(recipe, isFavorite);
+        if (recipes.length === 1) {
+            recipeCard.classList.add('expanded');
+        }
         recipeResultsDiv.appendChild(recipeCard);
     });
 }
@@ -1750,6 +1764,94 @@ function renderAddToPlanCalendar(year, month) {
     }
 }
 
+async function renderSidebarCalendar() {
+    const container = document.getElementById('sidebar-calendar-container');
+    if (!container || !householdId) return;
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+
+    container.innerHTML = `
+        <div id="sidebar-calendar-header">
+            <h5>${today.toLocaleString('default', { month: 'long', year: 'numeric' })}</h5>
+        </div>
+        <div id="sidebar-calendar-grid"></div>
+    `;
+
+    const grid = document.getElementById('sidebar-calendar-grid');
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => {
+        const dayNameEl = document.createElement('div');
+        dayNameEl.className = 'sidebar-calendar-day-name';
+        dayNameEl.textContent = day;
+        grid.appendChild(dayNameEl);
+    });
+
+    for (let i = 0; i < firstDay; i++) {
+        grid.appendChild(document.createElement('div'));
+    }
+
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0,0,0,0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayEl = document.createElement('div');
+        dayEl.className = 'sidebar-calendar-day';
+        dayEl.textContent = day;
+        const thisDate = new Date(year, month, day);
+        thisDate.setHours(0,0,0,0);
+        
+        if (thisDate >= startOfWeek && thisDate <= endOfWeek) {
+            dayEl.classList.add('current-week');
+        }
+        
+        dayEl.addEventListener('click', () => {
+            currentDate = thisDate;
+            updateWeekView();
+        });
+
+        grid.appendChild(dayEl);
+    }
+    
+    // Fetch all meal plans for the month to highlight days
+    const mealPlanCollectionRef = collection(db, 'households', householdId, 'mealPlan');
+    const q = query(mealPlanCollectionRef, where('__name__', '>=', `${year}-W01`), where('__name__', '<=', `${year}-W53`));
+    const querySnapshot = await getDocs(q);
+    const plannedDays = new Set();
+    querySnapshot.forEach(doc => {
+        const plan = doc.data().meals;
+        if (plan) {
+            Object.keys(plan).forEach(dayKey => {
+                // This is a simplified way to get the date. A more robust solution would be needed for multi-year views.
+                const weekId = doc.id;
+                const [planYear, weekNum] = weekId.split('-W');
+                const janFirst = new Date(planYear, 0, 1);
+                const days = (weekNum - 1) * 7;
+                const date = new Date(janFirst.valueOf() + days * 86400000);
+                const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(dayKey);
+                date.setDate(date.getDate() - date.getDay() + dayIndex);
+
+                if (date.getMonth() === month) {
+                    plannedDays.add(date.getDate());
+                }
+            });
+        }
+    });
+
+    grid.querySelectorAll('.sidebar-calendar-day').forEach(dayEl => {
+        const dayNum = parseInt(dayEl.textContent);
+        if (plannedDays.has(dayNum)) {
+            dayEl.classList.add('has-meal');
+        }
+    });
+}
+
 // --- How-To Modal Logic ---
 function showHowToModal() {
     currentHowToSlide = 0;
@@ -2009,7 +2111,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.closest('#grocery-list')) handleGroceryListClick(event);
         if (target.closest('#recipe-results') || target.closest('#favorite-recipes-container')) handleCardClick(event);
         if (target.closest('#meal-planner-grid')) {
-            handleMealSlotClick(event);
+            // Clicks on the meal planner grid are now handled inside renderMealPlanner for day headers
+            // and here for meal slots to avoid double-firing.
+            if (target.closest('.meal-slot')) {
+                 handleMealSlotClick(event);
+            }
             handlePlanSingleDayClick(event);
         }
         if (target.closest('.modal-recipe-item')) handleModalClick(event);
@@ -2092,6 +2198,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     document.getElementById('plan-my-week-btn')?.addEventListener('click', handlePlanMyWeek);
+    document.getElementById('toggle-all-days-btn')?.addEventListener('click', (e) => {
+        const shouldCollapse = e.target.textContent === 'Collapse All';
+        document.querySelectorAll('.day-card').forEach(card => {
+            card.classList.toggle('collapsed', shouldCollapse);
+        });
+        e.target.textContent = shouldCollapse ? 'Expand All' : 'Collapse All';
+    });
     document.getElementById('calendar-prev-month')?.addEventListener('click', () => {
         calendarDate.setMonth(calendarDate.getMonth() - 1);
         renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
