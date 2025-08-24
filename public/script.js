@@ -50,7 +50,7 @@ function renderAuthUI(user) {
                 <button id="upgrade-btn-header" class="upgrade-button" style="display: none;">Upgrade</button>
             </div>
             <div class="auth-right">
-                <p id="household-info" class="household-code-container" style="display: none;"></p>
+                <div id="household-info" class="household-code-container" style="display: none;"></div>
                 <button id="sign-out-btn" class="danger">Sign Out</button>
             </div>
         `;
@@ -289,7 +289,7 @@ async function displayGroceryList() {
                         <label>${item.name}</label>
                     </div>
                     <div class="grocery-item-controls">
-                        <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>W</span></a>
+                        <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>Walmart</span></a>
                         <button class="delete-grocery-btn" data-id="${item.id}">X</button>
                     </div>
                 `;
@@ -1406,43 +1406,70 @@ async function handleMealSlotClick(event) {
 
 async function handleModalClick(event) {
     const target = event.target;
-    const card = target.closest('.modal-recipe-item');
-    if (!card) return;
+    const recipeDetailModal = target.closest('#recipe-detail-modal');
 
-    if (target.classList.contains('instructions-toggle')) {
-        const list = target.nextElementSibling;
-        const isVisible = list.style.display === 'block';
-        list.style.display = isVisible ? 'none' : 'block';
-        target.textContent = isVisible ? 'Show Instructions' : 'Hide Instructions';
-    } else if (target.classList.contains('remove-from-plan-btn')) {
-        const { day, meal, id } = target.dataset;
-        const mealPlanRef = getMealPlanRef();
-        const updatePath = `meals.${day}.${meal}.${id}`;
-        await updateDoc(mealPlanRef, { [updatePath]: deleteField() });
-        document.getElementById('meal-plan-modal').style.display = 'none';
-    } else if (target.classList.contains('favorite-from-modal-btn')) {
-        const recipeData = JSON.parse(card.dataset.recipe);
-        await toggleFavorite(recipeData);
-    } else if (target.classList.contains('add-to-plan-btn')) {
-        currentRecipeToPlan = JSON.parse(card.dataset.recipe);
-        document.getElementById('add-to-plan-recipe-title').textContent = currentRecipeToPlan.title;
-        selectedDates = [];
-        calendarDate = new Date();
-        renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
-        document.getElementById('meal-plan-modal').style.display = 'none';
-        document.getElementById('add-to-plan-modal').style.display = 'block';
-    }
-     else if (target.classList.contains('star')) {
-        const { rating, day, meal, id } = target.dataset;
-        const mealPlanRef = getMealPlanRef();
-        const updatePath = `meals.${day}.${meal}.${id}.rating`;
-        await updateDoc(mealPlanRef, { [updatePath]: parseInt(rating, 10) });
+    if (recipeDetailModal) {
+        const modalContent = recipeDetailModal.querySelector('#recipe-detail-content');
+        const recipeData = JSON.parse(modalContent.dataset.recipe);
         
-        const starContainer = target.parentElement;
-        const stars = starContainer.querySelectorAll('.star');
-        stars.forEach(star => {
-            star.classList.toggle('filled', parseInt(star.dataset.rating, 10) <= parseInt(rating, 10));
-        });
+        if (target.closest('.add-to-plan-btn')) {
+            currentRecipeToPlan = recipeData;
+            document.getElementById('add-to-plan-recipe-title').textContent = currentRecipeToPlan.title;
+            selectedDates = []; 
+            calendarDate = new Date(); 
+            renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
+            recipeDetailModal.style.display = 'none';
+            document.getElementById('add-to-plan-modal').style.display = 'block';
+        } else if (target.closest('.instructions-toggle') || target.closest('.ingredients-toggle')) {
+            const button = target.closest('button');
+            const list = button.nextElementSibling;
+            if (list) {
+                const isVisible = list.style.display === 'block';
+                list.style.display = isVisible ? 'none' : 'block';
+            }
+        } else if (target.closest('.add-to-list-btn')) {
+            handleAddFromRecipe(target);
+        } else if (target.closest('.star')) {
+            const recipeId = target.dataset.id;
+            const newRating = parseInt(target.dataset.rating, 10);
+            const favoritesRef = getFavoritesRef();
+            if (favoritesRef && recipeId) {
+                await updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
+                 // Update stars in modal
+                const starContainer = target.parentElement;
+                const stars = starContainer.querySelectorAll('.star');
+                stars.forEach(star => {
+                    star.classList.toggle('filled', parseInt(star.dataset.rating, 10) <= newRating);
+                });
+            }
+        }
+    }
+
+    const mealPlanItem = target.closest('.modal-recipe-item');
+    if (mealPlanItem) {
+        if (target.classList.contains('remove-from-plan-btn')) {
+            const { day, meal, id } = target.dataset;
+            const mealPlanRef = getMealPlanRef();
+            const updatePath = `meals.${day}.${meal}.${id}`;
+            await updateDoc(mealPlanRef, { [updatePath]: deleteField() });
+            document.getElementById('meal-plan-modal').style.display = 'none';
+        } else if (target.classList.contains('favorite-from-modal-btn')) {
+            const recipeData = JSON.parse(mealPlanItem.dataset.recipe);
+            await toggleFavorite(recipeData);
+        } else if (target.classList.contains('add-to-plan-btn')) {
+            currentRecipeToPlan = JSON.parse(mealPlanItem.dataset.recipe);
+            document.getElementById('add-to-plan-recipe-title').textContent = currentRecipeToPlan.title;
+            selectedDates = [];
+            calendarDate = new Date();
+            renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
+            document.getElementById('meal-plan-modal').style.display = 'none';
+            document.getElementById('add-to-plan-modal').style.display = 'block';
+        } else if (target.classList.contains('star')) {
+            const { rating, day, meal, id } = target.dataset;
+            const mealPlanRef = getMealPlanRef();
+            const updatePath = `meals.${day}.${meal}.${id}.rating`;
+            await updateDoc(mealPlanRef, { [updatePath]: parseInt(rating, 10) });
+        }
     }
 }
 
@@ -2081,7 +2108,10 @@ async function initializeAppUI(user) {
                 
                 if(householdInfoEl) {
                     householdInfoEl.innerHTML = `
-                        <span>Invite Code: <strong id="household-code-text">${householdId}</strong></span>
+                        <div class="invite-code-wrapper">
+                            <span>Invite Code:</span>
+                            <strong id="household-code-text">${householdId}</strong>
+                        </div>
                         <button id="copy-household-code-btn" title="Copy Code"><i class="far fa-copy"></i></button>
                     `;
                     householdInfoEl.style.display = 'flex';
@@ -2189,7 +2219,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (recipeDetailModal) {
             const modalContent = recipeDetailModal.querySelector('#recipe-detail-content');
             const recipeData = JSON.parse(modalContent.dataset.recipe);
-
+            
             if (target.closest('.add-to-plan-btn')) {
                 currentRecipeToPlan = recipeData;
                 document.getElementById('add-to-plan-recipe-title').textContent = currentRecipeToPlan.title;
@@ -2213,6 +2243,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const favoritesRef = getFavoritesRef();
                 if (favoritesRef && recipeId) {
                     updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
+                     // Update stars in modal
+                    const starContainer = target.parentElement;
+                    const stars = starContainer.querySelectorAll('.star');
+                    stars.forEach(star => {
+                        star.classList.toggle('filled', parseInt(star.dataset.rating, 10) <= newRating);
+                    });
                 }
             }
         }
