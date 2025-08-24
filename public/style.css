@@ -20,20 +20,22 @@
 
 /* --- Base & Typography --- */
 *, *::before, *::after { box-sizing: border-box; }
+
 html, body {
     height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden; /* Prevent scrolling on the body itself on mobile */
+    overflow: hidden; /* Prevent scrolling on the body itself */
 }
+
 body {
     font-family: var(--font-primary);
-    line-height: 1.5; /* Reduced line-height */
+    line-height: 1.5;
     background-color: var(--bg-color);
     color: var(--text-color);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    font-size: 14px; /* Slightly smaller base font */
+    font-size: 14px;
 }
 
 h1, h2, h3, h4, h5 {
@@ -41,21 +43,21 @@ h1, h2, h3, h4, h5 {
     margin-top: 0;
     color: var(--text-color);
 }
-h2 { font-size: 1.5rem; margin-bottom: 1rem; text-align: left; } /* Reduced font size and margin */
-h3 { font-size: 1.1rem; margin-bottom: 0.75rem; } /* Reduced font size and margin */
+h2 { font-size: 1.5rem; margin-bottom: 1rem; text-align: left; }
+h3 { font-size: 1.1rem; margin-bottom: 0.75rem; }
 h4 {
-    margin-top: 1.5rem; /* Reduced margin */
+    margin-top: 1.5rem;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 0.4rem;
     font-weight: 500;
     color: var(--text-secondary-color);
 }
 p { color: var(--text-secondary-color); margin-top: 0; margin-bottom: 0.75rem; }
-hr { border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0; } /* Reduced margin */
+hr { border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0; }
 ul { list-style-type: none; padding: 0; }
 li {
     background-color: var(--surface-highlight-color);
-    padding: 0.75rem; /* Reduced padding */
+    padding: 0.75rem;
     border-radius: var(--border-radius);
     margin-bottom: 0.5rem;
     border: 1px solid var(--border-color);
@@ -66,7 +68,7 @@ a:hover { color: var(--primary-accent-color); }
 /* --- Main App Layout --- */
 #app-container {
     display: grid;
-    grid-template-columns: 240px 1fr; /* Slightly narrower sidebar */
+    grid-template-columns: 240px 1fr;
     grid-template-rows: 1fr;
     height: 100vh;
     overflow: hidden;
@@ -75,7 +77,7 @@ a:hover { color: var(--primary-accent-color); }
 /* --- Sidebar --- */
 .sidebar {
     background-color: var(--sidebar-bg-color);
-    padding: 1rem; /* Reduced padding */
+    padding: 1rem;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -86,11 +88,11 @@ a:hover { color: var(--primary-accent-color); }
 .sidebar-nav li a {
     display: flex;
     align-items: center;
-    gap: 0.75rem; /* Reduced gap */
-    padding: 0.4rem; /* Further reduced padding */
+    gap: 0.75rem;
+    padding: 0.4rem;
     border-radius: 4px;
     font-weight: 700;
-    font-size: 0.85rem; /* Reduced font size */
+    font-size: 0.85rem;
     color: var(--text-secondary-color);
     transition: color 0.2s, background-color 0.2s;
 }
@@ -113,7 +115,7 @@ a:hover { color: var(--primary-accent-color); }
 
 /* --- Sidebar Calendar --- */
 #sidebar-calendar-container {
-    background-color: transparent; /* Removed background */
+    background-color: transparent;
     border-radius: var(--border-radius);
     padding: 0.75rem;
     margin-top: 1rem;
@@ -158,7 +160,7 @@ a:hover { color: var(--primary-accent-color); }
 .main-content { display: flex; flex-direction: column; overflow-y: auto; }
 .top-bar {
     background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0));
-    padding: 0.75rem 1.5rem; /* Reduced padding */
+    padding: 0.75rem 1.5rem;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -166,18 +168,56 @@ a:hover { color: var(--primary-accent-color); }
     justify-content: flex-end;
     align-items: center;
 }
-.content-wrapper { padding: 0.75rem 1.5rem; } /* Reduced padding */
+.content-wrapper { padding: 0.75rem 1.5rem; }
 .content-section { display: none; }
 .content-section.active { display: block; }
 
 /* --- Auth & Household --- */
-#auth-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem 1rem; }
+#auth-container { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem 1rem; width: 100%; }
 #auth-container span {overflow-wrap: break-word; text-align: right; flex-grow: 1;}
 .auth-view { max-width: 400px; margin: 3rem auto; padding: 1.5rem; background-color: var(--surface-color); border-radius: var(--border-radius); text-align: center; }
-.user-profile { display: flex; align-items: center; gap: 0.75rem; background-color: var(--sidebar-bg-color); padding: 4px; border-radius: 50px; }
-.user-profile #welcome-message { font-weight: 700; font-size: 0.9rem; padding: 0 0.5rem; }
-#household-details { display: flex; align-items: center; gap: 0.5rem; }
-#household-info, #household-status-info { font-size: 0.75em; color: var(--text-secondary-color); margin: 0; padding: 4px 10px; background-color: var(--surface-color); border: 1px solid var(--border-color); border-radius: 50px; }
+
+.user-profile {
+    width: 100%;
+}
+.user-profile-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+}
+.user-profile-welcome {
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+.user-profile-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.user-profile-info-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+}
+.user-profile-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+#household-info, #household-status-info {
+    font-size: 0.8em;
+    color: var(--text-secondary-color);
+    margin: 0;
+    padding: 2px 8px;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 50px;
+}
+
 .household-code-container { display: flex; align-items: center; gap: 0.5rem; }
 .household-code-text-wrapper { text-align: left; line-height: 1.2; }
 .household-code-text-wrapper strong { font-size: 1.1em; }
@@ -194,11 +234,11 @@ section {
 button {
     background-color: var(--primary-accent-color);
     color: #000;
-    padding: 10px 20px; /* Reduced padding */
+    padding: 10px 20px;
     border: none;
     border-radius: 50px;
     cursor: pointer;
-    font-size: 0.9em; /* Reduced font size */
+    font-size: 0.9em;
     font-weight: 700;
     transition: transform 0.1s ease-in-out, background-color 0.2s;
     text-transform: uppercase;
@@ -218,18 +258,18 @@ input, select, textarea {
     border: 1px solid transparent;
     border-radius: 4px;
     color: var(--text-color);
-    padding: 10px; /* Reduced padding */
-    font-size: 0.9em; /* Reduced font size */
+    padding: 10px;
+    font-size: 0.9em;
     width: 100%;
-    margin-bottom: 8px; /* Reduced margin */
+    margin-bottom: 8px;
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-accent-color); background-color: #333; }
 
 /* --- Recipe Cards --- */
 #recipe-results, #favorite-recipes-container .recipe-card-row {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Allow for smaller cards */
-    gap: 1rem; /* Reduced gap */
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
 }
 .recipe-card {
     background-color: var(--surface-color);
@@ -237,7 +277,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     overflow: hidden;
     transition: background-color 0.3s;
     cursor: pointer;
-    padding: 0.75rem; /* Reduced padding */
+    padding: 0.75rem;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -251,7 +291,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     -webkit-box-orient: vertical;
     overflow: hidden;
     margin-bottom: 0.5rem;
-    flex-grow: 1; /* Allow description to take up space */
+    flex-grow: 1;
 }
 .recipe-card.expanded p {
     -webkit-line-clamp: unset;
@@ -347,19 +387,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 .inline-form > input,
 .inline-form > select {
-    flex: 1; /* Allows the element to grow and fill available space */
-    min-width: 0; /* Prevents overflow in flex containers */
+    flex: 1;
+    min-width: 0;
 }
 .pantry-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap; /* Allow wrapping on small screens */
+    flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 1rem;
 }
 .pantry-header h2 {
-    margin-bottom: 0; /* Remove default margin from h2 */
+    margin-bottom: 0;
 }
 .pantry-controls, .button-group {
     display: flex;
@@ -372,17 +412,25 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .source-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; }
 .source-tabs button { background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-secondary-color); padding: 6px 10px; font-size: 1em; font-weight: 500; text-transform: none; letter-spacing: 0; border-radius: 0; }
 .source-tabs button.active { color: var(--primary-accent-color); border-bottom-color: var(--primary-accent-color); }
-.meal-type-selector { display: flex; justify-content: center; flex-wrap: wrap; gap: 0.75rem; margin: 1.5rem 0; }
+
+.meal-type-selector {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+}
 .meal-type-selector label { cursor: pointer; }
 .meal-type-selector input { position: absolute; opacity: 0; }
 .meal-type-selector span { padding: 6px 14px; border-radius: 50px; border: 1px solid var(--surface-highlight-color); transition: all 0.2s; background-color: var(--surface-highlight-color); font-size: 0.9rem; }
 .meal-type-selector input:checked + span { background-color: var(--primary-accent-color); color: #000; border-color: var(--primary-accent-color); }
+
 .recipe-criteria { background-color: var(--surface-color); padding: 1rem; border-radius: var(--border-radius); margin: 1.5rem 0; }
 .collapsible-header { cursor: pointer; }
 .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out; }
 .criteria-controls {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 1rem;
     align-items: stretch;
 }
@@ -411,9 +459,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 .checkbox-group {
     display: flex;
-    flex-wrap: wrap; /* CHANGED: from nowrap to wrap for better mobile compatibility */
+    flex-wrap: wrap;
     gap: 1rem;
-    /* REMOVED: overflow-x: auto and padding-bottom */
 }
 .checkbox-group label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
 .premium-feature.disabled { opacity: 0.5; pointer-events: none; }
@@ -422,7 +469,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     display: flex;
     border: 1px solid var(--surface-highlight-color);
     border-radius: 50px;
-    overflow: hidden; /* Ensures children conform to the rounded corners */
+    overflow: hidden;
     background-color: var(--surface-highlight-color);
 }
 .toggle-switch input {
@@ -432,12 +479,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     height: 0;
 }
 .toggle-switch label {
-    flex: 1; /* Each label takes up equal space */
+    flex: 1;
     padding: 6px 14px;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-bottom: 0; /* Override global input/label margins */
+    margin-bottom: 0;
     font-size: 0.9rem;
 }
 .toggle-switch input:checked + label {
@@ -460,7 +507,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     z-index: 1001;
     width: 90%;
     max-width: 500px;
-    display: none; /* Initially hidden */
+    display: none;
     flex-direction: column;
     align-items: center;
 }
@@ -506,10 +553,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 @media (max-width: 768px) {
     #app-container {
-        display: block; /* Revert to default block display */
-        height: 100%;
-        grid-template-columns: 1fr; /* This is redundant with flex, but harmless */
+        display: block;
+        height: 100vh;
+        overflow-y: auto;
+        padding-bottom: 55px; 
+        background-color: var(--surface-color);
+        -webkit-overflow-scrolling: touch;
     }
+    .main-content {
+        height: auto;
+        overflow-y: visible;
+        padding-bottom: 0;
+        background-color: transparent;
+    }
+
     .sidebar { 
         position: fixed; 
         bottom: 0; 
@@ -523,23 +580,20 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         padding: 0; 
         z-index: 1000; 
         border-top: 1px solid var(--border-color);
-        flex-shrink: 0; /* Prevent the sidebar from shrinking */
+        flex-shrink: 0;
     }
     .sidebar-header, .sidebar-footer { display: none; }
     .sidebar-nav { display: flex; justify-content: space-around; width: 100%; }
-    .sidebar-nav li a { flex-direction: column; gap: 2px; font-size: 0.65rem; padding: 0.4rem; }
+    .sidebar-nav li {
+        flex: 1;
+        text-align: center;
+        background-color: transparent;
+        border: none;
+    }
+    .sidebar-nav li a { flex-direction: column; gap: 2px; font-size: 0.65rem; padding: 0.4rem; justify-content: center; }
     .sidebar-nav li a.active { background: none; }
     .sidebar-nav li a i { font-size: 1.1rem; }
 
-    .main-content { 
-        height: 100vh; /* Make this container fill the app-container */
-        overflow-y: auto; /* This becomes the single scrollable area */
-        padding-bottom: 55px; /* Space for the fixed nav bar */
-        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-    }
-    .content-wrapper {
-        flex-grow: 1; /* Allows this to grow */
-    }
     .top-bar { background: var(--bg-color); padding: 0.75rem; }
     .content-wrapper { padding: 0.75rem; }
     h2 { font-size: 1.4rem; }
@@ -548,7 +602,34 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     #meal-planner-grid {
         grid-template-columns: 1fr;
     }
-    .criteria-row {
+    
+    .inline-form {
         flex-direction: column;
+    }
+    
+    .criteria-controls {
+        flex-direction: column;
+    }
+
+    /* ✅ FIX: This specifically targets the filter groups to enable horizontal scrolling */
+    .checkbox-group {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 10px;
+    }
+    .checkbox-group label {
+        white-space: nowrap;
+    }
+
+    /* ✅ FIX: Implements the 2x2 grid for meal types on mobile */
+    .meal-type-selector {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+        justify-items: center; /* Center items within the grid cells */
+    }
+
+    .user-profile {
+        flex-wrap: wrap;
     }
 }

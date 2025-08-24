@@ -46,13 +46,19 @@ function renderAuthUI(user) {
         const userProfile = document.createElement('div');
         userProfile.className = 'user-profile';
         userProfile.innerHTML = `
-            <span id="welcome-message">Hello, ${user.displayName || user.email}!</span>
-            <div id="household-details">
-                <p id="household-info" class="household-code-container" style="display: none;"></p>
-                <p id="household-status-info" style="display: none;"></p>
+            <div class="user-profile-layout">
+                <div class="user-profile-welcome">Hello, ${user.displayName || user.email}!</div>
+                <div class="user-profile-details">
+                    <div class="user-profile-info-stack">
+                        <div id="household-info" class="household-code-container" style="display: none;"></div>
+                        <div id="household-status-info" style="display: none;"></div>
+                    </div>
+                    <div class="user-profile-actions">
+                         <button id="upgrade-btn-header" class="upgrade-button" style="display: none;">Upgrade</button>
+                         <button id="sign-out-btn" class="danger">Sign Out</button>
+                    </div>
+                </div>
             </div>
-            <button id="upgrade-btn-header" class="upgrade-button" style="display: none;">Upgrade</button>
-            <button id="sign-out-btn" class="danger">Sign Out</button>
         `;
         authContainer.appendChild(userProfile);
         document.getElementById('sign-out-btn').addEventListener('click', () => signOut(auth));
@@ -1561,9 +1567,17 @@ function configurePaywallUI() {
     if(householdStatusInfo) householdStatusInfo.textContent = statusText;
 }
 
+// ✅ EDIT: This function now only reads from the visible tab to prevent bugs
 async function saveUserPreferences() {
     if (!currentUser) return;
-    const allergies = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked, input[name="recipeCriteria"]:checked'))
+
+    const activeSection = document.querySelector('.content-section.active');
+    if (!activeSection) return;
+
+    // Determine which set of checkboxes to read from
+    const checkboxName = activeSection.id === 'meal-plan-section' ? 'plannerCriteria' : 'recipeCriteria';
+    
+    const allergies = Array.from(activeSection.querySelectorAll(`input[name="${checkboxName}"]:checked`))
                            .map(cb => cb.value);
     
     userPreferences.allergies = [...new Set(allergies)];
@@ -1571,6 +1585,7 @@ async function saveUserPreferences() {
     const userDocRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userDocRef, { preferences: userPreferences });
 }
+
 
 function loadUserPreferences() {
     if (userPreferences.allergies) {
