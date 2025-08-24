@@ -540,6 +540,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 .sub-criteria-group {
     min-width: 0; /* Fix for flexbox overflow */
+    overflow: hidden; /* Contain the horizontally-scrolling checkbox group */
+    display: grid; /* Use grid layout for more robust containment of the scrolling child */
 }
 .sub-criteria-group h4 {
     margin-top: 0;
@@ -720,7 +722,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 @media (max-width: 768px) {
     #app-container {
         display: block; /* Revert to default block display */
-        height: 100%;
+        height: 100vh; /* Use viewport height for a stable reference */
+        overflow-y: auto; /* THIS becomes the primary scroll container */
+        overflow-x: hidden; /* Prevent horizontal scrolling on the main container */
+        padding-bottom: 55px; /* Add padding here to avoid content hiding under the nav bar */
+        -webkit-overflow-scrolling: touch; /* Keep smooth scrolling */
     }
     .sidebar { 
         position: fixed; 
@@ -759,10 +765,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     .sidebar-nav li a i { font-size: 1.1rem; }
 
     .main-content { 
-        height: 100vh; /* Make this container fill the app-container */
-        overflow-y: auto; /* This becomes the single scrollable area */
-        padding-bottom: 55px; /* Space for the fixed nav bar */
-        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        height: auto; /* Let content determine the height */
+        overflow: visible; /* The parent container handles scrolling now */
+        padding-bottom: 0; /* Padding is moved to the parent */
     }
     .content-wrapper {
         flex-grow: 1; /* Allows this to grow */
