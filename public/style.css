@@ -409,21 +409,36 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-.pantry-item, .grocery-item { display: flex; justify-content: space-between; align-items: center; }
+.pantry-item, .grocery-item { display: flex; justify-content: space-between; align-items: center; padding: .3rem; }
 .pantry-item .item-info {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-grow: 1; /* Allow text to take up space */
-    min-width: 0; /* Prevent overflow */
+    flex-grow: 1; /* Allow this section to take up available space */
+    min-width: 0; /* Crucial for allowing long text to wrap correctly in a flex item */
+}
+.pantry-item.checked .item-info {
+    text-decoration: line-through;
+    color: var(--text-secondary-color);
+}
+.pantry-item .item-info input[type="checkbox"] {
+    /* Override global input styles for the checkbox */
+    width: auto; /* Prevent it from taking 100% width */
+    margin-bottom: 0; /* Remove the default margin for inputs */
+    flex-shrink: 0; /* Prevent the checkbox from being squished */
 }
 .pantry-item .item-info span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    word-break: break-word;
 }
 .grocery-item .item-info { display: flex; align-items: center; gap: 0.5rem; }
 .grocery-item.checked .item-info { text-decoration: line-through; color: var(--text-secondary-color); }
+.grocery-item .item-info input[type="checkbox"] {
+    /* Override global input styles for the checkbox */
+    width: auto; /* Prevent it from taking 100% width */
+    margin-bottom: 0; /* Remove the default margin for inputs */
+    flex-shrink: 0; /* Prevent the checkbox from being squished */
+}
 .grocery-item-controls { display: flex; align-items: center; gap: 0.5rem; }
 .walmart-search-btn {
     background-color: #0071ce;

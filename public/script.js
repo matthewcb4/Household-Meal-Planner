@@ -662,6 +662,10 @@ function handlePantryClick(event) {
     }
 
     if (event.target.classList.contains('pantry-item-checkbox')) {
+        const listItem = event.target.closest('.pantry-item');
+        if (listItem) {
+            listItem.classList.toggle('checked');
+        }
         handlePantryItemCheck();
     }
 }
