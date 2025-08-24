@@ -405,13 +405,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 /* UPDATED MEAL TYPE SELECTOR */
 .meal-type-selector {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    display: flex; /* Changed to flex for desktop */
+    justify-content: center;
+    flex-wrap: nowrap;
     gap: 0.75rem;
     margin: 1.5rem auto;
-    max-width: 300px; /* Or a width that fits your design */
+    max-width: 500px;
 }
-.meal-type-selector label { cursor: pointer; }
+.meal-type-selector label { cursor: pointer; flex: 1; min-width: 120px; }
 .meal-type-selector input { position: absolute; opacity: 0; }
 .meal-type-selector span {
     display: block; /* Make span fill the label */
@@ -614,6 +615,42 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 @-webkit-keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
 @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
 
+
+/* --- NEW RECIPE DETAIL MODAL --- */
+#recipe-detail-content {
+    max-height: 80vh;
+    overflow-y: auto;
+}
+#recipe-detail-content .recipe-image {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: var(--border-radius);
+    margin-bottom: 1rem;
+}
+#recipe-detail-content h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+#recipe-detail-content .star-rating {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+#recipe-detail-content .star {
+    cursor: pointer;
+    color: var(--surface-highlight-color);
+}
+#recipe-detail-content .star.filled {
+    color: var(--primary-accent-color);
+}
+#recipe-detail-content .card-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+
 /* --- Responsive Styles --- */
 @media (max-width: 1400px) {
     #meal-planner-grid {
@@ -667,5 +704,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     }
     .criteria-row {
         flex-direction: column;
+    }
+    .meal-type-selector {
+        display: grid; /* Add this line */
+        grid-template-columns: repeat(2, 1fr); /* 2x2 grid on mobile */
     }
 }

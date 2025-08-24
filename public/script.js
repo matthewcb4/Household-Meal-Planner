@@ -43,22 +43,17 @@ function renderAuthUI(user) {
     const authContainer = document.getElementById('auth-container');
     authContainer.innerHTML = ''; // Clear previous state
     if (user) {
-        const userProfile = document.createElement('div');
-        userProfile.className = 'user-profile';
-        userProfile.innerHTML = `
+        authContainer.innerHTML = `
             <div class="auth-left">
-                <span id="welcome-message">Hello, ${user.displayName || user.email}!</span>
+                <h3 id="welcome-message">Hello, ${user.displayName || user.email}!</h3>
                 <p id="household-status-info" style="display: none;"></p>
+                <button id="upgrade-btn-header" class="upgrade-button" style="display: none;">Upgrade</button>
             </div>
             <div class="auth-right">
                 <p id="household-info" class="household-code-container" style="display: none;"></p>
                 <button id="sign-out-btn" class="danger">Sign Out</button>
             </div>
-            <div class="auth-full-width">
-                <button id="upgrade-btn-header" class="upgrade-button" style="display: none;">Upgrade</button>
-            </div>
         `;
-        authContainer.appendChild(userProfile);
         document.getElementById('sign-out-btn').addEventListener('click', () => signOut(auth));
         const upgradeBtn = document.getElementById('upgrade-btn-header');
         if (upgradeBtn) {
@@ -371,10 +366,14 @@ function renderMealPlanner() {
     endOfWeek.setHours(23, 59, 59, 999);
     
     const isCurrentWeek = today >= startOfWeek && today <= endOfWeek;
+    const isMobile = window.innerWidth <= 768;
 
     days.forEach((day, index) => {
         const dayCard = document.createElement('div');
         dayCard.className = 'day-card';
+        if (isMobile) {
+            dayCard.classList.add('collapsed');
+        }
 
         if (isCurrentWeek && index === currentDayIndex) {
             dayCard.classList.add('today');
@@ -737,16 +736,42 @@ async function addItemsToPantry() {
     document.getElementById('pantry-forms-container').style.display = 'none';
 }
 
-// --- RECIPE FUNCTIONS (FIXED) ---
+// --- RECIPE FUNCTIONS (MODIFIED) ---
 function createRecipeCard(recipe, isFavorite) {
     const recipeCard = document.createElement('div');
     recipeCard.className = 'recipe-card';
-    recipeCard.draggable = true;
-    recipeCard.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('application/json', JSON.stringify(recipe));
-        e.dataTransfer.effectAllowed = 'copy';
-    });
+    
+    const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/333/FFF?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+    
+    let ratingHTML = '';
+    if (isFavorite) {
+        ratingHTML = '<div class="star-rating">';
+        for (let i = 1; i <= 5; i++) {
+            ratingHTML += `<span class="star ${i <= (recipe.rating || 0) ? 'filled' : ''}" data-rating="${i}" data-id="${recipe.id}">★</span>`;
+        }
+        ratingHTML += '</div>';
+    }
 
+    const cardContent = `
+        <div class="recipe-card-header">
+            <h3>${recipe.title}</h3>
+        </div>
+        ${ratingHTML}
+        <p>${recipe.description}</p>
+    `;
+
+    recipeCard.innerHTML = `
+        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/333/FFF?text=Image+Not+Found';">
+        <button class="save-recipe-btn ${isFavorite ? 'is-favorite' : ''}" title="${isFavorite ? 'Remove from Favorites' : 'Save to Favorites'}">⭐</button>
+        <div class="recipe-card-content">${cardContent}</div>
+    `;
+    
+    recipeCard.dataset.recipe = JSON.stringify(recipe);
+    return recipeCard;
+}
+
+function populateRecipeDetailModal(recipe, isFavorite) {
+    const modalContent = document.getElementById('recipe-detail-content');
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/333/FFF?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
 
     const ingredientsList = (recipe.ingredients && Array.isArray(recipe.ingredients)) 
@@ -770,9 +795,6 @@ function createRecipeCard(recipe, isFavorite) {
         </div>
     `;
 
-    const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
-    const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
-    
     let instructionsHTML = '';
     if (householdData && householdData.subscriptionTier === 'paid' && recipe.instructions && recipe.instructions.length > 0) {
         const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
@@ -796,7 +818,8 @@ function createRecipeCard(recipe, isFavorite) {
         `;
     }
 
-    const cardActionsHTML = `<div class="card-actions"><button class="add-to-plan-btn">Add to Plan</button>${instructionsHTML}</div>`;
+    const cardActionsHTML = `<div class="card-actions"><button class="add-to-plan-btn">Add to Plan</button></div>`;
+    
     let ratingHTML = '';
     if (isFavorite) {
         ratingHTML = '<div class="star-rating">';
@@ -806,25 +829,21 @@ function createRecipeCard(recipe, isFavorite) {
         ratingHTML += '</div>';
     }
 
-    const cardContent = `
-        <div class="recipe-card-header">
-            <h3><a href="${googleSearchUrl}" target="_blank" title="Search for this recipe">${recipe.title} 🔗</a></h3>
-        </div>
+    modalContent.innerHTML = `
+        <span class="close-btn" id="recipe-detail-modal-close-btn">&times;</span>
+        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/333/FFF?text=Image+Not+Found';">
+        <h3>${recipe.title}</h3>
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${cardActionsHTML}
         ${ingredientsHTML}
+        ${instructionsHTML}
     `;
 
-    recipeCard.innerHTML = `
-        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/333/FFF?text=Image+Not+Found';">
-        <button class="save-recipe-btn ${isFavorite ? 'is-favorite' : ''}" title="${isFavorite ? 'Remove from Favorites' : 'Save to Favorites'}">⭐</button>
-        <div class="recipe-card-content">${cardContent}</div>
-    `;
-    
-    recipeCard.dataset.recipe = JSON.stringify(recipe);
-    return recipeCard;
+    modalContent.dataset.recipe = JSON.stringify(recipe);
+    document.getElementById('recipe-detail-modal').style.display = 'block';
 }
+
 
 function displayRecipeResults(recipes, mealType) {
     const recipeResultsDiv = document.getElementById('recipe-results');
@@ -1281,35 +1300,25 @@ async function handleCardClick(event) {
     const card = target.closest('.recipe-card');
     if (!card) return;
 
-    const addToListBtn = target.closest('.add-to-list-btn');
-
+    const recipeData = JSON.parse(card.dataset.recipe);
+    
     if (target.closest('.save-recipe-btn')) {
-        const recipeData = JSON.parse(card.dataset.recipe);
         toggleFavorite(recipeData, target.closest('.save-recipe-btn'));
-    } else if (addToListBtn) {
-        handleAddFromRecipe(addToListBtn);
-    } else if (target.closest('.add-to-plan-btn')) {
-        currentRecipeToPlan = JSON.parse(card.dataset.recipe);
-        document.getElementById('add-to-plan-recipe-title').textContent = currentRecipeToPlan.title;
-        selectedDates = []; 
-        calendarDate = new Date(); 
-        renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
-        document.getElementById('add-to-plan-modal').style.display = 'block';
-    } else if (target.closest('.instructions-toggle') || target.closest('.ingredients-toggle')) {
-        const button = target.closest('button');
-        const list = button.nextElementSibling;
-        if (list) {
-            const isVisible = list.style.display === 'block';
-            list.style.display = isVisible ? 'none' : 'block';
-            button.textContent = isVisible ? button.textContent.replace('Hide', 'Show') : button.textContent.replace('Show', 'Hide');
-        }
     } else if (target.closest('.star')) {
-        const recipeId = target.closest('.star-rating').querySelector('.star').dataset.id;
+        const recipeId = target.dataset.id;
         const newRating = parseInt(target.dataset.rating, 10);
         const favoritesRef = getFavoritesRef();
         if (favoritesRef && recipeId) {
             await updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
         }
+    } else {
+        // Click on the card itself, not a specific button inside it
+        const favoritesRef = getFavoritesRef();
+        const q = query(favoritesRef, where("title", "==", recipeData.title));
+        const querySnapshot = await getDocs(q);
+        const isFavorite = !querySnapshot.empty;
+        
+        populateRecipeDetailModal(recipeData, isFavorite);
     }
 }
 
@@ -2169,13 +2178,45 @@ document.addEventListener('DOMContentLoaded', () => {
         if (target.closest('#grocery-list')) handleGroceryListClick(event);
         if (target.closest('#recipe-results') || target.closest('#favorite-recipes-container')) handleCardClick(event);
         if (target.closest('#meal-planner-grid')) {
-            // Clicks on the meal planner grid are now handled inside renderMealPlanner for day headers
-            // and here for meal slots to avoid double-firing.
             if (target.closest('.meal-slot')) {
                  handleMealSlotClick(event);
             }
             handlePlanSingleDayClick(event);
         }
+        
+        // Modal click logic
+        const recipeDetailModal = target.closest('#recipe-detail-modal');
+        if (recipeDetailModal) {
+            const modalContent = recipeDetailModal.querySelector('#recipe-detail-content');
+            const recipeData = JSON.parse(modalContent.dataset.recipe);
+
+            if (target.closest('.add-to-plan-btn')) {
+                currentRecipeToPlan = recipeData;
+                document.getElementById('add-to-plan-recipe-title').textContent = currentRecipeToPlan.title;
+                selectedDates = []; 
+                calendarDate = new Date(); 
+                renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
+                recipeDetailModal.style.display = 'none';
+                document.getElementById('add-to-plan-modal').style.display = 'block';
+            } else if (target.closest('.instructions-toggle') || target.closest('.ingredients-toggle')) {
+                const button = target.closest('button');
+                const list = button.nextElementSibling;
+                if (list) {
+                    const isVisible = list.style.display === 'block';
+                    list.style.display = isVisible ? 'none' : 'block';
+                }
+            } else if (target.closest('.add-to-list-btn')) {
+                handleAddFromRecipe(target);
+            } else if (target.closest('.star')) {
+                const recipeId = target.dataset.id;
+                const newRating = parseInt(target.dataset.rating, 10);
+                const favoritesRef = getFavoritesRef();
+                if (favoritesRef && recipeId) {
+                    updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
+                }
+            }
+        }
+        
         if (target.closest('.modal-recipe-item')) handleModalClick(event);
         if (target.closest('#update-cuisine-btn')) {
              if (!householdId || target.closest('#update-cuisine-btn').disabled) return;
