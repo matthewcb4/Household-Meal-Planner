@@ -24,6 +24,7 @@ html, body {
     height: 100%;
     margin: 0;
     padding: 0;
+    overflow: hidden; /* Prevent body scrolling */
 }
 body {
     font-family: var(--font-primary);
@@ -65,10 +66,10 @@ a:hover { color: var(--primary-accent-color); }
 /* --- Main App Layout --- */
 #app-container {
     display: grid;
-    grid-template-columns: 240px 1fr; /* Slightly narrower sidebar */
+    grid-template-columns: 240px 1fr;
     grid-template-rows: 1fr;
     height: 100vh;
-    /* overflow: hidden; <--- THIS LINE WAS THE PROBLEM AND HAS BEEN REMOVED */
+    width: 100vw;
 }
 
 /* --- Sidebar --- */
@@ -153,11 +154,15 @@ a:hover { color: var(--primary-accent-color); }
 }
 
 
-/* --- Main Content Area --- */
-.main-content { display: flex; flex-direction: column; overflow-y: auto; }
+/* --- Main Content Area (MODIFIED) --- */
+.main-content {
+    display: grid;
+    grid-template-rows: auto 1fr; /* Header takes auto height, wrapper takes the rest */
+    overflow: hidden; /* Prevent this container from scrolling */
+}
 .top-bar {
     background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0));
-    padding: 0.75rem 1.5rem; /* Reduced padding */
+    padding: 0.75rem 1.5rem;
     position: sticky;
     top: 0;
     z-index: 100;
@@ -165,7 +170,10 @@ a:hover { color: var(--primary-accent-color); }
     justify-content: flex-end;
     align-items: center;
 }
-.content-wrapper { padding: 0.75rem 1.5rem; } /* Reduced padding */
+.content-wrapper {
+    overflow-y: auto; /* This is now the main scrollable area */
+    padding: 0.75rem 1.5rem;
+}
 .content-section { display: none; }
 .content-section.active { display: block; }
 
@@ -625,20 +633,35 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     border-radius: 50px;
 }
 
-/* --- Scan Modal --- */
+/* --- Scan Modal (MODIFIED) --- */
 #scan-item-container {
-    /* This is no longer a fixed modal, it's now an inline block within a placeholder */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: none; /* Toggled by JS to 'flex' */
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    padding: 1rem;
+}
+
+.scan-modal-content {
     background-color: var(--surface-color);
     padding: 1.5rem;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-md);
     width: 100%;
     max-width: 500px;
-    margin: 1rem auto 0; /* Add some top margin and center it */
-    display: none; /* Initially hidden */
+    display: flex;
     flex-direction: column;
     align-items: center;
+    position: relative; /* For the close button */
 }
+
 #camera-controls { display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; }
 #camera-container { width: 100%; position: relative; padding-top: 75%; background-color: #000; border-radius: var(--border-radius); overflow: hidden; }
 #camera-stream { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -717,32 +740,30 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 @media (max-width: 768px) {
     #app-container {
-        display: block; /* Revert to default block display */
-        height: 100vh; /* Use viewport height for a stable reference */
-        overflow-y: auto; /* THIS becomes the primary scroll container */
-        overflow-x: hidden; /* Prevent horizontal scrolling on the main container */
-        padding-bottom: 55px; /* Add padding here to avoid content hiding under the nav bar */
-        -webkit-overflow-scrolling: touch; /* Keep smooth scrolling */
+        grid-template-columns: 1fr; /* Single column layout */
+        grid-template-rows: 1fr auto; /* Content on top, sidebar at bottom */
+        height: 100vh;
+        overflow: hidden; /* Prevent the whole container from scrolling */
+    }
+    .main-content {
+        grid-row: 1 / 2;
     }
     .sidebar { 
-        position: fixed; 
-        bottom: 0; 
-        left: 0; 
-        right: 0; 
-        width: 100%; 
-        height: auto; /* Let content determine height */
+        grid-row: 2 / 3;
+        position: static; /* No longer fixed */
         flex-direction: row; 
-        align-items: stretch; /* Make items fill the height */
+        align-items: stretch;
         justify-content: space-around; 
         padding: 0; 
-        z-index: 1000; 
         border-top: 1px solid var(--border-color);
-        background-color: var(--sidebar-bg-color); /* Add solid background */
+        background-color: var(--sidebar-bg-color);
+        height: 55px; /* Fixed height for the nav bar */
+        overflow: hidden; /* Prevent nav bar itself from scrolling */
     }
     .sidebar-header, .sidebar-footer { display: none; }
     .sidebar-nav { display: flex; justify-content: space-around; width: 100%; }
     .sidebar-nav li {
-        flex: 1; /* Make each nav item take equal space */
+        flex: 1;
         margin-bottom: 0;
         background: none;
         border: none;
@@ -752,22 +773,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         gap: 2px; 
         font-size: 0.65rem; 
         padding: 0.4rem;
-        height: 100%; /* Make link fill the list item */
-        border-radius: 0; /* Remove rounded corners */
+        height: 100%;
+        border-radius: 0;
     }
     .sidebar-nav li a.active {
-        background: var(--surface-highlight-color); /* Add active state background */
+        background: var(--surface-highlight-color);
     }
     .sidebar-nav li a i { font-size: 1.1rem; }
 
-    .main-content { 
-        height: auto; /* Let content determine the height */
-        overflow: visible; /* The parent container handles scrolling now */
-        padding-bottom: 0; /* Padding is moved to the parent */
-    }
-    .content-wrapper {
-        flex-grow: 1; /* Allows this to grow */
-    }
     .top-bar { background: var(--bg-color); padding: 0.75rem; }
     #auth-container {
         display: grid;

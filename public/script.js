@@ -1013,7 +1013,10 @@ async function captureAndScan() {
             targetContainer.innerHTML = `<p>Sorry, the AI scan failed. Please try again.</p>`;
         }
     } finally {
-        stopCamera();
+        // We only close the modal for quick meal, otherwise we show the confirmation form
+        if (scanMode === 'quickMeal' || scanMode === 'grocery' || scanMode === 'groceryReceipt') {
+            stopCamera();
+        }
     }
 }
 
@@ -1080,7 +1083,8 @@ function stopCamera() {
 }
 
 function toggleScanView(mode) {
-    if (isCameraOpen) {
+    const scanItemContainer = document.getElementById('scan-item-container');
+    if (scanItemContainer.style.display === 'flex') {
         stopCamera();
         return;
     }
@@ -1102,8 +1106,15 @@ function openCameraFor(mode) {
     
     capturedImage.style.display = 'none';
     capturedImage.src = '';
-    document.getElementById('item-confirmation-list').innerHTML = '';
-    document.getElementById('confirmation-section').style.display = 'none';
+
+    // Hide confirmation forms when opening the camera
+    const pantryFormsContainer = document.getElementById('pantry-forms-container');
+    if (pantryFormsContainer) pantryFormsContainer.style.display = 'none';
+    const confirmationSection = document.getElementById('confirmation-section');
+    if (confirmationSection) confirmationSection.style.display = 'none';
+    const itemConfirmationList = document.getElementById('item-confirmation-list');
+    if (itemConfirmationList) itemConfirmationList.innerHTML = '';
+    
     startCameraBtn.style.display = 'block';
     captureBtn.style.display = 'none';
 }

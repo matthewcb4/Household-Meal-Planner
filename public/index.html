@@ -293,14 +293,16 @@
 
     <!-- Modals and other floating elements -->
     <div id="scan-item-container" style="display: none;">
-        <h3>Scan New Items</h3>
-        <div id="scan-quota-display" style="display: none; text-align: center; margin-bottom: 1rem; font-weight: 500;"></div>
-        <div id="camera-container" style="display: none;"><video id="camera-stream" autoplay playsinline></video><canvas id="capture-canvas" style="display:none;"></canvas></div>
-        <img id="captured-image" alt="Captured from pantry" style="display: none;">
-        <div id="camera-controls">
-            <button id="start-camera-btn">Start Camera</button>
-            <button id="capture-btn" style="display: none;">Capture & Scan</button>
-            <button id="close-scan-btn" class="danger">Close</button>
+        <div class="scan-modal-content">
+            <span class="close-btn" id="close-scan-btn">&times;</span>
+            <h3>Scan New Items</h3>
+            <div id="scan-quota-display" style="display: none; text-align: center; margin-bottom: 1rem; font-weight: 500;"></div>
+            <div id="camera-container" style="display: none;"><video id="camera-stream" autoplay playsinline></video><canvas id="capture-canvas" style="display:none;"></canvas></div>
+            <img id="captured-image" alt="Captured from pantry" style="display: none;">
+            <div id="camera-controls">
+                <button id="start-camera-btn">Start Camera</button>
+                <button id="capture-btn" style="display: none;">Capture & Scan</button>
+            </div>
         </div>
     </div>
 
