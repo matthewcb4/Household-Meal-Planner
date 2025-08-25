@@ -1397,8 +1397,19 @@ async function handleMealSlotClick(event) {
 
 async function handleModalClick(event) {
     const target = event.target;
-    const recipeDetailModal = target.closest('#recipe-detail-modal');
+    
+    // Logic for toggling instructions/ingredients in ANY modal
+    if (target.closest('.instructions-toggle, .ingredients-toggle')) {
+        const button = target.closest('button');
+        const list = button.nextElementSibling;
+        if (list) {
+            const isVisible = list.style.display === 'block';
+            list.style.display = isVisible ? 'none' : 'block';
+        }
+        return; // Stop further processing for this click
+    }
 
+    const recipeDetailModal = target.closest('#recipe-detail-modal');
     if (recipeDetailModal) {
         const modalContent = recipeDetailModal.querySelector('#recipe-detail-content');
         const recipeData = JSON.parse(modalContent.dataset.recipe);
@@ -1411,13 +1422,6 @@ async function handleModalClick(event) {
             renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
             recipeDetailModal.style.display = 'none';
             document.getElementById('add-to-plan-modal').style.display = 'block';
-        } else if (target.closest('.instructions-toggle') || target.closest('.ingredients-toggle')) {
-            const button = target.closest('button');
-            const list = button.nextElementSibling;
-            if (list) {
-                const isVisible = list.style.display === 'block';
-                list.style.display = isVisible ? 'none' : 'block';
-            }
         } else if (target.closest('.add-to-list-btn')) {
             await handleAddFromRecipe(target);
         } else if (target.closest('.star')) {
@@ -2206,45 +2210,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         // Modal click logic
-        const recipeDetailModal = target.closest('#recipe-detail-modal');
-        if (recipeDetailModal) {
-            const modalContent = recipeDetailModal.querySelector('#recipe-detail-content');
-            const recipeData = JSON.parse(modalContent.dataset.recipe);
-            
-            if (target.closest('.add-to-plan-btn')) {
-                currentRecipeToPlan = recipeData;
-                document.getElementById('add-to-plan-recipe-title').textContent = currentRecipeToPlan.title;
-                selectedDates = []; 
-                calendarDate = new Date(); 
-                renderAddToPlanCalendar(calendarDate.getFullYear(), calendarDate.getMonth());
-                recipeDetailModal.style.display = 'none';
-                document.getElementById('add-to-plan-modal').style.display = 'block';
-            } else if (target.closest('.instructions-toggle') || target.closest('.ingredients-toggle')) {
-                const button = target.closest('button');
-                const list = button.nextElementSibling;
-                if (list) {
-                    const isVisible = list.style.display === 'block';
-                    list.style.display = isVisible ? 'none' : 'block';
-                }
-            } else if (target.closest('.add-to-list-btn')) {
-                handleAddFromRecipe(target);
-            } else if (target.closest('.star')) {
-                const recipeId = target.dataset.id;
-                const newRating = parseInt(target.dataset.rating, 10);
-                const favoritesRef = getFavoritesRef();
-                if (favoritesRef && recipeId) {
-                    updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
-                     // Update stars in modal
-                    const starContainer = target.parentElement;
-                    const stars = starContainer.querySelectorAll('.star');
-                    stars.forEach(star => {
-                        star.classList.toggle('filled', parseInt(star.dataset.rating, 10) <= newRating);
-                    });
-                }
-            }
-        }
+        handleModalClick(event);
         
-        if (target.closest('.modal-recipe-item')) handleModalClick(event);
         if (target.closest('#update-cuisine-btn')) {
              if (!householdId || target.closest('#update-cuisine-btn').disabled) return;
             const newCuisine = document.getElementById('cuisine-select').value;

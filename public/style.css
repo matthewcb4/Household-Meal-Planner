@@ -55,7 +55,7 @@ hr { border: none; border-top: 1px solid var(--border-color); margin: 1.5rem 0; 
 ul { list-style-type: none; padding: 0; }
 li {
     background-color: var(--surface-highlight-color);
-    padding: 0.75rem; /* Reduced padding */
+    padding: 0.3rem; /* Reduced padding */
     border-radius: var(--border-radius);
     margin-bottom: 0.5rem;
     border: 1px solid var(--border-color);
@@ -68,7 +68,8 @@ a:hover { color: var(--primary-accent-color); }
     display: grid;
     grid-template-columns: 240px 1fr;
     grid-template-rows: 1fr;
-    height: 100vh;
+    height: 100vh; /* Fallback for older browsers */
+    height: 100dvh; /* Dynamic viewport height */
     width: 100vw;
     position: relative; /* ADDED: This makes it the positioning context for the toast */
 }
@@ -88,7 +89,7 @@ a:hover { color: var(--primary-accent-color); }
     display: flex;
     align-items: center;
     gap: 0.75rem; /* Reduced gap */
-    padding: 0.4rem; /* Further reduced padding */
+    padding: 0.3rem; /* Further reduced padding */
     border-radius: 4px;
     font-weight: 700;
     font-size: 0.85rem; /* Reduced font size */
@@ -288,13 +289,13 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     border-radius: var(--border-radius);
     overflow: hidden;
     transition: background-color 0.3s;
-    cursor: pointer;
+    /* cursor: pointer; */
     padding: 0.75rem; /* Reduced padding */
     position: relative;
     display: flex;
     flex-direction: column;
 }
-.recipe-card:hover { background-color: var(--surface-highlight-color); }
+/*.recipe-card:hover { background-color: var(--surface-highlight-color); }*/
 .recipe-card img.recipe-image { width: 100%; height: 150px; object-fit: cover; border-radius: var(--border-radius); margin-bottom: 0.75rem; }
 .recipe-card h3 { font-size: 0.95rem; margin: 0 0 0.25rem 0; white-space: normal; }
 .recipe-card p {
@@ -467,6 +468,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 
 .week-navigation { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.week-navigation h3 {
+    flex-grow: 1;
+    text-align: center;
+}
 .source-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; }
 .source-tabs button { background: none; border: none; border-bottom: 3px solid transparent; color: var(--text-secondary-color); padding: 6px 10px; font-size: 1em; font-weight: 500; text-transform: none; letter-spacing: 0; border-radius: 0; }
 .source-tabs button.active { color: var(--primary-accent-color); border-bottom-color: var(--primary-accent-color); }
@@ -678,7 +683,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     text-align: center;
     border-radius: 4px;
     padding: 16px;
-    position: fixed;
+    position: absolute; /* Changed from fixed */
     z-index: 2000;
     left: 50%;
     transform: translateX(-50%);
@@ -744,7 +749,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     #app-container {
         grid-template-columns: 1fr; /* Single column layout */
         grid-template-rows: 1fr auto; /* Content on top, sidebar at bottom */
-        height: 100vh;
+        height: 100vh; /* Fallback for older browsers */
+        height: 100dvh; /* Dynamic viewport height */
         overflow: hidden; /* Prevent the whole container from scrolling */
     }
     .main-content {
@@ -773,7 +779,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     .sidebar-nav li a { 
         flex-direction: column; 
         gap: 2px; 
-        font-size: 0.65rem; 
+        font-size: 0.8rem; 
+        text-align: center;
         padding: 0.4rem;
         height: 100%;
         border-radius: 0;
