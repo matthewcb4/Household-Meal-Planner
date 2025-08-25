@@ -32,7 +32,6 @@ let selectedDates = [];
 let currentHowToSlide = 0;
 // New variables for camera state management
 let isCameraOpen = false;
-let currentScanPlaceholder = null;
 
 
 const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"];
@@ -943,9 +942,8 @@ async function captureAndScan() {
     capturedImageElement.src = `data:image/jpeg;base64,${base64ImageData}`;
     capturedImageElement.style.display = 'block';
     
-    // Stop the camera stream but keep the UI visible for a moment
     if (stream) { stream.getTracks().forEach(track => track.stop()); }
-    stream = null; // Clear the stream
+    stream = null;
     document.getElementById('camera-container').style.display = 'none';
     
     let targetContainer;
@@ -957,20 +955,20 @@ async function captureAndScan() {
             showLoadingState('Scanning ingredients and finding recipes...', targetContainer);
             scanFunction = httpsCallable(functions, 'identifyItems');
             break;
-        case 'receipt': // For Pantry
+        case 'receipt':
             targetContainer = itemConfirmationList;
             pantryFormsContainer.style.display = 'block';
             confirmationSection.style.display = 'block';
             targetContainer.innerHTML = '<p>🧠 Reading receipt for Pantry...</p>';
             scanFunction = httpsCallable(functions, 'scanReceipt');
             break;
-        case 'groceryReceipt': // For Grocery List
-            targetContainer = document.getElementById('grocery-scan-ui-placeholder');
+        case 'groceryReceipt':
+            targetContainer = document.getElementById('grocery-list');
             showLoadingState("Reading receipt for Grocery List...", targetContainer);
             scanFunction = httpsCallable(functions, 'scanReceipt');
             break;
-        case 'grocery': // For Grocery List (single items)
-             targetContainer = document.getElementById('grocery-scan-ui-placeholder');
+        case 'grocery':
+             targetContainer = document.getElementById('grocery-list');
              showLoadingState("Scanning items for Grocery List...", targetContainer);
              scanFunction = httpsCallable(functions, 'identifyItems');
              break;
@@ -997,7 +995,7 @@ async function captureAndScan() {
             const groceryRef = getGroceryListRef();
             if (!groceryRef || !identifiedItems || identifiedItems.length === 0) {
                  targetContainer.innerHTML = '<p>No items found to add.</p>';
-                 setTimeout(() => { targetContainer.innerHTML = '' }, 3000);
+                 setTimeout(() => { displayGroceryList(); }, 3000);
                  return;
             }
             const batch = writeBatch(db);
@@ -1015,7 +1013,6 @@ async function captureAndScan() {
             targetContainer.innerHTML = `<p>Sorry, the AI scan failed. Please try again.</p>`;
         }
     } finally {
-        // The stopCamera function will handle hiding the main container now
         stopCamera();
     }
 }
@@ -1079,50 +1076,30 @@ function stopCamera() {
     videoElement.srcObject = null;
     isCameraOpen = false;
 
-    // Reset and hide the main scan UI
-    if (currentScanPlaceholder) {
-        currentScanPlaceholder.style.display = 'none';
-        currentScanPlaceholder = null;
-    }
-    document.body.appendChild(scanItemContainer);
     scanItemContainer.style.display = 'none';
 }
 
-function toggleScanView(mode, placeholderId) {
-    const placeholder = document.getElementById(placeholderId);
-    
-    // If the camera is already open and this button was clicked again, close it.
-    if (isCameraOpen && currentScanPlaceholder === placeholder) {
+function toggleScanView(mode) {
+    if (isCameraOpen) {
         stopCamera();
         return;
     }
 
-    // If any other camera is open, close it first.
-    if (isCameraOpen) {
-        stopCamera();
-    }
-
-    // Hide all manual forms before opening a camera view
     document.getElementById('pantry-forms-container').style.display = 'none';
     document.getElementById('add-grocery-item-form').style.display = 'none';
 
-    // Set up and open the new camera view
-    currentScanPlaceholder = placeholder;
-    placeholder.style.display = 'block';
-    openCameraFor(mode, placeholder);
+    openCameraFor(mode);
 }
 
-function openCameraFor(mode, placeholderElement) {
+function openCameraFor(mode) {
     const scanItemContainer = document.getElementById('scan-item-container');
     const startCameraBtn = document.getElementById('start-camera-btn');
     const captureBtn = document.getElementById('capture-btn');
     const capturedImage = document.getElementById('captured-image');
 
     scanMode = mode;
-    placeholderElement.appendChild(scanItemContainer);
     scanItemContainer.style.display = 'flex';
     
-    // Reset UI state
     capturedImage.style.display = 'none';
     capturedImage.src = '';
     document.getElementById('item-confirmation-list').innerHTML = '';
@@ -1307,7 +1284,7 @@ async function handleCardClick(event) {
     const recipeData = JSON.parse(card.dataset.recipe);
     
     if (target.closest('.save-recipe-btn')) {
-        toggleFavorite(recipeData, target.closest('.save-recipe-btn'));
+        await toggleFavorite(recipeData, target.closest('.save-recipe-btn'));
     } else if (target.closest('.star')) {
         const recipeId = target.dataset.id;
         const newRating = parseInt(target.dataset.rating, 10);
@@ -1316,7 +1293,6 @@ async function handleCardClick(event) {
             await updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
         }
     } else {
-        // Click on the card itself, not a specific button inside it
         const favoritesRef = getFavoritesRef();
         const q = query(favoritesRef, where("title", "==", recipeData.title));
         const querySnapshot = await getDocs(q);
@@ -1432,7 +1408,7 @@ async function handleModalClick(event) {
                 list.style.display = isVisible ? 'none' : 'block';
             }
         } else if (target.closest('.add-to-list-btn')) {
-            handleAddFromRecipe(target);
+            await handleAddFromRecipe(target);
         } else if (target.closest('.star')) {
             const recipeId = target.dataset.id;
             const newRating = parseInt(target.dataset.rating, 10);
@@ -2284,7 +2260,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('add-grocery-item-form')?.addEventListener('submit', handleAddGroceryItem);
     document.getElementById('move-to-pantry-btn')?.addEventListener('click', moveSelectedItemsToPantryDirectly);
     
-    // UPDATED: Manual Add Buttons
     document.getElementById('show-manual-add-btn').addEventListener('click', () => {
         if (isCameraOpen) stopCamera();
         const container = document.getElementById('pantry-forms-container');
@@ -2301,14 +2276,13 @@ document.addEventListener('DOMContentLoaded', () => {
         form.style.display = form.style.display === 'none' ? 'flex' : 'none';
     });
 
-    // UPDATED: Scan Buttons
-    document.getElementById('show-scan-item-btn').addEventListener('click', () => toggleScanView('pantry', 'pantry-scan-ui-placeholder'));
-    document.getElementById('show-scan-receipt-btn').addEventListener('click', () => toggleScanView('receipt', 'pantry-scan-ui-placeholder'));
-    document.getElementById('show-scan-grocery-btn').addEventListener('click', () => toggleScanView('grocery', 'grocery-scan-ui-placeholder'));
-    document.getElementById('show-scan-receipt-grocery-btn').addEventListener('click', () => toggleScanView('groceryReceipt', 'grocery-scan-ui-placeholder'));
-    document.getElementById('quick-meal-btn').addEventListener('click', () => toggleScanView('quickMeal', 'recipe-scan-ui-placeholder'));
+    // Corrected Event Listeners for Scan Buttons
+    document.getElementById('show-scan-item-btn').addEventListener('click', () => toggleScanView('pantry'));
+    document.getElementById('show-scan-receipt-btn').addEventListener('click', () => toggleScanView('receipt'));
+    document.getElementById('show-scan-grocery-btn').addEventListener('click', () => toggleScanView('grocery'));
+    document.getElementById('show-scan-receipt-grocery-btn').addEventListener('click', () => toggleScanView('groceryReceipt'));
+    document.getElementById('quick-meal-btn').addEventListener('click', () => toggleScanView('quickMeal'));
     
-    // UPDATED: Close Button
     document.getElementById('close-scan-btn').addEventListener('click', stopCamera);
 
     document.getElementById('generate-grocery-list-btn')?.addEventListener('click', generateAutomatedGroceryList);

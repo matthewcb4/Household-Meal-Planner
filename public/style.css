@@ -24,7 +24,6 @@ html, body {
     height: 100%;
     margin: 0;
     padding: 0;
-    overflow: hidden; /* Prevent scrolling on the body itself on mobile */
 }
 body {
     font-family: var(--font-primary);
@@ -69,7 +68,7 @@ a:hover { color: var(--primary-accent-color); }
     grid-template-columns: 240px 1fr; /* Slightly narrower sidebar */
     grid-template-rows: 1fr;
     height: 100vh;
-    overflow: hidden;
+    /* overflow: hidden; <--- THIS LINE WAS THE PROBLEM AND HAS BEEN REMOVED */
 }
 
 /* --- Sidebar --- */
@@ -628,17 +627,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 /* --- Scan Modal --- */
 #scan-item-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    /* This is no longer a fixed modal, it's now an inline block within a placeholder */
     background-color: var(--surface-color);
     padding: 1.5rem;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-md);
-    z-index: 1001;
-    width: 90%;
+    width: 100%;
     max-width: 500px;
+    margin: 1rem auto 0; /* Add some top margin and center it */
     display: none; /* Initially hidden */
     flex-direction: column;
     align-items: center;
