@@ -70,6 +70,7 @@ a:hover { color: var(--primary-accent-color); }
     grid-template-rows: 1fr;
     height: 100vh;
     width: 100vw;
+    position: relative; /* ADDED: This makes it the positioning context for the toast */
 }
 
 /* --- Sidebar --- */
@@ -159,6 +160,7 @@ a:hover { color: var(--primary-accent-color); }
     display: grid;
     grid-template-rows: auto 1fr; /* Header takes auto height, wrapper takes the rest */
     overflow: hidden; /* Prevent this container from scrolling */
+    min-width: 0; /* ADDED: Prevents grid blowout */
 }
 .top-bar {
     background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0));
@@ -638,8 +640,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
+    width: 100vw;
+    height: 100vh;
     background-color: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(5px);
     display: none; /* Toggled by JS to 'flex' */
