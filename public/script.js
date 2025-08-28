@@ -30,6 +30,8 @@ let unitSystem = 'imperial';
 let calendarDate = new Date();
 let selectedDates = [];
 let currentHowToSlide = 0;
+let accumulatedRecipes = [];
+let loadingInterval = null;
 // New variables for camera state management
 let isCameraOpen = false;
 
@@ -186,8 +188,28 @@ function populateCuisineDropdowns() {
 }
 function showLoadingState(message, container) {
     if (!container) return;
-    container.innerHTML = `<div class="loading-card"><div class="loading-spinner"></div><p>${message}</p></div>`;
+    if (loadingInterval) clearInterval(loadingInterval);
+
+    container.innerHTML = `
+        <div class="loading-card">
+            <div class="chef-loader"><i class="fas fa-hat-chef"></i></div>
+            <p id="loading-text"></p>
+        </div>`;
+    
+    const loadingTextEl = document.getElementById('loading-text');
+
+    if (Array.isArray(message)) {
+        let messageIndex = 0;
+        loadingTextEl.textContent = message[messageIndex];
+        loadingInterval = setInterval(() => {
+            messageIndex = (messageIndex + 1) % message.length;
+            loadingTextEl.textContent = message[messageIndex];
+        }, 2500);
+    } else {
+        loadingTextEl.textContent = message;
+    }
 }
+
 
 // --- UI DISPLAY FUNCTIONS ---
 async function displayPantryItems() {
@@ -757,7 +779,7 @@ function createRecipeCard(recipe, isFavorite) {
 
     const cardContent = `
         <div class="recipe-card-header">
-            <h3>${recipe.title}</h3>
+             <h3>${recipe.title}</h3>
         </div>
         ${ratingHTML}
         <p>${recipe.description}</p>
@@ -776,6 +798,9 @@ function createRecipeCard(recipe, isFavorite) {
 function populateRecipeDetailModal(recipe, isFavorite) {
     const modalContent = document.getElementById('recipe-detail-content');
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/333/FFF?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+    const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
+    const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
+
 
     const ingredientsList = (recipe.ingredients && Array.isArray(recipe.ingredients)) 
         ? recipe.ingredients.map(ing => {
@@ -834,8 +859,8 @@ function populateRecipeDetailModal(recipe, isFavorite) {
 
     modalContent.innerHTML = `
         <span class="close-btn" id="recipe-detail-modal-close-btn">&times;</span>
-        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/333/FFF?text=Image+Not+Found';">
-        <h3>${recipe.title}</h3>
+        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
+        <h3><a href="${googleSearchUrl}" target="_blank" title="Search on Google">${recipe.title} 🔗</a></h3>
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${cardActionsHTML}
@@ -849,6 +874,10 @@ function populateRecipeDetailModal(recipe, isFavorite) {
 
 
 function displayRecipeResults(recipes, mealType) {
+    if (loadingInterval) {
+        clearInterval(loadingInterval);
+        loadingInterval = null;
+    }
     const recipeResultsDiv = document.getElementById('recipe-results');
     recipeResultsDiv.innerHTML = "";
     if (!recipes || recipes.length === 0) {
@@ -899,8 +928,13 @@ async function generateRecipes(items, source) {
     const selectedCuisine = document.getElementById('cuisine-select').value;
     const selectedCriteria = Array.from(document.querySelectorAll('input[name="recipeCriteria"]:checked')).map(cb => cb.value);
 
-    let loadingMessage = `Your Chef is creating ${selectedCuisine} ${selectedMealType} recipes...`;
-    showLoadingState(loadingMessage, recipeResultsDiv);
+    const loadingMessages = [
+        `Whipping up ${selectedCuisine || ''} ${selectedMealType} ideas...`,
+        "Consulting with master chefs...",
+        "Sourcing the freshest concepts...",
+        "Plating your recipes now..."
+    ];
+    showLoadingState(loadingMessages, recipeResultsDiv);
 
     try {
         let result;
@@ -918,9 +952,17 @@ async function generateRecipes(items, source) {
             const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
             result = await discoverRecipesFunc(commonPayload);
         }
-        displayRecipeResults(result.data, selectedMealType);
+        
+        const newRecipes = result.data;
+        accumulatedRecipes.unshift(...newRecipes);
+        if (accumulatedRecipes.length > 18) {
+            accumulatedRecipes.length = 18; // Trim to 18
+        }
+        displayRecipeResults(accumulatedRecipes, selectedMealType);
+
     } catch (error) {
         console.error("Error getting recipes:", error);
+        if (loadingInterval) clearInterval(loadingInterval);
         recipeResultsDiv.innerHTML = "<p>Sorry, couldn't get recipe suggestions at this time.</p>";
     }
 }
@@ -1292,6 +1334,11 @@ async function handleCardClick(event) {
     const card = target.closest('.recipe-card');
     if (!card) return;
 
+    // Prevent modal from opening if a link inside the card header was clicked
+    if (target.closest('.recipe-card-header a')) {
+        return;
+    }
+
     const recipeData = JSON.parse(card.dataset.recipe);
     
     if (target.closest('.save-recipe-btn')) {
@@ -1605,6 +1652,7 @@ async function saveUserPreferences() {
     
     const userDocRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userDocRef, { preferences: userPreferences });
+    showToast('Preferences saved!');
 }
 
 function loadUserPreferences() {
@@ -1916,30 +1964,36 @@ async function renderSidebarCalendar() {
     querySnapshot.forEach(doc => {
         const plan = doc.data().meals;
         if (plan) {
-            Object.keys(plan).forEach(dayKey => {
-                // This is a simplified way to get the date. A more robust solution would be needed for multi-year views.
-                const weekId = doc.id;
-                const [planYear, weekNum] = weekId.split('-W');
-                const janFirst = new Date(planYear, 0, 1);
-                const days = (weekNum - 1) * 7;
-                const date = new Date(janFirst.valueOf() + days * 86400000);
-                const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(dayKey);
-                date.setDate(date.getDate() - date.getDay() + dayIndex);
-
-                if (date.getMonth() === month) {
-                    plannedDays.add(date.getDate());
+            Object.entries(plan).forEach(([dayKey, dayMeals]) => {
+                // Check if there are any meals for the day
+                const hasMeals = Object.values(dayMeals).some(mealType => mealType && Object.keys(mealType).length > 0);
+                if (hasMeals) {
+                    const weekId = doc.id;
+                    const [planYear, weekNum] = weekId.split('-W');
+                    const janFirst = new Date(planYear, 0, 1);
+                    const days = (weekNum - 1) * 7;
+                    const date = new Date(janFirst.valueOf() + days * 86400000);
+                    const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(dayKey);
+                    date.setDate(date.getDate() - date.getDay() + dayIndex);
+    
+                    if (date.getMonth() === month) {
+                        plannedDays.add(date.getDate());
+                    }
                 }
             });
         }
     });
 
+    // UPDATE: Clear old highlights before applying new ones
     grid.querySelectorAll('.sidebar-calendar-day').forEach(dayEl => {
+        dayEl.classList.remove('has-meal');
         const dayNum = parseInt(dayEl.textContent);
         if (plannedDays.has(dayNum)) {
             dayEl.classList.add('has-meal');
         }
     });
 }
+
 
 // --- How-To Modal Logic ---
 function showHowToModal() {
@@ -2335,13 +2389,26 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please enter a meal to ask the chef!');
             return;
         }
-        showLoadingState(`Your Chef is creating a "${mealQuery}" recipe...`, document.getElementById('recipe-results'));
+        const loadingMessages = [
+            `Searching the grand cookbook for "${mealQuery}"...`,
+            "Gathering ingredients...",
+            "Perfecting the instructions...",
+            "Here comes your custom recipe!"
+        ];
+        showLoadingState(loadingMessages, document.getElementById('recipe-results'));
         try {
             const askTheChefFunc = httpsCallable(functions, 'askTheChef');
             const result = await askTheChefFunc({ mealQuery, unitSystem });
-            displayRecipeResults([result.data], 'your custom');
+            
+            const newRecipe = result.data;
+            accumulatedRecipes.unshift(newRecipe);
+            if (accumulatedRecipes.length > 18) {
+                accumulatedRecipes.length = 18;
+            }
+            displayRecipeResults(accumulatedRecipes, 'your custom');
             queryInput.value = '';
         } catch (error) {
+            if (loadingInterval) clearInterval(loadingInterval);
             console.error("Error asking the chef:", error);
             document.getElementById('recipe-results').innerHTML = `<p>Sorry, the chef couldn't find a recipe for that.</p>`;
         }

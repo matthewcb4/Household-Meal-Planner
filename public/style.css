@@ -1,5 +1,4 @@
 /* public/style.css */
-/* style.css (Spotify Inspired Redesign - Tighter Layout) */
 
 /* --- CSS Variables --- */
 :root {
@@ -7,7 +6,7 @@
     --sidebar-bg-color: #000000;
     --surface-color: #181818;
     --surface-highlight-color: #282828;
-    --primary-accent-color: #1DB954; /* Spotify Green */
+    --primary-accent-color: #1DB954; 
     --secondary-accent-color: #B3B3B3;
     --text-color: #FFFFFF;
     --text-secondary-color: #B3B3B3;
@@ -43,6 +42,14 @@ h1, h2, h3, h4, h5 {
 }
 h2 { font-size: 1.5rem; margin-bottom: 1rem; text-align: left; } /* Reduced font size and margin */
 h3 { font-size: 1.1rem; margin-bottom: 0.75rem; } /* Reduced font size and margin */
+/* UPDATE: Added styles for links within headers */
+h3 a {
+    color: inherit;
+    text-decoration: none;
+}
+h3 a:hover {
+    text-decoration: underline;
+}
 h4 {
     margin-top: 1.5rem; /* Reduced margin */
     border-bottom: 1px solid var(--border-color);
@@ -281,8 +288,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 /* --- Recipe Cards --- */
 #recipe-results, #favorite-recipes-container .recipe-card-row {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Allow for smaller cards */
-    gap: 1rem; /* Reduced gap */
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.75rem;
 }
 .recipe-card {
     background-color: var(--surface-color);
@@ -737,8 +744,75 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     flex-wrap: wrap;
 }
 
+/* --- NEW: Loading Animation --- */
+.loading-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem;
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    color: var(--text-secondary-color);
+}
+
+.loading-card .chef-loader {
+    font-size: 3rem;
+    color: var(--primary-accent-color);
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.loading-card p {
+    font-weight: 500;
+    text-align: center;
+}
+
 
 /* --- Responsive Styles --- */
+@media (min-width: 769px) {
+    /* UPDATE: Horizontal scrolling for recipe results on desktop */
+    #recipe-results {
+        display: flex;
+        overflow-x: auto;
+        gap: 1rem;
+        padding-bottom: 1rem; /* Make space for scrollbar if visible */
+    }
+    #recipe-results .recipe-card {
+        flex: 0 0 220px; /* Don't shrink, don't grow, fixed width */
+        width: 220px;
+    }
+    /* Hide scrollbar but keep it functional */
+    #recipe-results::-webkit-scrollbar {
+        height: 8px;
+    }
+    #recipe-results::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    #recipe-results::-webkit-scrollbar-thumb {
+        background: var(--surface-highlight-color);
+        border-radius: 4px;
+    }
+    #recipe-results::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+}
+
 @media (max-width: 1400px) {
     #meal-planner-grid {
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -809,7 +883,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     }
     .content-wrapper { padding: 0.75rem; }
     h2 { font-size: 1.4rem; }
-    #recipe-results, #favorite-recipes-container .recipe-card-row { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
+    #recipe-results, #favorite-recipes-container .recipe-card-row { 
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
+        gap: 0.75rem; 
+    }
     .recipe-card img.recipe-image { height: 120px; }
     #meal-planner-grid {
         grid-template-columns: 1fr;
@@ -820,5 +897,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     .meal-type-selector {
         display: grid; /* Switch to grid on mobile */
         grid-template-columns: repeat(2, 1fr); /* 2x2 grid on mobile */
+    }
+    /* UPDATE: Smaller bulk action buttons on mobile */
+    .bulk-controls button {
+        padding: 6px 12px;
+        font-size: 0.8rem;
     }
 }
