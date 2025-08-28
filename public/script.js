@@ -7,13 +7,13 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCylczs2HKlIKQTiikGFFnF9cB60jEXLUo",
-  authDomain: "family-dinner-app-dev.firebaseapp.com",
-  projectId: "family-dinner-app-dev",
-  storageBucket: "family-dinner-app-dev.firebasestorage.app",
-  messagingSenderId: "1065607981746",
-  appId: "1:1065607981746:web:99124a92a45287bc35b7ab",
-  measurementId: "G-XPPVQ8S73W"
+  apiKey: "AIzaSyD-NEXCNVe8GuAeuKvcgvmgy7A01kZhgKI",
+  authDomain: "family-dinner-app-79249.firebaseapp.com",
+  projectId: "family-dinner-app-79249",
+  storageBucket: "family-dinner-app-79249.firebasestorage.app",
+  messagingSenderId: "665272276696",
+  appId: "1:665272276696:web:599165b284256c907e69ad",
+  measurementId: "G-YLVBPLNDWF"
 };
 
 // Initialize Firebase
