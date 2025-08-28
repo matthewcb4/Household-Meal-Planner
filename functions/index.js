@@ -244,7 +244,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, 
             }
         }
 
-        prompt += ` Include a mix of 2-3 simple recipes and 2-3 more complex recipes. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", and "instructions" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
+        prompt += ` Include a mix of 3 simple recipes and 3 more complex recipes. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", and "instructions" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -291,7 +291,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" },
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
-        let prompt = `You are a helpful chef. Suggest 5 popular and delicious ${mealType} recipes.`;
+        let prompt = `You are a helpful chef. Suggest 6 popular and delicious ${mealType} recipes.`;
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
         
         const otherCriteria = [];
