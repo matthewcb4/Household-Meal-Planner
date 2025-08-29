@@ -778,9 +778,38 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     }
 }
 
-.loading-card p {
-    font-weight: 500;
+/* FIX: Added How-To Modal Styles */
+.how-to-slider {
+    position: relative;
+    min-height: 150px; /* Give it some space */
     text-align: center;
+}
+.how-to-slide {
+    display: none; /* Hide all slides by default */
+}
+.how-to-slide.active {
+    display: block; /* Show only the active slide */
+    animation: fadein 0.5s;
+}
+.how-to-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1.5rem;
+}
+.how-to-dots {
+    display: flex;
+    gap: 8px;
+}
+.how-to-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--surface-highlight-color);
+    transition: background-color 0.3s;
+}
+.how-to-dot.active {
+    background-color: var(--primary-accent-color);
 }
 
 

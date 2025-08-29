@@ -32,7 +32,6 @@ let selectedDates = [];
 let currentHowToSlide = 0;
 let accumulatedRecipes = [];
 let loadingInterval = null;
-// New variables for camera state management
 let isCameraOpen = false;
 
 
@@ -186,15 +185,24 @@ function populateCuisineDropdowns() {
         }
     });
 }
-function showLoadingState(message, container) {
+function showLoadingState(message, container, append = false) {
     if (!container) return;
     if (loadingInterval) clearInterval(loadingInterval);
 
-    container.innerHTML = `
-        <div class="loading-card">
+    const loaderHTML = `
+        <div class="loading-card" id="loading-indicator">
             <div class="chef-loader"><i class="fas fa-hat-chef"></i></div>
             <p id="loading-text"></p>
         </div>`;
+    
+    if (append) {
+        const existingLoader = document.getElementById('loading-indicator');
+        if (!existingLoader) {
+            container.insertAdjacentHTML('afterbegin', loaderHTML);
+        }
+    } else {
+        container.innerHTML = loaderHTML;
+    }
     
     const loadingTextEl = document.getElementById('loading-text');
 
@@ -407,9 +415,7 @@ function renderMealPlanner() {
             <button class="plan-day-btn secondary" data-day="${day.toLowerCase()}" data-day-full-name="${fullDayNames[index]}">✨</button>
         `;
         
-        // Add click listener for collapsing
         dayHeader.addEventListener('click', (e) => {
-            // Don't collapse if the plan button itself was clicked
             if (!e.target.closest('.plan-day-btn')) {
                 dayCard.classList.toggle('collapsed');
             }
@@ -496,7 +502,7 @@ async function displayMealPlan() {
                 }
             });
         }
-        renderSidebarCalendar(); // Re-render calendar to update meal indicators
+        renderSidebarCalendar();
     });
 }
 
@@ -873,35 +879,45 @@ function populateRecipeDetailModal(recipe, isFavorite) {
 }
 
 
+// FIX: This function now renders the accumulated recipes without clearing the container first.
 function displayRecipeResults(recipes, mealType) {
     if (loadingInterval) {
         clearInterval(loadingInterval);
         loadingInterval = null;
     }
     const recipeResultsDiv = document.getElementById('recipe-results');
+    const existingLoader = document.getElementById('loading-indicator');
+    if (existingLoader) {
+        existingLoader.remove();
+    }
+
+    // Always re-render the full list from the accumulated array.
     recipeResultsDiv.innerHTML = "";
+
     if (!recipes || recipes.length === 0) {
         recipeResultsDiv.innerHTML = `<p>The AI couldn't think of any ${mealType} recipes with the selected criteria.</p>`;
         return;
     }
-    recipes.forEach(async (recipe) => {
-        const favoritesRef = getFavoritesRef();
-        const q = query(favoritesRef, where("title", "==", recipe.title));
-        const querySnapshot = await getDocs(q);
-        const isFavorite = !querySnapshot.empty;
-        if(isFavorite) {
-            recipe.id = querySnapshot.docs[0].id;
-        }
-        if (!recipe.mealType) {
-            recipe.mealType = mealType;
-        }
-        const recipeCard = createRecipeCard(recipe, isFavorite);
-        if (recipes.length === 1) {
-            recipeCard.classList.add('expanded');
-        }
-        recipeResultsDiv.appendChild(recipeCard);
+
+    const favoritesRef = getFavoritesRef();
+    getDocs(favoritesRef).then(favSnapshot => {
+        const favoriteTitles = new Set(favSnapshot.docs.map(doc => doc.data().title));
+        
+        recipes.forEach(recipe => {
+            const isFavorite = favoriteTitles.has(recipe.title);
+            if(isFavorite) {
+                const favDoc = favSnapshot.docs.find(d => d.data().title === recipe.title);
+                if (favDoc) recipe.id = favDoc.id;
+            }
+            if (!recipe.mealType) {
+                recipe.mealType = mealType;
+            }
+            const recipeCard = createRecipeCard(recipe, isFavorite);
+            recipeResultsDiv.appendChild(recipeCard);
+        });
     });
 }
+
 
 async function getRecipeSuggestions() {
     const pantryRef = getPantryRef();
@@ -915,15 +931,23 @@ async function getRecipeSuggestions() {
         document.getElementById('recipe-results').innerHTML = "<p>Your pantry is empty. Add some items to get suggestions.</p>";
         return;
     }
-    await generateRecipes(pantryItems, 'Suggest from Pantry');
+    await generateRecipes(pantryItems, 'Suggest from Pantry', false); // New search
 }
 
 async function discoverNewRecipes() {
-    await generateRecipes(null, 'Discover New Recipes');
+    await generateRecipes(null, 'Discover New Recipes', false); // New search
 }
 
-async function generateRecipes(items, source) {
+// FIX: Added 'append' parameter to control loading state and accumulated recipes.
+async function generateRecipes(items, source, append = false) {
     const recipeResultsDiv = document.getElementById('recipe-results');
+    const discoverBtn = document.getElementById('discover-recipes-btn');
+    const suggestBtn = document.getElementById('suggest-recipe-btn');
+    
+    if (!append) {
+        accumulatedRecipes = []; // Clear recipes for a new search
+    }
+
     const selectedMealType = document.querySelector('input[name="mealType"]:checked').value;
     const selectedCuisine = document.getElementById('cuisine-select').value;
     const selectedCriteria = Array.from(document.querySelectorAll('input[name="recipeCriteria"]:checked')).map(cb => cb.value);
@@ -934,7 +958,11 @@ async function generateRecipes(items, source) {
         "Sourcing the freshest concepts...",
         "Plating your recipes now..."
     ];
-    showLoadingState(loadingMessages, recipeResultsDiv);
+    
+    // Show loading state without clearing content if appending
+    showLoadingState(loadingMessages, recipeResultsDiv, append);
+    discoverBtn.disabled = true;
+    suggestBtn.disabled = true;
 
     try {
         let result;
@@ -954,6 +982,7 @@ async function generateRecipes(items, source) {
         }
         
         const newRecipes = result.data;
+        // Prepend new recipes to the accumulated list
         accumulatedRecipes.unshift(...newRecipes);
         if (accumulatedRecipes.length > 18) {
             accumulatedRecipes.length = 18; // Trim to 18
@@ -963,9 +992,19 @@ async function generateRecipes(items, source) {
     } catch (error) {
         console.error("Error getting recipes:", error);
         if (loadingInterval) clearInterval(loadingInterval);
-        recipeResultsDiv.innerHTML = "<p>Sorry, couldn't get recipe suggestions at this time.</p>";
+        const existingLoader = document.getElementById('loading-indicator');
+        if (existingLoader) existingLoader.remove();
+        if (!append) {
+            recipeResultsDiv.innerHTML = "<p>Sorry, couldn't get recipe suggestions at this time.</p>";
+        } else {
+            showToast("Could not fetch more recipes.");
+        }
+    } finally {
+        discoverBtn.disabled = false;
+        suggestBtn.disabled = false;
     }
 }
+
 
 async function captureAndScan() {
     const canvasElement = document.getElementById('capture-canvas');
@@ -1030,7 +1069,7 @@ async function captureAndScan() {
 
         if (scanMode === 'quickMeal') {
             const itemNames = identifiedItems.map(item => item.name);
-            await generateRecipes(itemNames, 'Suggest from Pantry');
+            await generateRecipes(itemNames, 'Suggest from Pantry', false);
         } else if (scanMode === 'pantry' || scanMode === 'receipt') {
             displayConfirmationForm(identifiedItems);
         } else if (scanMode === 'grocery' || scanMode === 'groceryReceipt') {
@@ -1055,7 +1094,6 @@ async function captureAndScan() {
             targetContainer.innerHTML = `<p>Sorry, the AI scan failed. Please try again.</p>`;
         }
     } finally {
-        // We only close the modal for quick meal, otherwise we show the confirmation form
         if (scanMode === 'quickMeal' || scanMode === 'grocery' || scanMode === 'groceryReceipt') {
             stopCamera();
         }
@@ -1149,7 +1187,6 @@ function openCameraFor(mode) {
     capturedImage.style.display = 'none';
     capturedImage.src = '';
 
-    // Hide confirmation forms when opening the camera
     const pantryFormsContainer = document.getElementById('pantry-forms-container');
     if (pantryFormsContainer) pantryFormsContainer.style.display = 'none';
     const confirmationSection = document.getElementById('confirmation-section');
@@ -1334,7 +1371,6 @@ async function handleCardClick(event) {
     const card = target.closest('.recipe-card');
     if (!card) return;
 
-    // Prevent modal from opening if a link inside the card header was clicked
     if (target.closest('.recipe-card-header a')) {
         return;
     }
@@ -1445,7 +1481,6 @@ async function handleMealSlotClick(event) {
 async function handleModalClick(event) {
     const target = event.target;
     
-    // Logic for toggling instructions/ingredients in ANY modal
     if (target.closest('.instructions-toggle, .ingredients-toggle')) {
         const button = target.closest('button');
         const list = button.nextElementSibling;
@@ -1453,7 +1488,7 @@ async function handleModalClick(event) {
             const isVisible = list.style.display === 'block';
             list.style.display = isVisible ? 'none' : 'block';
         }
-        return; // Stop further processing for this click
+        return;
     }
 
     const recipeDetailModal = target.closest('#recipe-detail-modal');
@@ -1477,7 +1512,6 @@ async function handleModalClick(event) {
             const favoritesRef = getFavoritesRef();
             if (favoritesRef && recipeId) {
                 await updateDoc(doc(favoritesRef, recipeId), { rating: newRating });
-                 // Update stars in modal
                 const starContainer = target.parentElement;
                 const stars = starContainer.querySelectorAll('.star');
                 stars.forEach(star => {
@@ -1624,7 +1658,7 @@ function configurePaywallUI() {
         }
         if(cuisineSelect) cuisineSelect.value = householdData.cuisine || "";
 
-    } else { // Paid tier
+    } else {
         if (upgradeBtnHeader) upgradeBtnHeader.style.display = 'none';
         premiumFeatures.forEach(el => {
             el.classList.remove('disabled');
@@ -1643,25 +1677,60 @@ function configurePaywallUI() {
     if(householdStatusInfo) householdStatusInfo.textContent = statusText;
 }
 
+// NEW FUNCTION TO HANDLE PREFERENCE TOGGLES
+function handlePreferenceChange(event) {
+    const changedElement = event.target;
+    
+    // Sync checkboxes with the same value across different sections
+    if (changedElement.type === 'checkbox' && changedElement.value) {
+        const value = changedElement.value;
+        const isChecked = changedElement.checked;
+        document.querySelectorAll(`input[type="checkbox"][value="${value}"]`).forEach(checkbox => {
+            if (checkbox !== changedElement) {
+                checkbox.checked = isChecked;
+            }
+        });
+    }
+    
+    // Now save the updated preferences
+    saveUserPreferences();
+}
+
+// FIX: This function now saves all relevant criteria to the user's profile.
 async function saveUserPreferences() {
     if (!currentUser) return;
-    const allergies = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked, input[name="recipeCriteria"]:checked'))
-                           .map(cb => cb.value);
-    
-    userPreferences.allergies = [...new Set(allergies)];
-    
+
+    // Consolidate criteria from both planner and recipe sections
+    const criteriaCheckboxes = document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]');
+    const allCriteria = new Set();
+    criteriaCheckboxes.forEach(cb => {
+        if (cb.checked) {
+            allCriteria.add(cb.value);
+        }
+    });
+
+    userPreferences.criteria = Array.from(allCriteria);
+    userPreferences.unitSystem = document.querySelector('input[name="unitSystem"]:checked').value;
+
     const userDocRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userDocRef, { preferences: userPreferences });
     showToast('Preferences saved!');
 }
 
+// FIX: This function now loads all relevant criteria from the user's profile.
 function loadUserPreferences() {
-    if (userPreferences.allergies) {
-        document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]').forEach(checkbox => {
-            if (userPreferences.allergies.includes(checkbox.value)) {
-                checkbox.checked = true;
-            }
-        });
+    const savedCriteria = userPreferences.criteria || [];
+    const savedUnitSystem = userPreferences.unitSystem || 'imperial';
+
+    // Set criteria checkboxes across the app
+    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]').forEach(checkbox => {
+        checkbox.checked = savedCriteria.includes(checkbox.value);
+    });
+
+    // Set unit system radio buttons
+    const unitRadio = document.querySelector(`input[name="unitSystem"][value="${savedUnitSystem}"]`);
+    if (unitRadio) {
+        unitRadio.checked = true;
     }
 }
 
@@ -1956,7 +2025,6 @@ async function renderSidebarCalendar() {
         grid.appendChild(dayEl);
     }
     
-    // Fetch all meal plans for the month to highlight days
     const mealPlanCollectionRef = collection(db, 'households', householdId, 'mealPlan');
     const q = query(mealPlanCollectionRef, where('__name__', '>=', `${year}-W01`), where('__name__', '<=', `${year}-W53`));
     const querySnapshot = await getDocs(q);
@@ -1965,7 +2033,6 @@ async function renderSidebarCalendar() {
         const plan = doc.data().meals;
         if (plan) {
             Object.entries(plan).forEach(([dayKey, dayMeals]) => {
-                // Check if there are any meals for the day
                 const hasMeals = Object.values(dayMeals).some(mealType => mealType && Object.keys(mealType).length > 0);
                 if (hasMeals) {
                     const weekId = doc.id;
@@ -1984,7 +2051,6 @@ async function renderSidebarCalendar() {
         }
     });
 
-    // UPDATE: Clear old highlights before applying new ones
     grid.querySelectorAll('.sidebar-calendar-day').forEach(dayEl => {
         dayEl.classList.remove('has-meal');
         const dayNum = parseInt(dayEl.textContent);
@@ -2060,7 +2126,6 @@ onAuthStateChanged(auth, async user => {
     }
 });
 
-// --- Auth handlers (to be called from the new UI) ---
 function handleGoogleSignIn() {
     const provider = new GoogleAuthProvider();
     signInWithPopup(auth, provider).catch(error => console.error("Sign in error", error));
@@ -2188,7 +2253,6 @@ async function initializeAppUI(user) {
 document.addEventListener('DOMContentLoaded', () => {
     populateCuisineDropdowns();
     
-    // Static listeners
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -2200,28 +2264,52 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('create-household-modal').style.display = 'block';
     });
 
+    // FIX: Corrected household creation logic with error handling and proper user doc update.
     document.getElementById('create-household-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!currentUser) return;
-        const householdCuisineSelect = document.getElementById('household-cuisine-select');
-        const selectedCuisine = householdCuisineSelect.value;
-        const newHouseholdId = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const householdRef = doc(db, 'households', newHouseholdId);
-        const userRef = doc(db, 'users', currentUser.uid);
-        
-        const batch = writeBatch(db);
-        batch.set(householdRef, { 
-            owner: currentUser.uid, 
-            members: [currentUser.uid],
-            cuisine: selectedCuisine,
-            subscriptionTier: 'free',
-            lastCuisineUpdate: serverTimestamp()
-        });
-        batch.set(userRef, { email: currentUser.email, householdId: newHouseholdId, hasSeenHowToGuide: false, preferences: {} });
-        
-        await batch.commit();
-        document.getElementById('create-household-modal').style.display = 'none';
-        await initializeAppUI(currentUser);
+        const createButton = e.target.querySelector('button[type="submit"]');
+        createButton.disabled = true;
+        createButton.textContent = 'Creating...';
+
+        try {
+            if (!currentUser) {
+                throw new Error("You must be signed in to create a household.");
+            }
+            const householdCuisineSelect = document.getElementById('household-cuisine-select');
+            const selectedCuisine = householdCuisineSelect.value;
+            
+            if (householdCuisineSelect.required && !selectedCuisine) {
+                 showToast("Please select a cuisine preference.");
+                 return; 
+            }
+
+            const newHouseholdId = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const householdRef = doc(db, 'households', newHouseholdId);
+            const userRef = doc(db, 'users', currentUser.uid);
+
+            const batch = writeBatch(db);
+            batch.set(householdRef, {
+                owner: currentUser.uid,
+                members: [currentUser.uid],
+                cuisine: selectedCuisine,
+                subscriptionTier: 'free',
+                lastCuisineUpdate: serverTimestamp()
+            });
+            // Use update, not set, to avoid overwriting existing user data like preferences.
+            batch.update(userRef, { householdId: newHouseholdId }); 
+
+            await batch.commit();
+
+            document.getElementById('create-household-modal').style.display = 'none';
+            await initializeAppUI(currentUser);
+
+        } catch (error) {
+            console.error("Error creating household:", error);
+            showToast(`Failed to create household. Please check permissions and try again.`);
+        } finally {
+            createButton.disabled = false;
+            createButton.textContent = 'Create Household';
+        }
     });
 
     document.getElementById('join-household-btn').addEventListener('click', async () => {
@@ -2236,13 +2324,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const userRef = doc(db, 'users', currentUser.uid);
         const batch = writeBatch(db);
         batch.update(householdRef, { members: arrayUnion(currentUser.uid) });
-        batch.set(userRef, { email: currentUser.email, householdId: code });
+        batch.update(userRef, { householdId: code });
         
         await batch.commit();
         await initializeAppUI(currentUser);
     });
 
-    // Delegated event listeners for dynamically added content
     document.body.addEventListener('click', (event) => {
         const target = event.target;
         
@@ -2263,7 +2350,6 @@ document.addEventListener('DOMContentLoaded', () => {
             handlePlanSingleDayClick(event);
         }
         
-        // Modal click logic
         handleModalClick(event);
         
         if (target.closest('#update-cuisine-btn')) {
@@ -2281,7 +2367,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Form Submissions and other specific listeners
     document.getElementById('manual-add-form')?.addEventListener('submit', handleManualAdd);
     document.getElementById('add-to-pantry-btn')?.addEventListener('click', addItemsToPantry);
     document.getElementById('item-confirmation-list')?.addEventListener('click', handleRemoveConfirmedItem);
@@ -2308,7 +2393,6 @@ document.addEventListener('DOMContentLoaded', () => {
         form.style.display = form.style.display === 'none' ? 'flex' : 'none';
     });
 
-    // Corrected Event Listeners for Scan Buttons
     document.getElementById('show-scan-item-btn').addEventListener('click', () => toggleScanView('pantry'));
     document.getElementById('show-scan-receipt-btn').addEventListener('click', () => toggleScanView('receipt'));
     document.getElementById('show-scan-grocery-btn').addEventListener('click', () => toggleScanView('grocery'));
@@ -2443,6 +2527,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('how-to-modal').style.display = 'none';
         markHowToAsSeen();
     });
+    // FIX: Added better error handling for feedback submission.
     document.getElementById('feedback-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const textarea = document.getElementById('feedback-textarea');
@@ -2460,7 +2545,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast('Thank you for your feedback!');
             } catch (error) {
                 console.error("Error submitting feedback:", error);
-                alert('Sorry, there was an issue submitting your feedback.');
+                showToast('Sorry, there was an issue submitting your feedback. (Check Permissions)');
             }
         }
     });
@@ -2478,7 +2563,8 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Could not generate calendar link. Household not found.');
         }
     });
-    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]').forEach(checkbox => {
-        checkbox.addEventListener('change', saveUserPreferences);
+    
+    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="unitSystem"]').forEach(element => {
+        element.addEventListener('change', handlePreferenceChange);
     });
 });
