@@ -755,11 +755,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 #recipe-detail-content .star.filled {
     color: var(--primary-accent-color);
 }
-#recipe-detail-content .card-actions {
+/* UPDATED: Unified margin for all button containers in recipe detail modal */
+#recipe-detail-content .card-actions,
+#recipe-detail-content .ingredients-container,
+#recipe-detail-content .instructions-container {
     margin-top: 1rem;
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
+    margin-bottom: 0.75rem; /* Ensures spacing below each button/group */
 }
 
 /* --- NEW: Loading Animation --- */

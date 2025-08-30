@@ -538,6 +538,60 @@ async function displayMealPlan() {
     });
 }
 
+// FIX: Added missing function to render the "Add to Plan" modal's calendar
+function renderAddToPlanCalendar(year, month) {
+    const calendarGrid = document.getElementById('calendar-grid');
+    const monthYearDisplay = document.getElementById('calendar-month-year');
+    if (!calendarGrid || !monthYearDisplay) return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize today's date
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    monthYearDisplay.textContent = new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
+    calendarGrid.innerHTML = '';
+
+    // Add day names
+    ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
+        const dayNameEl = document.createElement('div');
+        dayNameEl.className = 'calendar-day-name';
+        dayNameEl.textContent = day;
+        calendarGrid.appendChild(dayNameEl);
+    });
+
+    // Add empty cells for the start of the month
+    for (let i = 0; i < firstDay; i++) {
+        calendarGrid.appendChild(document.createElement('div'));
+    }
+
+    // Add days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayEl = document.createElement('div');
+        dayEl.className = 'calendar-day';
+        dayEl.textContent = day;
+
+        const thisDate = new Date(year, month, day);
+        thisDate.setHours(0, 0, 0, 0);
+        
+        // Format date as YYYY-MM-DD for the dataset
+        const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        dayEl.dataset.date = dateString;
+
+        if (thisDate.getTime() === today.getTime()) {
+            dayEl.classList.add('today');
+        }
+
+        if (selectedDates.includes(dateString)) {
+            dayEl.classList.add('selected');
+        }
+        
+        calendarGrid.appendChild(dayEl);
+    }
+}
+
+
 async function addRecipeToPlan(dateObject, meal, recipe) {
     const dayAbbr = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dateObject.getDay()];
     const mealPlanRef = getMealPlanRefForDate(dateObject);
@@ -1046,12 +1100,17 @@ async function captureAndScan() {
     const confirmationSection = document.getElementById('confirmation-section');
     const recipeResultsDiv = document.getElementById('recipe-results');
     const pantryFormsContainer = document.getElementById('pantry-forms-container');
-
     const context = canvasElement.getContext('2d');
-    canvasElement.width = videoElement.videoWidth;
-    canvasElement.height = videoElement.videoHeight;
+    
+    // --- UPDATED: Client-side Image Resizing ---
+    const MAX_WIDTH = 800; // Define max width for the resized image
+    const scale = MAX_WIDTH / videoElement.videoWidth;
+    canvasElement.width = MAX_WIDTH;
+    canvasElement.height = videoElement.videoHeight * scale;
     context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-    const base64ImageData = canvasElement.toDataURL('image/jpeg').split(',')[1];
+    // Convert canvas to JPEG with quality 0.8 to reduce file size
+    const base64ImageData = canvasElement.toDataURL('image/jpeg', 0.8).split(',')[1];
+    
     capturedImageElement.src = `data:image/jpeg;base64,${base64ImageData}`;
     capturedImageElement.style.display = 'block';
     
@@ -2327,22 +2386,38 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // UPDATED: Added loading state to join household button
     document.getElementById('join-household-btn').addEventListener('click', async () => {
         if (!currentUser) return;
         const code = document.getElementById('household-code-input').value.trim().toUpperCase();
         if (!code) return alert("Please enter a household code.");
-        
-        const householdRef = doc(db, 'households', code);
-        const householdDoc = await getDoc(householdRef);
-        if (!householdDoc.exists()) return alert("Household not found.");
-        
-        const userRef = doc(db, 'users', currentUser.uid);
-        const batch = writeBatch(db);
-        batch.update(householdRef, { members: arrayUnion(currentUser.uid) });
-        batch.update(userRef, { householdId: code });
-        
-        await batch.commit();
-        await initializeAppUI(currentUser);
+
+        const joinButton = document.getElementById('join-household-btn');
+        joinButton.disabled = true;
+        joinButton.textContent = 'Joining...';
+
+        try {
+            const householdRef = doc(db, 'households', code);
+            const householdDoc = await getDoc(householdRef);
+            if (!householdDoc.exists()) {
+                alert("Household not found.");
+                return;
+            }
+            
+            const userRef = doc(db, 'users', currentUser.uid);
+            const batch = writeBatch(db);
+            batch.update(householdRef, { members: arrayUnion(currentUser.uid) });
+            batch.update(userRef, { householdId: code });
+            
+            await batch.commit();
+            await initializeAppUI(currentUser);
+        } catch (error) {
+            console.error("Error joining household:", error);
+            alert("Failed to join household. Please check the code and try again.");
+        } finally {
+            joinButton.disabled = false;
+            joinButton.textContent = 'Join';
+        }
     });
 
     document.body.addEventListener('click', (event) => {

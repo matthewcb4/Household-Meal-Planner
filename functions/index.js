@@ -90,8 +90,8 @@ const fetchWithTimeout = async (url, options, timeout = 530000) => {
 // --- HELPER: Delay function ---
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// --- SCAN QUOTA MANAGEMENT (UPDATED to use isPremium helper) ---
-const checkScanQuota = async (householdId) => {
+// --- NEW/UPDATED: Generic Usage Quota Management ---
+const checkAndIncrementUsage = async (householdId, feature) => {
     const householdRef = db.collection('households').doc(householdId);
     const householdDoc = await householdRef.get();
     const householdData = householdDoc.data();
@@ -100,43 +100,50 @@ const checkScanQuota = async (householdId) => {
         return { allowed: true };
     }
 
-    const usage = householdData.scanUsage || { count: 0, resetDate: new Date(0) };
     const now = new Date();
-    const resetDate = usage.resetDate.toDate ? usage.resetDate.toDate() : usage.resetDate;
-
-    if (now > resetDate) {
-        usage.count = 0;
-    }
-
-    const FREE_SCAN_LIMIT = 20;
-    if (usage.count >= FREE_SCAN_LIMIT) {
-        return { allowed: false, limit: FREE_SCAN_LIMIT };
-    }
-    return { allowed: true };
-};
-
-const incrementScanUsage = async (householdId) => {
-    const householdRef = db.collection('households').doc(householdId);
-    const householdDoc = await householdRef.get();
-    const householdData = householdDoc.data();
-
-    if (isPremium(householdData)) {
-        return; // Don't increment for premium users
-    }
+    // Use a new top-level `usage` map in your household document
+    const usage = householdData.usage || {};
+    const featureUsage = usage[feature] || { count: 0, resetDate: new Date(0) };
+    const resetDate = featureUsage.resetDate.toDate ? featureUsage.resetDate.toDate() : featureUsage.resetDate;
     
-    const usage = householdData.scanUsage || { count: 0, resetDate: new Date(0) };
-    const now = new Date();
-    const resetDate = usage.resetDate.toDate ? usage.resetDate.toDate() : usage.resetDate;
-
+    let currentCount = featureUsage.count;
+    
+    // Check if the reset date has passed
     if (now > resetDate) {
-        usage.count = 1;
+        currentCount = 0;
+    }
+
+    const LIMITS = {
+        scan: 20,
+        recipeGeneration: 100 // Example: 50 AI recipe generations per month for free users
+    };
+
+    if (currentCount >= LIMITS[feature]) {
+        return { allowed: false, limit: LIMITS[feature] };
+    }
+
+    // Increment usage
+    const newCount = currentCount + 1;
+    let newResetDate = admin.firestore.Timestamp.fromDate(resetDate);
+
+    // If the count was reset, set a new reset date for next month
+    if (now > resetDate) {
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        usage.resetDate = admin.firestore.Timestamp.fromDate(nextMonth);
-    } else {
-        usage.count += 1;
+        newResetDate = admin.firestore.Timestamp.fromDate(nextMonth);
     }
     
-    await householdRef.update({ scanUsage: usage });
+    // Update Firestore
+    // Note the use of FieldPath to dynamically set the key in the usage map
+    await householdRef.set({
+        usage: {
+            [feature]: {
+                count: newCount,
+                resetDate: newResetDate
+            }
+        }
+    }, { merge: true });
+    
+    return { allowed: true };
 };
 
 
@@ -151,9 +158,9 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const quotaCheck = await checkScanQuota(householdId);
-    if (!quotaCheck.allowed) {
-        throw new HttpsError('resource-exhausted', `You have used all ${quotaCheck.limit} of your free scans for the month.`);
+    const usageCheck = await checkAndIncrementUsage(householdId, 'scan');
+    if (!usageCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free scans for the month.`);
     }
     
     const base64ImageData = request.data.image;
@@ -188,9 +195,6 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
             const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
             const items = JSON.parse(jsonTextResponse);
-            if (items.length > 0) {
-                await incrementScanUsage(householdId);
-            }
             return items;
         } else {
             if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].finishReason === 'SAFETY') {
@@ -209,6 +213,20 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
 
 // --- CLOUD FUNCTION (V2): suggestRecipes ---
 exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+    const userDoc = await db.collection('users').doc(request.auth.uid).get();
+    const householdId = userDoc.data()?.householdId;
+    if (!householdId) {
+        throw new HttpsError('failed-precondition', 'User is not part of a household.');
+    }
+
+    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
+    if (!usageCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free AI recipe generations for the month.`);
+    }
+
     const { pantryItems, mealType, cuisine, criteria, unitSystem } = request.data;
 
     try {
@@ -269,6 +287,20 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
 
 // --- CLOUD FUNCTION (V2): discoverRecipes ---
 exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+    const userDoc = await db.collection('users').doc(request.auth.uid).get();
+    const householdId = userDoc.data()?.householdId;
+    if (!householdId) {
+        throw new HttpsError('failed-precondition', 'User is not part of a household.');
+    }
+
+    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
+    if (!usageCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free AI recipe generations for the month.`);
+    }
+
     const { mealType, cuisine, criteria, unitSystem } = request.data;
 
     try {
@@ -328,6 +360,20 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
 
 // --- CLOUD FUNCTION (V2): askTheChef ---
 exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforceAppCheck: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+    const userDoc = await db.collection('users').doc(request.auth.uid).get();
+    const householdId = userDoc.data()?.householdId;
+    if (!householdId) {
+        throw new HttpsError('failed-precondition', 'User is not part of a household.');
+    }
+
+    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
+    if (!usageCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free AI recipe generations for the month.`);
+    }
+
     const { mealQuery, unitSystem } = request.data;
     if (!mealQuery) {
         throw new HttpsError('invalid-argument', 'The function must be called with a "mealQuery".');
@@ -594,9 +640,9 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1", enfor
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const quotaCheck = await checkScanQuota(householdId);
-    if (!quotaCheck.allowed) {
-        throw new HttpsError('resource-exhausted', `You have used all ${quotaCheck.limit} of your free scans for the month.`);
+    const usageCheck = await checkAndIncrementUsage(householdId, 'scan');
+    if (!usageCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free scans for the month.`);
     }
 
     const { image } = request.data;
@@ -655,9 +701,6 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1", enfor
         
         if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
             const items = JSON.parse(responseData.candidates[0].content.parts[0].text);
-            if (items.length > 0) {
-                await incrementScanUsage(householdId);
-            }
             return items;
         } else {
              throw new HttpsError('internal', 'Failed to parse the categorization response from the AI service.');
