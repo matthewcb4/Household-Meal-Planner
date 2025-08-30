@@ -1,4 +1,4 @@
-// index.js (Cloud Functions) - Updated to V2 Syntax with Subscription Logic
+// index.js (Cloud Functions) - Updated with App Check Enforcement and full Stripe Webhook logic
 
 const functions = require("firebase-functions");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
@@ -18,7 +18,6 @@ const db = admin.firestore();
 const pexelsKey = defineString("PEXELS_KEY");
 const documentAiProcessorId = defineString("DOCUMENT_AI_PROCESSOR_ID");
 const documentAiLocation = defineString("DOCUMENT_AI_LOCATION");
-// --- NEW: Add your Stripe Price ID as a secret/param ---
 const stripePriceId = defineString("STRIPE_PRICE_ID");
 
 
@@ -34,7 +33,6 @@ const isPremium = (householdData) => {
             return false;
         }
     }
-    // If subscriptionTier is 'paid' but there's no expiration, it's a legacy permanent plan.
     return true;
 };
 
@@ -47,8 +45,6 @@ const getPexelsImage = async (query) => {
             console.error("Pexels API key is not set as a secret.");
             return null;
         }
-
-        // IMPROVEMENT: Appending "food" to the query to get more relevant images
         const enhancedQuery = `${query} food`;
         const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(enhancedQuery)}&per_page=1`;
         const response = await fetch(url, {
@@ -60,18 +56,11 @@ const getPexelsImage = async (query) => {
             console.error(`Pexels API error: ${response.statusText} for query "${enhancedQuery}"`, errorBody);
             return null;
         }
-
         const data = await response.json();
-        
         const imageUrl = data?.photos?.[0]?.src?.large;
         if (imageUrl) {
             return imageUrl;
         }
-        
-        if (data?.photos?.length > 0) {
-            console.warn(`Pexels API response for query "${enhancedQuery}" had a photo but was missing the expected 'src.large' path.`, JSON.stringify(data.photos[0]));
-        }
-
         return null;
     } catch (error) {
         console.error(`Error fetching image from Pexels for query "${query}":`, error);
@@ -152,7 +141,7 @@ const incrementScanUsage = async (householdId) => {
 
 
 // --- CLOUD FUNCTION (V2): identifyItems ---
-exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1" }, async (request) => {
+exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
@@ -204,7 +193,6 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1" }, a
             }
             return items;
         } else {
-            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
             if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].finishReason === 'SAFETY') {
                  throw new HttpsError('invalid-argument', 'The request was blocked due to safety concerns. Please try a different image.');
             }
@@ -220,7 +208,7 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1" }, a
 });
 
 // --- CLOUD FUNCTION (V2): suggestRecipes ---
-exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, async (request) => {
+exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
     const { pantryItems, mealType, cuisine, criteria, unitSystem } = request.data;
 
     try {
@@ -258,7 +246,6 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, 
 
         if (!aiResponse.ok) {
             const errorText = await aiResponse.text();
-            console.error("AI Recipe API Error Response:", errorText);
             throw new HttpsError('internal', `AI API request failed with status ${aiResponse.status}`);
         }
         const responseData = await aiResponse.json();
@@ -271,7 +258,6 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, 
             }
             return recipes;
         } else {
-            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
             throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }
 
@@ -282,7 +268,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, 
 });
 
 // --- CLOUD FUNCTION (V2): discoverRecipes ---
-exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" }, async (request) => {
+exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
     const { mealType, cuisine, criteria, unitSystem } = request.data;
 
     try {
@@ -319,7 +305,6 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" },
 
         if (!aiResponse.ok) {
             const errorText = await aiResponse.text();
-            console.error("AI Discover API Error Response:", errorText);
             throw new HttpsError('internal', `AI API request failed with status ${aiResponse.status}`);
         }
         const responseData = await aiResponse.json();
@@ -332,7 +317,6 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" },
             }
             return recipes;
         } else {
-            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
             throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }
 
@@ -343,7 +327,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1" },
 });
 
 // --- CLOUD FUNCTION (V2): askTheChef ---
-exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1" }, async (request) => {
+exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforceAppCheck: true }, async (request) => {
     const { mealQuery, unitSystem } = request.data;
     if (!mealQuery) {
         throw new HttpsError('invalid-argument', 'The function must be called with a "mealQuery".');
@@ -374,7 +358,6 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1" }, asyn
 
         if (!aiResponse.ok) {
             const errorText = await aiResponse.text();
-            console.error("AI Ask the Chef Error Response:", errorText);
             throw new HttpsError('internal', `AI API request failed with status ${aiResponse.status}`);
         }
 
@@ -386,7 +369,6 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1" }, asyn
             recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
             return recipe;
         } else {
-            console.error("Unexpected AI API response structure:", JSON.stringify(responseData));
             throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }
 
@@ -398,7 +380,7 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1" }, asyn
 
 
 // --- CLOUD FUNCTION (V2): generateGroceryList ---
-exports.generateGroceryList = onCall(async (request) => {
+exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in to generate a grocery list.');
     }
@@ -485,7 +467,7 @@ exports.generateGroceryList = onCall(async (request) => {
 });
 
 // --- CLOUD FUNCTION (V2): planSingleDay ---
-exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, async (request) => {
+exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1", enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
@@ -508,7 +490,6 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
         if (!existingMeals?.dinner) mealsToPlan.push("Dinner");
 
         if (mealsToPlan.length === 0) {
-            console.log(`All meals for ${day} are already planned. Skipping.`);
             return {};
         }
 
@@ -557,9 +538,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
         prompt += ` For each recipe, provide a title, a brief description, a list of ingredients (including quantity, unit in the ${unitSystem || 'imperial'} system, and category: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]), a simple image search keyword, and step-by-step cooking instructions.
         
         VERY IMPORTANT: Structure your response as a single, valid JSON object. The top-level keys should be the meal types you planned (e.g., "breakfast", "dinner").
-        Each meal's value should be an object where the key is a unique meal ID (e.g., "meal_1700000000") and the value is the full recipe object.
-        
-        Example for planning Breakfast and Dinner: { "breakfast": { "meal_12345": { "title": "Scrambled Eggs", "description": "Classic...", "ingredients": [{"name": "Eggs", "quantity": 2, "unit": "", "category": "Dairy & Eggs"}], "imageQuery": "scrambled eggs", "instructions": ["..."] } }, "dinner": { "meal_67890": { "title": "...", ... } } }`;
+        Each meal's value should be an object where the key is a unique meal ID (e.g., "meal_1700000000") and the value is the full recipe object.`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -574,14 +553,12 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
 
         if (!aiResponse.ok) {
             const errorText = await aiResponse.text();
-            console.error(`AI planSingleDay Error for ${day}:`, errorText);
             throw new HttpsError('internal', `Failed to generate plan for ${day}`);
         }
 
         const responseData = await aiResponse.json();
         
         if (!responseData.candidates || !responseData.candidates[0].content || !responseData.candidates[0].content.parts[0].text) {
-            console.error(`Invalid AI response structure for ${day}:`, responseData);
             throw new HttpsError('internal', `Invalid AI response for ${day}`);
         }
         
@@ -599,7 +576,6 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
         return dayPlan;
 
     } catch (error) {
-        console.error(`planSingleDay function error for ${day}:`, error);
         if (error instanceof HttpsError) {
             throw error;
         }
@@ -608,7 +584,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1" }, a
 });
 
 
-exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1" }, async (request) => {
+exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
@@ -684,7 +660,6 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1" }, asy
             }
             return items;
         } else {
-             console.error("Unexpected AI API response structure in scanReceipt:", JSON.stringify(responseData));
              throw new HttpsError('internal', 'Failed to parse the categorization response from the AI service.');
         }
 
@@ -756,7 +731,7 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
                                 title: `${meal.charAt(0).toUpperCase() + meal.slice(1)}: ${recipe.title}`,
                                 start: [eventDate.getFullYear(), eventDate.getMonth() + 1, eventDate.getDate(), hour, 0],
                                 duration: { hours: 1 },
-                                description: `Recipe: ${recipe.title}\n\n${recipe.description || ''}`,
+                                description: `Recipe: ${recipe.title}\\n\\n${recipe.description || ''}`,
                                 calName: 'Household Meal Plan',
                                 productId: 'household-meal-planner/ics'
                             };
@@ -788,7 +763,7 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
 
 // --- Stripe Cloud Functions (UPDATED FOR SUBSCRIPTIONS) ---
 
-exports.createStripeCheckout = onCall(async (request) => {
+exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in to make a purchase.');
     }
@@ -800,7 +775,6 @@ exports.createStripeCheckout = onCall(async (request) => {
         const userDoc = await db.collection('users').doc(uid).get();
 
         if (!userDoc.exists) {
-            console.error(`User document not found for uid: ${uid}`);
             throw new HttpsError('not-found', 'Could not find user data.');
         }
         const householdId = userDoc.data().householdId;
@@ -823,6 +797,13 @@ exports.createStripeCheckout = onCall(async (request) => {
             mode: 'subscription', 
             success_url: `https://householdmealplanner.online?payment_success=true`,
             cancel_url: `https://householdmealplanner.online?payment_cancel=true`,
+            // UPDATED: Pass metadata to the subscription for future reference in webhooks
+            subscription_data: {
+                metadata: {
+                    householdId: householdId
+                }
+            },
+            // Keep metadata on the session for the initial checkout.session.completed event
             metadata: {
                 householdId: householdId
             }
@@ -850,12 +831,10 @@ exports.stripeWebhook = onRequest(async (req, res) => {
         return res.sendStatus(400);
     }
     
-    // --- Helper function to grant premium access ---
     const grantAccess = async (householdId, customerId, subscriptionId) => {
         if (householdId) {
             const householdRef = db.collection('households').doc(householdId);
             const now = new Date();
-            // Grant access for 31 days to be safe
             const accessEndDate = new Date(now.getTime() + 31 * 24 * 60 * 60 * 1000);
 
             await householdRef.update({
@@ -867,8 +846,23 @@ exports.stripeWebhook = onRequest(async (req, res) => {
             console.log(`Successfully granted premium access to household ${householdId}.`);
         }
     };
+    
+    // NEW: Helper function to revoke premium access
+    const revokeAccess = async (householdId) => {
+        if (!householdId) {
+            console.error('Revoke access called without a householdId.');
+            return;
+        }
+        const householdRef = db.collection('households').doc(householdId);
+        await householdRef.update({
+            subscriptionTier: 'free',
+            premiumAccessUntil: admin.firestore.FieldValue.delete(),
+            stripeCustomerId: admin.firestore.FieldValue.delete(),
+            stripeSubscriptionId: admin.firestore.FieldValue.delete()
+        });
+        console.log(`Successfully revoked premium access for household ${householdId}.`);
+    };
 
-    // --- Handle different event types ---
     switch (event.type) {
         case 'checkout.session.completed': {
             const session = event.data.object;
@@ -881,7 +875,6 @@ exports.stripeWebhook = onRequest(async (req, res) => {
         }
         case 'invoice.payment_succeeded': {
             const invoice = event.data.object;
-            // For recurring payments, we need to get metadata from the subscription
             if (invoice.subscription) {
                  const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
                  const householdId = subscription.metadata.householdId;
@@ -891,7 +884,31 @@ exports.stripeWebhook = onRequest(async (req, res) => {
             }
             break;
         }
-        // TODO: Handle other events like 'customer.subscription.deleted' to downgrade users.
+        // NEW: Handle failed payments to revoke access
+        case 'invoice.payment_failed': {
+            const invoice = event.data.object;
+            if (invoice.subscription) {
+                const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+                const householdId = subscription.metadata.householdId;
+                if (householdId) {
+                    console.log(`Payment failed for household ${householdId}. Revoking access.`);
+                    await revokeAccess(householdId);
+                }
+            }
+            break;
+        }
+        // NEW: Handle subscription cancellations to revoke access
+        case 'customer.subscription.deleted': {
+            const subscription = event.data.object;
+            const householdId = subscription.metadata.householdId;
+            if (householdId) {
+                console.log(`Subscription deleted for household ${householdId}. Revoking access.`);
+                await revokeAccess(householdId);
+            } else {
+                 console.error(`Could not find householdId in metadata for deleted subscription ${subscription.id}`);
+            }
+            break;
+        }
         default:
             console.log(`Unhandled event type ${event.type}`);
     }
@@ -899,10 +916,8 @@ exports.stripeWebhook = onRequest(async (req, res) => {
     res.status(200).send();
 });
 
-// --- NEW CLOUD FUNCTION (V2): grantTrialAccess ---
-// This function is for you to manually grant trial access to beta testers.
-exports.grantTrialAccess = onCall(async (request) => {
-    // SECURITY NOTE: In a real app, you would add checks here to ensure only an admin can run this.
+// --- CLOUD FUNCTION (V2): grantTrialAccess ---
+exports.grantTrialAccess = onCall({ enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
@@ -916,7 +931,7 @@ exports.grantTrialAccess = onCall(async (request) => {
         const householdRef = db.collection('households').doc(householdIdToGrant);
         const householdDoc = await householdRef.get();
 
-        if (!householdDoc.exists) {
+        if (!householdDoc.exists()) {
             throw new HttpsError('not-found', `Household with ID ${householdIdToGrant} not found.`);
         }
 
@@ -924,15 +939,13 @@ exports.grantTrialAccess = onCall(async (request) => {
         const trialEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
         await householdRef.update({
-            subscriptionTier: 'paid', // Treat them as 'paid' during the trial
+            subscriptionTier: 'paid',
             premiumAccessUntil: admin.firestore.Timestamp.fromDate(trialEndDate)
         });
 
-        console.log(`Granted 30-day premium trial to household ${householdIdToGrant}. Expires on ${trialEndDate.toISOString()}`);
         return { success: true, message: `Trial granted until ${trialEndDate.toLocaleDateString()}.` };
 
     } catch (error) {
-        console.error("Error in grantTrialAccess function:", error);
         if (error instanceof HttpsError) {
             throw error;
         }
@@ -941,11 +954,8 @@ exports.grantTrialAccess = onCall(async (request) => {
 });
 
 
-// --- NEW CLOUD FUNCTION (V2): checkTrialExpirations (Scheduled) ---
-// This function will run automatically every 24 hours to check for and revoke expired trials.
+// --- CLOUD FUNCTION (V2): checkTrialExpirations (Scheduled) ---
 exports.checkTrialExpirations = onSchedule('every 24 hours', async (event) => {
-    console.log("Running scheduled job to check for expired premium trials...");
-
     const now = admin.firestore.Timestamp.now();
     const expiredTrialsQuery = db.collection('households')
         .where('premiumAccessUntil', '<=', now);
@@ -963,12 +973,11 @@ exports.checkTrialExpirations = onSchedule('every 24 hours', async (event) => {
             const householdRef = db.collection('households').doc(doc.id);
             batch.update(householdRef, {
                 subscriptionTier: 'free',
-                premiumAccessUntil: admin.firestore.FieldValue.delete() // Remove the field
+                premiumAccessUntil: admin.firestore.FieldValue.delete()
             });
         });
 
         await batch.commit();
-        console.log(`Successfully processed ${snapshot.size} expired trials.`);
         return { success: true, processedCount: snapshot.size };
 
     } catch (error) {
@@ -977,22 +986,18 @@ exports.checkTrialExpirations = onSchedule('every 24 hours', async (event) => {
     }
 });
 
-// --- NEW: Test Function for Stripe Secret ---
-exports.testStripeSecret = onCall(async (request) => {
+// --- Test Function for Stripe Secret ---
+exports.testStripeSecret = onCall({ enforceAppCheck: true }, async (request) => {
     try {
         const key = process.env.STRIPE_SECRET_KEY;
         if (key && key.startsWith("sk_test_")) {
-            console.log("Successfully loaded Stripe secret key.");
             return { success: true, keyStart: key.substring(0, 8) };
         } else if (key) {
-            console.error("Stripe secret key is present but does not look like a test key.");
             return { success: false, error: "Key is present but invalid." };
         } else {
-            console.error("Stripe secret key is missing from environment.");
             return { success: false, error: "Stripe secret key not found." };
         }
     } catch (error) {
-        console.error("Error in testStripeSecret function:", error);
         throw new HttpsError('internal', 'An error occurred while testing the secret.');
     }
 });

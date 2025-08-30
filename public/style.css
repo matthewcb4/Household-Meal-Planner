@@ -121,23 +121,41 @@ a:hover { color: var(--primary-accent-color); }
 .sidebar-footer a:hover { color: var(--text-color); background-color: var(--surface-highlight-color); }
 
 /* --- Sidebar Calendar --- */
-#sidebar-calendar-container {
+#sidebar-calendar-container-desktop, #sidebar-calendar-container-mobile {
     background-color: transparent; /* Removed background */
     border-radius: var(--border-radius);
     padding: 0.75rem;
     margin-top: 1rem;
 }
-#sidebar-calendar-header {
+.sidebar-calendar-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.5rem;
 }
-#sidebar-calendar-header h5 {
+.sidebar-calendar-header h5 {
     margin: 0;
     font-size: 0.9rem;
+    flex-grow: 1;
+    text-align: center;
 }
-#sidebar-calendar-grid {
+/* UPDATED: Styles for the new navigation buttons */
+.sidebar-calendar-header button {
+    background: none;
+    border: none;
+    color: var(--text-secondary-color);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 0.5rem;
+    line-height: 1; /* Ensure button height is minimal */
+    text-transform: none; /* Override global button styles */
+    letter-spacing: normal; /* Override global button styles */
+}
+.sidebar-calendar-header button:hover {
+    color: var(--text-color);
+}
+
+.sidebar-calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 2px;
@@ -812,6 +830,28 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     background-color: var(--primary-accent-color);
 }
 
+/* NEW: Mobile "More" Modal Styles */
+.mobile-links-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1rem;
+}
+
+.mobile-links-container a {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: var(--border-radius);
+    font-weight: 500;
+}
+.mobile-links-container a:hover {
+    background-color: var(--surface-highlight-color);
+}
+
 
 /* --- Responsive Styles --- */
 @media (min-width: 769px) {
@@ -840,6 +880,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     #recipe-results::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
+    #sidebar-calendar-container-mobile { display: none; } /* Hide mobile calendar on desktop */
+    .mobile-only-nav { display: none; } /* Hide "More" button on desktop */
 }
 
 @media (max-width: 1400px) {
@@ -871,7 +913,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         height: 55px; /* Fixed height for the nav bar */
         overflow: hidden; /* Prevent nav bar itself from scrolling */
     }
-    .sidebar-header, .sidebar-footer { display: none; }
+    .sidebar-header { display: none; }
+    /* UPDATED: Hide the desktop footer and show the mobile "More" button */
+    .sidebar-footer { display: none; }
+    .mobile-only-nav { display: list-item; } /* Use list-item to match other nav items */
+
     .sidebar-nav { display: flex; justify-content: space-around; width: 100%; }
     .sidebar-nav li {
         flex: 1;
@@ -892,6 +938,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         background: var(--surface-highlight-color);
     }
     .sidebar-nav li a i { font-size: 1.1rem; }
+    #sidebar-calendar-container-desktop { display: none; } /* Hide desktop calendar on mobile */
 
     .top-bar { background: var(--bg-color); padding: 0.75rem; }
     #auth-container {

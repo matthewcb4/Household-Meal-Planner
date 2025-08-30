@@ -1,9 +1,11 @@
 // public/script.js
 // Import all necessary functions from the Firebase SDKs at the top
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, signInWithRedirect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, onSnapshot, query, where, writeBatch, arrayUnion, serverTimestamp, deleteDoc, orderBy, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
+
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -18,6 +20,14 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// --- ACTION REQUIRED: Initialize App Check with your NEW reCAPTCHA v3 Site Key ---
+const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider('PASTE_YOUR_NEW_RECAPTCHA_V3_SITE_KEY_HERE'), 
+  isTokenAutoRefreshEnabled: true
+});
+
+
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app);
@@ -28,6 +38,7 @@ const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna
 let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeHousehold = () => {}, unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
 let unitSystem = 'imperial';
 let calendarDate = new Date();
+let sidebarCalendarDate = new Date(); // NEW: Separate date for the sidebar calendar
 let selectedDates = [];
 let currentHowToSlide = 0;
 let accumulatedRecipes = [];
@@ -38,10 +49,12 @@ let isCameraOpen = false;
 const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"];
 const CUISINE_OPTIONS = ["American", "Asian", "French", "Greek", "Indian", "Italian", "Mediterranean", "Mexican", "Spanish", "Thai"];
 
-// --- NEW: Function to create and manage the auth UI in the top bar ---
+// --- Function to create and manage the auth UI in the top bar ---
 function renderAuthUI(user) {
     const authContainer = document.getElementById('auth-container');
     authContainer.innerHTML = ''; // Clear previous state
+    const moreNavButton = document.querySelector('.mobile-only-nav');
+
     if (user) {
         authContainer.innerHTML = `
             <div class="auth-left">
@@ -59,6 +72,7 @@ function renderAuthUI(user) {
         if (upgradeBtn) {
             upgradeBtn.addEventListener('click', handleUpgradeClick);
         }
+        if (moreNavButton) moreNavButton.style.display = 'list-item'; // Show the 'More' button
     } else {
         authContainer.innerHTML = `<button id="login-main-btn">Login / Sign Up</button>`;
         document.getElementById('login-main-btn').addEventListener('click', () => {
@@ -73,10 +87,11 @@ function renderAuthUI(user) {
             householdManager.style.display = 'none';
             householdManager.classList.remove('active');
         });
+        if (moreNavButton) moreNavButton.style.display = 'none'; // Hide the 'More' button
     }
 }
 
-// --- NEW: Function to build the login form when needed ---
+// --- Function to build the login form when needed ---
 function buildLoginForm() {
     const loginSection = document.getElementById('login-section');
     loginSection.innerHTML = `
@@ -1927,106 +1942,75 @@ async function handlePlanMyWeek() {
     }
 }
 
-function renderAddToPlanCalendar(year, month) {
-    const calendarGrid = document.getElementById('calendar-grid');
-    const calendarMonthYear = document.getElementById('calendar-month-year');
-    calendarGrid.innerHTML = '';
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    calendarMonthYear.textContent = new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
-
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => {
-        const dayNameEl = document.createElement('div');
-        dayNameEl.className = 'calendar-day-name';
-        dayNameEl.textContent = day;
-        calendarGrid.appendChild(dayNameEl);
-    });
-
-    for (let i = 0; i < firstDay; i++) {
-        calendarGrid.appendChild(document.createElement('div'));
-    }
-
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dayEl = document.createElement('div');
-        dayEl.className = 'calendar-day';
-        dayEl.textContent = day;
-        const thisDate = new Date(year, month, day);
-        thisDate.setHours(0, 0, 0, 0);
-        dayEl.dataset.date = thisDate.toISOString();
-
-        if (thisDate.getTime() === today.getTime()) {
-            dayEl.classList.add('today');
-        }
-
-        if (selectedDates.some(d => new Date(d).getTime() === thisDate.getTime())) {
-            dayEl.classList.add('selected');
-        }
-
-        calendarGrid.appendChild(dayEl);
-    }
-}
-
 async function renderSidebarCalendar() {
-    const container = document.getElementById('sidebar-calendar-container');
-    if (!container || !householdId) return;
+    const containers = [
+        document.getElementById('sidebar-calendar-container-desktop'),
+        document.getElementById('sidebar-calendar-container-mobile')
+    ];
+    
+    if (!householdId) return;
 
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
+    for (const container of containers) {
+        if (!container) continue;
 
-    container.innerHTML = `
-        <div id="sidebar-calendar-header">
-            <h5>${today.toLocaleString('default', { month: 'long', year: 'numeric' })}</h5>
-        </div>
-        <div id="sidebar-calendar-grid"></div>
-    `;
+        const year = sidebarCalendarDate.getFullYear();
+        const month = sidebarCalendarDate.getMonth();
 
-    const grid = document.getElementById('sidebar-calendar-grid');
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+        container.innerHTML = `
+            <div class="sidebar-calendar-header">
+                 <button class="sidebar-cal-nav-btn" data-cal-nav="prev">&lt;</button>
+                 <h5>${sidebarCalendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</h5>
+                 <button class="sidebar-cal-nav-btn" data-cal-nav="next">&gt;</button>
+            </div>
+            <div class="sidebar-calendar-grid"></div>
+        `;
 
-    ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => {
-        const dayNameEl = document.createElement('div');
-        dayNameEl.className = 'sidebar-calendar-day-name';
-        dayNameEl.textContent = day;
-        grid.appendChild(dayNameEl);
-    });
+        const grid = container.querySelector('.sidebar-calendar-grid');
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    for (let i = 0; i < firstDay; i++) {
-        grid.appendChild(document.createElement('div'));
-    }
-
-    const startOfWeek = new Date(currentDate);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-    startOfWeek.setHours(0,0,0,0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6);
-
-    for (let day = 1; day <= daysInMonth; day++) {
-        const dayEl = document.createElement('div');
-        dayEl.className = 'sidebar-calendar-day';
-        dayEl.textContent = day;
-        const thisDate = new Date(year, month, day);
-        thisDate.setHours(0,0,0,0);
-        
-        if (thisDate >= startOfWeek && thisDate <= endOfWeek) {
-            dayEl.classList.add('current-week');
-        }
-        
-        dayEl.addEventListener('click', () => {
-            currentDate = thisDate;
-            updateWeekView();
+        ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach(day => {
+            const dayNameEl = document.createElement('div');
+            dayNameEl.className = 'sidebar-calendar-day-name';
+            dayNameEl.textContent = day;
+            grid.appendChild(dayNameEl);
         });
 
-        grid.appendChild(dayEl);
+        for (let i = 0; i < firstDay; i++) {
+            grid.appendChild(document.createElement('div'));
+        }
+
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        startOfWeek.setHours(0,0,0,0);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'sidebar-calendar-day';
+            dayEl.textContent = day;
+            const thisDate = new Date(year, month, day);
+            thisDate.setHours(0,0,0,0);
+            
+            if (thisDate >= startOfWeek && thisDate <= endOfWeek) {
+                dayEl.classList.add('current-week');
+            }
+            
+            dayEl.addEventListener('click', () => {
+                currentDate = thisDate;
+                sidebarCalendarDate = new Date(currentDate); // Sync sidebar date on click
+                updateWeekView();
+                const moreModal = document.getElementById('more-modal');
+                if (moreModal) moreModal.style.display = 'none';
+            });
+
+            grid.appendChild(dayEl);
+        }
     }
     
     const mealPlanCollectionRef = collection(db, 'households', householdId, 'mealPlan');
-    const q = query(mealPlanCollectionRef, where('__name__', '>=', `${year}-W01`), where('__name__', '<=', `${year}-W53`));
+    const q = query(mealPlanCollectionRef, where('__name__', '>=', `${sidebarCalendarDate.getFullYear()}-W01`), where('__name__', '<=', `${sidebarCalendarDate.getFullYear()}-W53`));
     const querySnapshot = await getDocs(q);
     const plannedDays = new Set();
     querySnapshot.forEach(doc => {
@@ -2043,7 +2027,7 @@ async function renderSidebarCalendar() {
                     const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(dayKey);
                     date.setDate(date.getDate() - date.getDay() + dayIndex);
     
-                    if (date.getMonth() === month) {
+                    if (date.getMonth() === sidebarCalendarDate.getMonth()) {
                         plannedDays.add(date.getDate());
                     }
                 }
@@ -2051,11 +2035,15 @@ async function renderSidebarCalendar() {
         }
     });
 
-    grid.querySelectorAll('.sidebar-calendar-day').forEach(dayEl => {
-        dayEl.classList.remove('has-meal');
-        const dayNum = parseInt(dayEl.textContent);
-        if (plannedDays.has(dayNum)) {
-            dayEl.classList.add('has-meal');
+    containers.forEach(container => {
+        if (container) {
+            container.querySelectorAll('.sidebar-calendar-day').forEach(dayEl => {
+                dayEl.classList.remove('has-meal');
+                const dayNum = parseInt(dayEl.textContent);
+                if (plannedDays.has(dayNum)) {
+                    dayEl.classList.add('has-meal');
+                }
+            });
         }
     });
 }
@@ -2106,6 +2094,8 @@ onAuthStateChanged(auth, async user => {
     const loginSection = document.getElementById('login-section');
     const householdManager = document.getElementById('household-manager');
 
+    renderAuthUI(user); // UPDATED: Always call renderAuthUI to handle showing/hiding "More" button
+
     if (user) {
         await initializeAppUI(user);
     } else {
@@ -2114,7 +2104,6 @@ onAuthStateChanged(auth, async user => {
         unsubscribeMealPlan();
         unsubscribeFavorites();
         
-        renderAuthUI(null);
         buildLoginForm();
         
         initialView.style.display = 'block';
@@ -2126,10 +2115,18 @@ onAuthStateChanged(auth, async user => {
     }
 });
 
+// UPDATED: Use signInWithRedirect on mobile devices
 function handleGoogleSignIn() {
     const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider).catch(error => console.error("Sign in error", error));
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    if (isMobile) {
+        signInWithRedirect(auth, provider).catch(error => console.error("Sign in with redirect error", error));
+    } else {
+        signInWithPopup(auth, provider).catch(error => console.error("Sign in with popup error", error));
+    }
 }
+
 async function handleEmailSignIn(e) {
     e.preventDefault();
     const email = document.getElementById('email-input').value;
@@ -2190,7 +2187,7 @@ async function handleUpgradeClick() {
 
 async function initializeAppUI(user) {
     currentUser = user;
-    renderAuthUI(user);
+    // renderAuthUI is now called in onAuthStateChanged
 
     const userDocRef = doc(db, 'users', user.uid);
     let userDoc = await getDoc(userDocRef);
@@ -2264,7 +2261,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('create-household-modal').style.display = 'block';
     });
 
-    // FIX: Corrected household creation logic with error handling and proper user doc update.
     document.getElementById('create-household-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const createButton = e.target.querySelector('button[type="submit"]');
@@ -2295,7 +2291,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 subscriptionTier: 'free',
                 lastCuisineUpdate: serverTimestamp()
             });
-            // Use update, not set, to avoid overwriting existing user data like preferences.
             batch.update(userRef, { householdId: newHouseholdId }); 
 
             await batch.commit();
@@ -2335,7 +2330,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (target.closest('.close-btn')) target.closest('.modal').style.display = 'none';
         if (event.target.classList.contains('modal')) event.target.style.display = 'none';
-        if (target.closest('#feedback-btn-sidebar')) document.getElementById('feedback-modal').style.display = 'block';
+        if (target.closest('#feedback-btn-sidebar') || target.closest('#feedback-btn-modal')) {
+             document.getElementById('more-modal').style.display = 'none';
+             document.getElementById('feedback-modal').style.display = 'block';
+        }
         if (target.closest('#copy-household-code-btn')) {
             const code = document.getElementById('household-code-text').textContent;
             navigator.clipboard.writeText(code).then(() => showToast('Household code copied!'));
@@ -2348,6 +2346,17 @@ document.addEventListener('DOMContentLoaded', () => {
                  handleMealSlotClick(event);
             }
             handlePlanSingleDayClick(event);
+        }
+        
+        // FIX: Moved calendar navigation to event delegation to prevent duplicate listeners
+        if (target.closest('.sidebar-cal-nav-btn')) {
+            const direction = target.closest('.sidebar-cal-nav-btn').dataset.calNav;
+            if (direction === 'prev') {
+                sidebarCalendarDate.setMonth(sidebarCalendarDate.getMonth() - 1);
+            } else if (direction === 'next') {
+                sidebarCalendarDate.setMonth(sidebarCalendarDate.getMonth() + 1);
+            }
+            renderSidebarCalendar();
         }
         
         handleModalClick(event);
@@ -2527,7 +2536,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('how-to-modal').style.display = 'none';
         markHowToAsSeen();
     });
-    // FIX: Added better error handling for feedback submission.
     document.getElementById('feedback-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const textarea = document.getElementById('feedback-textarea');
@@ -2562,6 +2570,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             alert('Could not generate calendar link. Household not found.');
         }
+    });
+    
+    document.getElementById('more-nav-link')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('more-modal').style.display = 'block';
     });
     
     document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="unitSystem"]').forEach(element => {
