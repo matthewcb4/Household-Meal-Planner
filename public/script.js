@@ -284,10 +284,10 @@ async function displayPantryItems() {
             list.style.display = 'none';
             groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
                 const listItem = document.createElement('li');
-                listItem.className = 'pantry-item';
+                listItem.className = `pantry-item ${item.checked ? 'checked' : ''}`;
                 listItem.innerHTML = `
                     <div class="item-info">
-                         <input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}">
+                         <input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
                         <span>${item.name} (${item.quantity} ${item.unit})</span>
                     </div>
                     <button class="delete-pantry-item-btn danger" data-id="${item.id}">X</button>
@@ -538,7 +538,6 @@ async function displayMealPlan() {
     });
 }
 
-// FIX: Added missing function to render the "Add to Plan" modal's calendar
 function renderAddToPlanCalendar(year, month) {
     const calendarGrid = document.getElementById('calendar-grid');
     const monthYearDisplay = document.getElementById('calendar-month-year');
@@ -763,7 +762,7 @@ function handlePantryClick(event) {
         if (list && (list.tagName === 'UL' || list.classList.contains('favorite-recipe-grid') || list.classList.contains('recipe-card-row'))) {
             const isVisible = list.style.display !== 'none';
             list.style.display = isVisible ? 'none' : 'block';
-            if (toggle) toggle.textContent = isVisible ? '−' : '+';
+            if (toggle) toggle.textContent = isVisible ? '+' : '−';
         }
     }
 
@@ -965,7 +964,6 @@ function populateRecipeDetailModal(recipe, isFavorite) {
 }
 
 
-// FIX: This function now renders the accumulated recipes without clearing the container first.
 function displayRecipeResults(recipes, mealType) {
     if (loadingInterval) {
         clearInterval(loadingInterval);
@@ -1006,25 +1004,13 @@ function displayRecipeResults(recipes, mealType) {
 
 
 async function getRecipeSuggestions() {
-    const pantryRef = getPantryRef();
-    if (!pantryRef) {
-        document.getElementById('recipe-results').innerHTML = "<p>Error: Not in a household.</p>";
-        return;
-    }
-    const snapshot = await getDocs(pantryRef);
-    const pantryItems = snapshot.docs.map(doc => doc.data().name);
-    if (pantryItems.length === 0) {
-        document.getElementById('recipe-results').innerHTML = "<p>Your pantry is empty. Add some items to get suggestions.</p>";
-        return;
-    }
-    await generateRecipes(pantryItems, 'Suggest from Pantry', false); // New search
+    await generateRecipes(null, 'Suggest from Pantry', false); // New search, not appending
 }
 
 async function discoverNewRecipes() {
     await generateRecipes(null, 'Discover New Recipes', true); // Append new recipes
 }
 
-// FIX: Added 'append' parameter to control loading state and accumulated recipes.
 async function generateRecipes(items, source, append = false) {
     const recipeResultsDiv = document.getElementById('recipe-results');
     const discoverBtn = document.getElementById('discover-recipes-btn');
@@ -1045,11 +1031,9 @@ async function generateRecipes(items, source, append = false) {
         "Plating your recipes now..."
     ];
     
-    // Show loading state without clearing content if appending
     showLoadingState(loadingMessages, recipeResultsDiv, append);
-    // Scroll to the results after they are displayed
     recipeResultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    
+
     discoverBtn.disabled = true;
     suggestBtn.disabled = true;
 
@@ -1063,18 +1047,24 @@ async function generateRecipes(items, source, append = false) {
         };
 
         if (source === 'Suggest from Pantry') {
+            const pantryRef = getPantryRef();
+            const snapshot = await getDocs(pantryRef);
+            const pantryItems = snapshot.docs.map(doc => doc.data().name);
+            if (pantryItems.length === 0) {
+                recipeResultsDiv.innerHTML = "<p>Your pantry is empty. Add some items to get suggestions.</p>";
+                return;
+            }
             const suggestRecipesFunc = httpsCallable(functions, 'suggestRecipes');
-            result = await suggestRecipesFunc({ ...commonPayload, pantryItems: items });
+            result = await suggestRecipesFunc({ ...commonPayload, pantryItems: pantryItems });
         } else {
             const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
             result = await discoverRecipesFunc(commonPayload);
         }
         
         const newRecipes = result.data;
-        // Prepend new recipes to the accumulated list
         accumulatedRecipes.unshift(...newRecipes);
-        if (accumulatedRecipes.length > 18) {
-            accumulatedRecipes.length = 18; // Trim to 18
+        if (accumulatedRecipes.length > 18) { // Keep the list to a max of 18
+            accumulatedRecipes.length = 18;
         }
         displayRecipeResults(accumulatedRecipes, selectedMealType);
 
@@ -1084,7 +1074,7 @@ async function generateRecipes(items, source, append = false) {
         const existingLoader = document.getElementById('loading-indicator');
         if (existingLoader) existingLoader.remove();
         if (!append) {
-            recipeResultsDiv.innerHTML = "<p>Sorry, couldn't get recipe suggestions at this time.</p>";
+            recipeResultsDiv.innerHTML = `<p>Sorry, couldn't get recipe suggestions at this time.</p>`;
         } else {
             showToast("Could not fetch more recipes.");
         }
@@ -1105,13 +1095,11 @@ async function captureAndScan() {
     const pantryFormsContainer = document.getElementById('pantry-forms-container');
     const context = canvasElement.getContext('2d');
     
-    // --- UPDATED: Client-side Image Resizing ---
-    const MAX_WIDTH = 800; // Define max width for the resized image
+    const MAX_WIDTH = 800;
     const scale = MAX_WIDTH / videoElement.videoWidth;
     canvasElement.width = MAX_WIDTH;
     canvasElement.height = videoElement.videoHeight * scale;
     context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-    // Convert canvas to JPEG with quality 0.8 to reduce file size
     const base64ImageData = canvasElement.toDataURL('image/jpeg', 0.8).split(',')[1];
     
     capturedImageElement.src = `data:image/jpeg;base64,${base64ImageData}`;
@@ -1725,7 +1713,7 @@ function configurePaywallUI() {
     let statusText = `Status: ${householdData.subscriptionTier.charAt(0).toUpperCase() + householdData.subscriptionTier.slice(1)}`;
 
     if (householdData.subscriptionTier === 'free') {
-        const scansUsed = householdData.scanUsage?.count || 0;
+        const scansUsed = householdData.usage?.scan?.count || 0;
         const scansLeft = 20 - scansUsed;
         statusText += ` (${scansLeft} / 20 Scans Left)`;
         if (upgradeBtnHeader) upgradeBtnHeader.style.display = 'block';
@@ -1734,6 +1722,13 @@ function configurePaywallUI() {
             el.querySelectorAll('input, button, select').forEach(input => input.disabled = true);
         });
         
+        if(scansLeft <= 0) {
+            document.querySelectorAll('#show-scan-item-btn, #show-scan-receipt-btn, #show-scan-grocery-btn, #show-scan-receipt-grocery-btn, #quick-meal-btn').forEach(btn => {
+                btn.disabled = true;
+                btn.title = "You have used all your free scans for the month.";
+            });
+        }
+
         if (updateCuisineBtn && householdData.lastCuisineUpdate) {
             const lastUpdate = householdData.lastCuisineUpdate.toDate();
             const now = new Date();
@@ -1930,6 +1925,18 @@ function startApp() {
     listenToFavorites();
     configurePaywallUI();
     loadUserPreferences();
+    
+    // UPDATED: Handle payment status from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('payment_success')) {
+        showToast("Upgrade successful! Welcome to Premium.");
+        // Clean the URL
+        window.history.replaceState({}, document.title, "/");
+    } else if (urlParams.has('payment_cancel')) {
+        showToast("Payment was canceled. You can upgrade anytime!");
+        // Clean the URL
+        window.history.replaceState({}, document.title, "/");
+    }
 }
 
 async function handlePlanMyWeek() {
