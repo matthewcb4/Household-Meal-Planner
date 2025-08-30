@@ -1,7 +1,7 @@
 // public/script.js
 // Import all necessary functions from the Firebase SDKs at the top
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, signInWithRedirect } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, onSnapshot, query, where, writeBatch, arrayUnion, serverTimestamp, deleteDoc, orderBy, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
@@ -21,9 +21,9 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// --- ACTION REQUIRED: Initialize App Check with your NEW reCAPTCHA v3 Site Key ---
+// --- App Check Initialization ---
 const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('PASTE_YOUR_NEW_RECAPTCHA_V3_SITE_KEY_HERE'), 
+  provider: new ReCaptchaV3Provider('6LflS7IgAAAAAPaEdXmeLldzPm-UyjeApdj26b80h5s'), 
   isTokenAutoRefreshEnabled: true
 });
 
@@ -32,6 +32,23 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app);
 const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
+
+
+// --- NEW: Handle Redirect Result ---
+// This function checks if the user is returning from a sign-in redirect.
+// It's essential for the mobile Google Sign-In to work correctly.
+getRedirectResult(auth)
+  .then((result) => {
+    if (result) {
+      // This means the user has successfully signed in via redirect.
+      // The onAuthStateChanged observer below will now handle the user session.
+      console.log("Redirect result processed successfully.");
+    }
+  }).catch((error) => {
+    // Handle errors here, such as the user canceling the sign-in.
+    console.error("Error processing redirect result:", error);
+    showToast(`Login failed: ${error.message}`);
+  });
 
 
 // --- GLOBAL VARIABLES ---
@@ -2115,16 +2132,19 @@ onAuthStateChanged(auth, async user => {
     }
 });
 
-// UPDATED: Use signInWithRedirect on mobile devices
+// UPDATED: Forcing signInWithPopup on all devices for troubleshooting
 function handleGoogleSignIn() {
     const provider = new GoogleAuthProvider();
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobile) {
-        signInWithRedirect(auth, provider).catch(error => console.error("Sign in with redirect error", error));
-    } else {
-        signInWithPopup(auth, provider).catch(error => console.error("Sign in with popup error", error));
-    }
+    // The isMobile check has been removed. All devices will now attempt to use the popup.
+    signInWithPopup(auth, provider).catch(error => {
+        console.error("Sign in with popup error", error);
+        // Provide more specific feedback if the popup is blocked
+        if (error.code === 'auth/popup-blocked') {
+            alert('Popup was blocked by the browser. Please allow popups for this site and try again.');
+        } else {
+             showToast(`Login failed: ${error.message}`);
+        }
+    });
 }
 
 async function handleEmailSignIn(e) {
