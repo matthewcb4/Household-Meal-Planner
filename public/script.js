@@ -593,7 +593,7 @@ function renderAddToPlanCalendar(year, month) {
 
 
 async function addRecipeToPlan(dateObject, meal, recipe) {
-    const dayAbbr = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dateObject.getDay()];
+    const dayAbbr = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dateObject.getUTCDay()];
     const mealPlanRef = getMealPlanRefForDate(dateObject);
     if (!mealPlanRef) return;
     
@@ -1021,7 +1021,7 @@ async function getRecipeSuggestions() {
 }
 
 async function discoverNewRecipes() {
-    await generateRecipes(null, 'Discover New Recipes', false); // New search
+    await generateRecipes(null, 'Discover New Recipes', true); // Append new recipes
 }
 
 // FIX: Added 'append' parameter to control loading state and accumulated recipes.
@@ -1047,6 +1047,9 @@ async function generateRecipes(items, source, append = false) {
     
     // Show loading state without clearing content if appending
     showLoadingState(loadingMessages, recipeResultsDiv, append);
+    // Scroll to the results after they are displayed
+    recipeResultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
     discoverBtn.disabled = true;
     suggestBtn.disabled = true;
 
@@ -2527,9 +2530,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const meal = document.getElementById('meal-select').value;
         if (currentRecipeToPlan && selectedDates.length > 0 && meal) {
             for (const dateString of selectedDates) {
-                await addRecipeToPlan(new Date(dateString), meal, currentRecipeToPlan);
+                // FIX: Create date object in UTC to prevent timezone shift issues
+                const parts = dateString.split('-'); // "YYYY-MM-DD"
+                const dateObject = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12, 0, 0));
+                await addRecipeToPlan(dateObject, meal, currentRecipeToPlan);
             }
-            currentDate = new Date(selectedDates[0]);
+            // Also set currentDate using UTC to ensure the view switches to the correct week
+            const firstDateParts = selectedDates[0].split('-');
+            currentDate = new Date(Date.UTC(firstDateParts[0], firstDateParts[1] - 1, firstDateParts[2], 12, 0, 0));
+
             document.getElementById('add-to-plan-modal').style.display = 'none';
             currentRecipeToPlan = null;
             selectedDates = [];

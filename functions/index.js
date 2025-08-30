@@ -115,7 +115,7 @@ const checkAndIncrementUsage = async (householdId, feature) => {
 
     const LIMITS = {
         scan: 20,
-        recipeGeneration: 100 // Example: 50 AI recipe generations per month for free users
+        recipeGeneration: 50 // Example: 50 AI recipe generations per month for free users
     };
 
     if (currentCount >= LIMITS[feature]) {

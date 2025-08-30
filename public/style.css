@@ -981,3 +981,41 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         font-size: 0.8rem;
     }
 }
+/* Style for the 'Remove from Plan' button in the modal */
+.modal-recipe-item .remove-from-plan-btn {
+    /* Positioning */
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10; /* Make sure it's on top of the image */
+
+    /* Appearance */
+    background-color: rgba(0, 0, 0, 0.6); /* Dark semi-transparent background */
+    color: #FFFFFF; /* White 'X' */
+    border: none;
+    border-radius: 50%; /* Make it circular */
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 32px; /* Vertically center the 'X' */
+    text-align: center;
+    
+    /* Remove default button padding and text transformations */
+    padding: 0;
+    text-transform: none;
+    letter-spacing: normal;
+    
+    /* Add a subtle shadow for depth */
+    text-shadow: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+
+    /* Smooth transition for hover effect */
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+/* Hover effect */
+.modal-recipe-item .remove-from-plan-btn:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+    transform: scale(1.1);
+}
