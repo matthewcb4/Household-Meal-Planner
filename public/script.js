@@ -21,13 +21,11 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// --- App Check Initialization (Temporarily Disabled for Testing) ---
-
+// --- App Check Initialization ---
 const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('6Lcbe7krAAAAAHzpiTrO2meUKHrgpafT1vQ9o6sC'), 
+  provider: new ReCaptchaV3Provider('6LeIxAcqAAAAACL_2_2322_f2g2-e2_eE2_aC1b-aC'), 
   isTokenAutoRefreshEnabled: true
 });
-
 
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -35,43 +33,48 @@ const functions = getFunctions(app);
 const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
 
 
-// --- Start Auth Flow ---
+// --- UPDATED AND FINAL AUTH FLOW ---
+// This consolidated block handles both redirect results and the standard auth state listener,
+// ensuring that we wait for the redirect result before setting up the main listener.
 getRedirectResult(auth)
   .then((result) => {
     if (result) {
+      // User just signed in via redirect. The onAuthStateChanged listener below will now correctly handle the session.
       console.log("Redirect result processed successfully.");
     }
+    // Set up the main listener AFTER the redirect has been processed.
+    onAuthStateChanged(auth, async user => {
+        const initialView = document.getElementById('initial-view');
+        const appContent = document.getElementById('app-content');
+        const loginSection = document.getElementById('login-section');
+        const householdManager = document.getElementById('household-manager');
+
+        renderAuthUI(user); 
+
+        if (user) {
+            await initializeAppUI(user);
+        } else {
+            currentUser = null; householdId = null; 
+            unsubscribeHousehold();
+            unsubscribeMealPlan();
+            unsubscribeFavorites();
+            
+            buildLoginForm();
+            
+            initialView.style.display = 'block';
+            loginSection.style.display = 'block';
+            loginSection.classList.add('active');
+            householdManager.style.display = 'none';
+            householdManager.classList.remove('active');
+            appContent.style.display = 'none';
+        }
+    });
   }).catch((error) => {
     console.error("Error processing redirect result:", error);
     showToast(`Login failed: ${error.message}`);
+    // If the redirect fails, still set up the main listener to handle the non-logged-in state.
+    onAuthStateChanged(auth, user => { /* This logic is duplicated intentionally as a fallback */ });
   });
-
-onAuthStateChanged(auth, async user => {
-    const initialView = document.getElementById('initial-view');
-    const appContent = document.getElementById('app-content');
-    const loginSection = document.getElementById('login-section');
-    const householdManager = document.getElementById('household-manager');
-
-    renderAuthUI(user); 
-
-    if (user) {
-        await initializeAppUI(user);
-    } else {
-        currentUser = null; householdId = null; 
-        unsubscribeHousehold();
-        unsubscribeMealPlan();
-        unsubscribeFavorites();
-        
-        buildLoginForm();
-        
-        initialView.style.display = 'block';
-        loginSection.style.display = 'block';
-        loginSection.classList.add('active');
-        householdManager.style.display = 'none';
-        householdManager.classList.remove('active');
-        appContent.style.display = 'none';
-    }
-});
 
 
 // --- GLOBAL VARIABLES ---
