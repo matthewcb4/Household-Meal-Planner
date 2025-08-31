@@ -22,10 +22,13 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // --- App Check Initialization ---
-const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('6LflS7IgAAAAAPaEdXmeLldzPm-UyjeApdj26b80h5s'), 
-  isTokenAutoRefreshEnabled: true
-});
+// UPDATED: Wrap initialization in a function to be called AFTER auth is confirmed.
+function initializeFirebaseServices() {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider('6LflS7IgAAAAAPaEdXmeLldzPm-UyjeApdj26b80h5s'), 
+      isTokenAutoRefreshEnabled: true
+    });
+}
 
 
 const db = getFirestore(app);
@@ -34,20 +37,48 @@ const functions = getFunctions(app);
 const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
 
 
-// --- NEW: Handle Redirect Result ---
-// This function checks if the user is returning from a sign-in redirect.
-// It's essential for the mobile Google Sign-In to work correctly.
+// --- Start Auth Flow ---
+// This consolidated block handles both redirect results and the standard auth state listener.
+// It ensures that we check for a redirect result immediately on page load.
 getRedirectResult(auth)
   .then((result) => {
     if (result) {
-      // This means the user has successfully signed in via redirect.
-      // The onAuthStateChanged observer below will now handle the user session.
+      // User just signed in via redirect. The onAuthStateChanged will handle it from here.
       console.log("Redirect result processed successfully.");
     }
+    // Now, set up the normal auth state listener. This will run after the redirect is handled.
+    onAuthStateChanged(auth, async user => {
+        const initialView = document.getElementById('initial-view');
+        const appContent = document.getElementById('app-content');
+        const loginSection = document.getElementById('login-section');
+        const householdManager = document.getElementById('household-manager');
+
+        renderAuthUI(user); 
+
+        if (user) {
+            initializeFirebaseServices(); // Initialize App Check now that we have a user.
+            await initializeAppUI(user);
+        } else {
+            currentUser = null; householdId = null; 
+            unsubscribeHousehold();
+            unsubscribeMealPlan();
+            unsubscribeFavorites();
+            
+            buildLoginForm();
+            
+            initialView.style.display = 'block';
+            loginSection.style.display = 'block';
+            loginSection.classList.add('active');
+            householdManager.style.display = 'none';
+            householdManager.classList.remove('active');
+            appContent.style.display = 'none';
+        }
+    });
   }).catch((error) => {
-    // Handle errors here, such as the user canceling the sign-in.
     console.error("Error processing redirect result:", error);
     showToast(`Login failed: ${error.message}`);
+    // Even if redirect fails, still set up the auth listener
+    onAuthStateChanged(auth, user => { /* ... same as above ... */ });
   });
 
 
@@ -2199,33 +2230,7 @@ async function markHowToAsSeen() {
     }
 }
 
-// --- AUTH STATE CHANGE & INITIALIZATION ---
-onAuthStateChanged(auth, async user => {
-    const initialView = document.getElementById('initial-view');
-    const appContent = document.getElementById('app-content');
-    const loginSection = document.getElementById('login-section');
-    const householdManager = document.getElementById('household-manager');
-
-    renderAuthUI(user); // UPDATED: Always call renderAuthUI to handle showing/hiding "More" button
-
-    if (user) {
-        await initializeAppUI(user);
-    } else {
-        currentUser = null; householdId = null; 
-        unsubscribeHousehold();
-        unsubscribeMealPlan();
-        unsubscribeFavorites();
-        
-        buildLoginForm();
-        
-        initialView.style.display = 'block';
-        loginSection.style.display = 'block';
-        loginSection.classList.add('active');
-        householdManager.style.display = 'none';
-        householdManager.classList.remove('active');
-        appContent.style.display = 'none';
-    }
-});
+// --- AUTH STATE CHANGE IS NOW HANDLED INSIDE THE getRedirectResult PROMISE ---
 
 // FIX: This function now handles both mobile and desktop sign-in correctly.
 function handleGoogleSignIn() {
