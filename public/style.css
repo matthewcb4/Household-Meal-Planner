@@ -441,7 +441,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 .pantry-controls, .button-group {
     display: flex;
-    padding-bottom: 0.5rem;
     flex-wrap: wrap;
     gap: 0.5rem;
 }

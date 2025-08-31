@@ -257,48 +257,52 @@ async function displayPantryItems() {
     const pantryBulkControls = document.getElementById('pantry-bulk-controls');
     const pantryRef = getPantryRef();
     if (!pantryRef) return;
-    pantryListDiv.innerHTML = '<li>Loading pantry...</li>';
-    const snapshot = await getDocs(pantryRef);
-    if (snapshot.empty) {
-        pantryListDiv.innerHTML = '<li>Your household pantry is empty!</li>';
-        pantryBulkControls.style.display = 'none';
-        return;
-    }
     
-    pantryBulkControls.style.display = 'flex';
-    const groupedItems = {};
-    snapshot.forEach(doc => {
-        const item = { id: doc.id, ...doc.data() };
-        const category = item.category || 'Other';
-        if (!groupedItems[category]) { groupedItems[category] = []; }
-        groupedItems[category].push(item);
-    });
-    pantryListDiv.innerHTML = '';
-    PANTRY_CATEGORIES.forEach(category => {
-        if (groupedItems[category]) {
-            const categoryHeader = document.createElement('h4');
-            categoryHeader.className = 'category-header';
-            categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
-            pantryListDiv.appendChild(categoryHeader);
-            const list = document.createElement('ul');
-            list.style.display = 'none';
-            groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-                const listItem = document.createElement('li');
-                listItem.className = `pantry-item ${item.checked ? 'checked' : ''}`;
-                listItem.innerHTML = `
-                    <div class="item-info">
-                         <input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
-                        <span>${item.name} (${item.quantity} ${item.unit})</span>
-                    </div>
-                    <button class="delete-pantry-item-btn danger" data-id="${item.id}">X</button>
-                `;
-                list.appendChild(listItem);
-            });
-            pantryListDiv.appendChild(list);
+    // Use onSnapshot for real-time updates
+    onSnapshot(query(pantryRef), (snapshot) => {
+        if (snapshot.empty) {
+            pantryListDiv.innerHTML = '<li>Your household pantry is empty!</li>';
+            pantryBulkControls.style.display = 'none';
+            return;
         }
+        
+        pantryBulkControls.style.display = 'flex';
+        const groupedItems = {};
+        snapshot.forEach(doc => {
+            const item = { id: doc.id, ...doc.data() };
+            const category = item.category || 'Other';
+            if (!groupedItems[category]) { groupedItems[category] = []; }
+            groupedItems[category].push(item);
+        });
+
+        pantryListDiv.innerHTML = '';
+        PANTRY_CATEGORIES.forEach(category => {
+            if (groupedItems[category]) {
+                const categoryHeader = document.createElement('h4');
+                categoryHeader.className = 'category-header';
+                categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
+                pantryListDiv.appendChild(categoryHeader);
+                const list = document.createElement('ul');
+                list.style.display = 'none'; // Initially collapsed
+                groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+                    const listItem = document.createElement('li');
+                    listItem.className = `pantry-item ${item.checked ? 'checked' : ''}`;
+                    listItem.innerHTML = `
+                        <div class="item-info">
+                             <input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
+                            <span>${item.name} (${item.quantity} ${item.unit})</span>
+                        </div>
+                        <button class="delete-pantry-item-btn danger" data-id="${item.id}">X</button>
+                    `;
+                    list.appendChild(listItem);
+                });
+                pantryListDiv.appendChild(list);
+            }
+        });
+        handlePantryItemCheck();
     });
-    handlePantryItemCheck();
 }
+
 
 function updateWeekView() {
     displayWeekRange();
@@ -755,32 +759,43 @@ function handleDragLeave(event) {
 // --- EVENT HANDLER FUNCTIONS ---
 
 function handlePantryClick(event) {
-    const header = event.target.closest('.category-header');
+    const target = event.target;
+    
+    // If a checkbox or delete button was clicked, handle that action specifically.
+    if (target.matches('.pantry-item-checkbox, .delete-pantry-item-btn')) {
+        if (target.classList.contains('delete-pantry-item-btn')) {
+            const itemId = target.dataset.id;
+            if (confirm("Are you sure you want to remove this item from your pantry?")) {
+                deleteDoc(doc(getPantryRef(), itemId)); // onSnapshot will handle the UI update
+            }
+        }
+
+        if (target.classList.contains('pantry-item-checkbox')) {
+            const checkbox = target;
+            const itemId = checkbox.dataset.id;
+            const isChecked = checkbox.checked;
+            const pantryRef = getPantryRef();
+            if (pantryRef && itemId) {
+                const itemRef = doc(pantryRef, itemId);
+                updateDoc(itemRef, { checked: isChecked }); // Save state, onSnapshot will update UI
+            }
+        }
+        return; // Stop the function here to prevent collapsing the category.
+    }
+    
+    // If the click was on the header itself, toggle the list.
+    const header = target.closest('.category-header');
     if (header) {
         const list = header.nextElementSibling;
         const toggle = header.querySelector('.category-toggle');
-        if (list && (list.tagName === 'UL' || list.classList.contains('favorite-recipe-grid') || list.classList.contains('recipe-card-row'))) {
+        if (list && list.tagName === 'UL') {
             const isVisible = list.style.display !== 'none';
             list.style.display = isVisible ? 'none' : 'block';
             if (toggle) toggle.textContent = isVisible ? '+' : '−';
         }
     }
-
-    if (event.target.classList.contains('delete-pantry-item-btn')) {
-        const itemId = event.target.dataset.id;
-        if (confirm("Are you sure you want to remove this item from your pantry?")) {
-            deleteDoc(doc(getPantryRef(), itemId)).then(() => displayPantryItems());
-        }
-    }
-
-    if (event.target.classList.contains('pantry-item-checkbox')) {
-        const listItem = event.target.closest('.pantry-item');
-        if (listItem) {
-            listItem.classList.toggle('checked');
-        }
-        handlePantryItemCheck();
-    }
 }
+
 
 async function handleManualAdd(event) {
     event.preventDefault();
@@ -799,10 +814,9 @@ async function handleManualAdd(event) {
             const existingQuantity = docToUpdate.data().quantity || 0;
             await updateDoc(docToUpdate.ref, { quantity: existingQuantity + quantity });
         } else {
-            await addDoc(pantryRef, { name, quantity, unit, category, addedBy: currentUser.email });
+            await addDoc(pantryRef, { name, quantity, unit, category, checked: false, addedBy: currentUser.email });
         }
 
-        displayPantryItems();
         document.getElementById('manual-add-form').reset();
         document.getElementById('pantry-forms-container').style.display = 'none';
     }
@@ -842,12 +856,11 @@ async function addItemsToPantry() {
                 batch.update(itemRef, { quantity: newQuantity });
             } else {
                 const newItemRef = doc(pantryRef);
-                batch.set(newItemRef, { name, quantity, unit, category, addedBy: currentUser.email, createdAt: serverTimestamp() });
+                batch.set(newItemRef, { name, quantity, unit, category, checked: false, addedBy: currentUser.email, createdAt: serverTimestamp() });
             }
         }
     });
     await batch.commit();
-    displayPantryItems();
     document.getElementById('confirmation-section').style.display = 'none';
     document.getElementById('pantry-forms-container').style.display = 'none';
 }
@@ -1383,7 +1396,7 @@ async function moveSelectedItemsToPantryDirectly() {
                     batch.update(itemRef, { quantity: newQuantity });
                 } else {
                     const newItemRef = doc(pantryRef);
-                    batch.set(newItemRef, { name, quantity, unit, category, addedBy: currentUser.email, createdAt: serverTimestamp() });
+                    batch.set(newItemRef, { name, quantity, unit, category, checked: false, addedBy: currentUser.email, createdAt: serverTimestamp() });
                 }
                 batch.delete(groceryItemDoc.ref);
             }
@@ -1722,6 +1735,7 @@ function configurePaywallUI() {
             el.querySelectorAll('input, button, select').forEach(input => input.disabled = true);
         });
         
+        // UPDATED: Disable scan buttons if quota is exceeded
         if(scansLeft <= 0) {
             document.querySelectorAll('#show-scan-item-btn, #show-scan-receipt-btn, #show-scan-grocery-btn, #show-scan-receipt-grocery-btn, #quick-meal-btn').forEach(btn => {
                 btn.disabled = true;
