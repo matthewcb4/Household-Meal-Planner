@@ -34,6 +34,23 @@ const functions = getFunctions(app);
 const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
 
 
+// --- NEW: Handle Redirect Result ---
+// This function checks if the user is returning from a sign-in redirect.
+// It's essential for the mobile Google Sign-In to work correctly.
+getRedirectResult(auth)
+  .then((result) => {
+    if (result) {
+      // This means the user has successfully signed in via redirect.
+      // The onAuthStateChanged observer below will now handle the user session.
+      console.log("Redirect result processed successfully.");
+    }
+  }).catch((error) => {
+    // Handle errors here, such as the user canceling the sign-in.
+    console.error("Error processing redirect result:", error);
+    showToast(`Login failed: ${error.message}`);
+  });
+
+
 // --- GLOBAL VARIABLES ---
 let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeHousehold = () => {}, unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
 let unitSystem = 'imperial';
@@ -235,67 +252,55 @@ function showLoadingState(message, container, append = false) {
 
 
 // --- UI DISPLAY FUNCTIONS ---
-// UPDATED: Changed from onSnapshot to getDocs to prevent collapsing on check.
 async function displayPantryItems() {
     const pantryListDiv = document.getElementById('pantry-list');
     const pantryBulkControls = document.getElementById('pantry-bulk-controls');
     const pantryRef = getPantryRef();
     if (!pantryRef) return;
     
-    const openCategories = new Set();
-    pantryListDiv.querySelectorAll('.category-header').forEach(header => {
-        const list = header.nextElementSibling;
-        if (list && list.style.display === 'block') {
-            openCategories.add(header.firstChild.textContent);
+    // Use onSnapshot for real-time updates
+    onSnapshot(query(pantryRef), (snapshot) => {
+        if (snapshot.empty) {
+            pantryListDiv.innerHTML = '<li>Your household pantry is empty!</li>';
+            pantryBulkControls.style.display = 'none';
+            return;
         }
-    });
+        
+        pantryBulkControls.style.display = 'flex';
+        const groupedItems = {};
+        snapshot.forEach(doc => {
+            const item = { id: doc.id, ...doc.data() };
+            const category = item.category || 'Other';
+            if (!groupedItems[category]) { groupedItems[category] = []; }
+            groupedItems[category].push(item);
+        });
 
-    const snapshot = await getDocs(query(pantryRef));
-
-    if (snapshot.empty) {
-        pantryListDiv.innerHTML = '<li>Your household pantry is empty!</li>';
-        pantryBulkControls.style.display = 'none';
-        return;
-    }
-    
-    pantryBulkControls.style.display = 'flex';
-    const groupedItems = {};
-    snapshot.forEach(doc => {
-        const item = { id: doc.id, ...doc.data() };
-        const category = item.category || 'Other';
-        if (!groupedItems[category]) { groupedItems[category] = []; }
-        groupedItems[category].push(item);
-    });
-
-    pantryListDiv.innerHTML = '';
-    PANTRY_CATEGORIES.forEach(category => {
-        if (groupedItems[category]) {
-            const categoryHeader = document.createElement('h4');
-            categoryHeader.className = 'category-header';
-            categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
-            pantryListDiv.appendChild(categoryHeader);
-            const list = document.createElement('ul');
-            list.style.display = openCategories.has(category) ? 'block' : 'none'; // Keep open if it was before
-            if (openCategories.has(category)) {
-                categoryHeader.querySelector('.category-toggle').textContent = '−';
+        pantryListDiv.innerHTML = '';
+        PANTRY_CATEGORIES.forEach(category => {
+            if (groupedItems[category]) {
+                const categoryHeader = document.createElement('h4');
+                categoryHeader.className = 'category-header';
+                categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
+                pantryListDiv.appendChild(categoryHeader);
+                const list = document.createElement('ul');
+                list.style.display = 'none'; // Initially collapsed
+                groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+                    const listItem = document.createElement('li');
+                    listItem.className = `pantry-item ${item.checked ? 'checked' : ''}`;
+                    listItem.innerHTML = `
+                        <div class="item-info">
+                             <input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
+                            <span>${item.name} (${item.quantity} ${item.unit})</span>
+                        </div>
+                        <button class="delete-pantry-item-btn danger" data-id="${item.id}">X</button>
+                    `;
+                    list.appendChild(listItem);
+                });
+                pantryListDiv.appendChild(list);
             }
-
-            groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-                const listItem = document.createElement('li');
-                listItem.className = `pantry-item ${item.checked ? 'checked' : ''}`;
-                listItem.innerHTML = `
-                    <div class="item-info">
-                         <input type="checkbox" class="pantry-item-checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
-                        <span>${item.name} (${item.quantity} ${item.unit})</span>
-                    </div>
-                    <button class="delete-pantry-item-btn danger" data-id="${item.id}">X</button>
-                `;
-                list.appendChild(listItem);
-            });
-            pantryListDiv.appendChild(list);
-        }
+        });
+        handlePantryItemCheck();
     });
-    handlePantryItemCheck();
 }
 
 
@@ -684,6 +689,22 @@ function handlePantryItemCheck() {
     }
 }
 
+async function handleSelectAllPantry(event) {
+    const isChecked = event.target.checked;
+    const pantryRef = getPantryRef();
+    if (!pantryRef) return;
+
+    const allCheckboxes = document.querySelectorAll('.pantry-item-checkbox');
+    if (allCheckboxes.length === 0) return;
+
+    const batch = writeBatch(db);
+    allCheckboxes.forEach(checkbox => {
+        const itemRef = doc(pantryRef, checkbox.dataset.id);
+        batch.update(itemRef, { checked: isChecked });
+    });
+    await batch.commit();
+}
+
 function handleCalendarDragStart(event) {
     const target = event.target.closest('.recipe-title');
     const recipeData = target.dataset.recipe;
@@ -753,28 +774,15 @@ function handleDragLeave(event) {
 
 // --- EVENT HANDLER FUNCTIONS ---
 
-// UPDATED: Re-structured to work with getDocs instead of onSnapshot
-async function handlePantryClick(event) {
+function handlePantryClick(event) {
     const target = event.target;
-
-    const header = target.closest('.category-header');
-    if (header) {
-        const list = header.nextElementSibling;
-        const toggle = header.querySelector('.category-toggle');
-        if (list && list.tagName === 'UL') {
-            const isVisible = list.style.display !== 'none';
-            list.style.display = isVisible ? 'none' : 'block';
-            if (toggle) toggle.textContent = isVisible ? '+' : '−';
-        }
-        return;
-    }
     
+    // If a checkbox or delete button was clicked, handle that action specifically.
     if (target.matches('.pantry-item-checkbox, .delete-pantry-item-btn')) {
         if (target.classList.contains('delete-pantry-item-btn')) {
             const itemId = target.dataset.id;
             if (confirm("Are you sure you want to remove this item from your pantry?")) {
-                await deleteDoc(doc(getPantryRef(), itemId));
-                await displayPantryItems();
+                deleteDoc(doc(getPantryRef(), itemId)); // onSnapshot will handle the UI update
             }
         }
 
@@ -785,10 +793,21 @@ async function handlePantryClick(event) {
             const pantryRef = getPantryRef();
             if (pantryRef && itemId) {
                 const itemRef = doc(pantryRef, itemId);
-                await updateDoc(itemRef, { checked: isChecked });
-                checkbox.closest('.pantry-item').classList.toggle('checked', isChecked);
-                handlePantryItemCheck();
+                updateDoc(itemRef, { checked: isChecked }); // Save state, onSnapshot will update UI
             }
+        }
+        return; // Stop the function here to prevent collapsing the category.
+    }
+    
+    // If the click was on the header itself, toggle the list.
+    const header = target.closest('.category-header');
+    if (header) {
+        const list = header.nextElementSibling;
+        const toggle = header.querySelector('.category-toggle');
+        if (list && list.tagName === 'UL') {
+            const isVisible = list.style.display !== 'none';
+            list.style.display = isVisible ? 'none' : 'block';
+            if (toggle) toggle.textContent = isVisible ? '+' : '−';
         }
     }
 }
@@ -816,7 +835,6 @@ async function handleManualAdd(event) {
 
         document.getElementById('manual-add-form').reset();
         document.getElementById('pantry-forms-container').style.display = 'none';
-        await displayPantryItems(); // Refresh list after adding
     }
 }
 
@@ -861,7 +879,6 @@ async function addItemsToPantry() {
     await batch.commit();
     document.getElementById('confirmation-section').style.display = 'none';
     document.getElementById('pantry-forms-container').style.display = 'none';
-    await displayPantryItems(); // Refresh list after adding
 }
 
 // --- RECIPE FUNCTIONS (MODIFIED) ---
@@ -1926,11 +1943,7 @@ function startApp() {
     
     if(selectAllGroceryCheckbox) selectAllGroceryCheckbox.addEventListener('change', handleSelectAllGrocery);
     if(document.getElementById('delete-selected-grocery-btn')) document.getElementById('delete-selected-grocery-btn').addEventListener('click', () => handleBulkDelete(getGroceryListRef(), '.grocery-item input[type="checkbox"]:checked'));
-    if(selectAllPantryCheckbox) selectAllPantryCheckbox.addEventListener('change', (e) => {
-        document.querySelectorAll('.pantry-item-checkbox').forEach(cb => cb.checked = e.target.checked);
-        handlePantryItemCheck();
-    });
-    if(document.getElementById('delete-selected-pantry-btn')) document.getElementById('delete-selected-pantry-btn').addEventListener('click', () => handleBulkDelete(getPantryRef(), '.pantry-item-checkbox:checked'));
+    if(selectAllPantryCheckbox) selectAllPantryCheckbox.addEventListener('change', handleSelectAllPantry);
     
     displayPantryItems();
     updateWeekView();
@@ -2214,19 +2227,25 @@ onAuthStateChanged(auth, async user => {
     }
 });
 
-// UPDATED: Forcing signInWithPopup on all devices for reliability.
-// The redirect method was causing issues on some mobile browsers and platforms.
+// FIX: This function now handles both mobile and desktop sign-in correctly.
 function handleGoogleSignIn() {
     const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider).catch(error => {
-        console.error("Sign in with popup error", error);
-        // Provide more specific feedback if the popup is blocked
-        if (error.code === 'auth/popup-blocked') {
-            alert('Popup was blocked by the browser. Please allow popups for this site and try again.');
-        } else {
-             showToast(`Login failed: ${error.message}`);
-        }
-    });
+    const isMobile = /Mobi/i.test(window.navigator.userAgent);
+
+    if (isMobile) {
+        // Use redirect for mobile devices to avoid pop-up blockers
+        signInWithRedirect(auth, provider);
+    } else {
+        // Use pop-up for desktop
+        signInWithPopup(auth, provider).catch(error => {
+            console.error("Sign in with popup error", error);
+            if (error.code === 'auth/popup-blocked') {
+                alert('Popup was blocked by the browser. Please allow popups for this site and try again.');
+            } else {
+                showToast(`Login failed: ${error.message}`);
+            }
+        });
+    }
 }
 
 
