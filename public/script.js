@@ -9,26 +9,24 @@ import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyD-NEXCNVe8GuAeuKvcgvmgy7A01kZhgKI",
+  apiKey: "AIzaSyDcsZlszhp5v93YheCfjkOYdzwf7ZQ_nm8",
   authDomain: "family-dinner-app-79249.firebaseapp.com",
   projectId: "family-dinner-app-79249",
   storageBucket: "family-dinner-app-79249.firebasestorage.app",
   messagingSenderId: "665272276696",
-  appId: "1:665272276696:web:599165b284256c907e69ad",
-  measurementId: "G-YLVBPLNDWF"
+  appId: "1:665272276696:web:f5aa5a5888f8abf97e69ad",
+  measurementId: "G-LQ124BNWKH"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// --- App Check Initialization ---
-// UPDATED: Wrap initialization in a function to be called AFTER auth is confirmed.
-function initializeFirebaseServices() {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider('6LflS7IgAAAAAPaEdXmeLldzPm-UyjeApdj26b80h5s'), 
-      isTokenAutoRefreshEnabled: true
-    });
-}
+// --- App Check Initialization (Temporarily Disabled for Testing) ---
+
+const appCheck = initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider('6Lcbe7krAAAAAHzpiTrO2meUKHrgpafT1vQ9o6sC'), 
+  isTokenAutoRefreshEnabled: true
+});
 
 
 const db = getFirestore(app);
@@ -38,55 +36,49 @@ const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna
 
 
 // --- Start Auth Flow ---
-// This consolidated block handles both redirect results and the standard auth state listener.
-// It ensures that we check for a redirect result immediately on page load.
 getRedirectResult(auth)
   .then((result) => {
     if (result) {
-      // User just signed in via redirect. The onAuthStateChanged will handle it from here.
       console.log("Redirect result processed successfully.");
     }
-    // Now, set up the normal auth state listener. This will run after the redirect is handled.
-    onAuthStateChanged(auth, async user => {
-        const initialView = document.getElementById('initial-view');
-        const appContent = document.getElementById('app-content');
-        const loginSection = document.getElementById('login-section');
-        const householdManager = document.getElementById('household-manager');
-
-        renderAuthUI(user); 
-
-        if (user) {
-            initializeFirebaseServices(); // Initialize App Check now that we have a user.
-            await initializeAppUI(user);
-        } else {
-            currentUser = null; householdId = null; 
-            unsubscribeHousehold();
-            unsubscribeMealPlan();
-            unsubscribeFavorites();
-            
-            buildLoginForm();
-            
-            initialView.style.display = 'block';
-            loginSection.style.display = 'block';
-            loginSection.classList.add('active');
-            householdManager.style.display = 'none';
-            householdManager.classList.remove('active');
-            appContent.style.display = 'none';
-        }
-    });
   }).catch((error) => {
     console.error("Error processing redirect result:", error);
     showToast(`Login failed: ${error.message}`);
-    // Even if redirect fails, still set up the auth listener
-    onAuthStateChanged(auth, user => { /* ... same as above ... */ });
   });
+
+onAuthStateChanged(auth, async user => {
+    const initialView = document.getElementById('initial-view');
+    const appContent = document.getElementById('app-content');
+    const loginSection = document.getElementById('login-section');
+    const householdManager = document.getElementById('household-manager');
+
+    renderAuthUI(user); 
+
+    if (user) {
+        await initializeAppUI(user);
+    } else {
+        currentUser = null; householdId = null; 
+        unsubscribeHousehold();
+        unsubscribeMealPlan();
+        unsubscribeFavorites();
+        
+        buildLoginForm();
+        
+        initialView.style.display = 'block';
+        loginSection.style.display = 'block';
+        loginSection.classList.add('active');
+        householdManager.style.display = 'none';
+        householdManager.classList.remove('active');
+        appContent.style.display = 'none';
+    }
+});
 
 
 // --- GLOBAL VARIABLES ---
 let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeHousehold = () => {}, unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
 let unitSystem = 'imperial';
 let calendarDate = new Date();
-let sidebarCalendarDate = new Date(); // NEW: Separate date for the sidebar calendar
+let sidebarCalendarDate = new Date();
 let selectedDates = [];
 let currentHowToSlide = 0;
 let accumulatedRecipes = [];
@@ -2230,7 +2222,7 @@ async function markHowToAsSeen() {
     }
 }
 
-// --- AUTH STATE CHANGE IS NOW HANDLED INSIDE THE getRedirectResult PROMISE ---
+// --- AUTH STATE CHANGE IS NOW HANDLED INSIDE THE INITIALIZATION FLOW ---
 
 // FIX: This function now handles both mobile and desktop sign-in correctly.
 function handleGoogleSignIn() {
