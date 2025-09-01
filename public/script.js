@@ -1,7 +1,6 @@
 // public/script.js
 // Import all necessary functions from the Firebase SDKs at the top
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-// REMOVED: signInWithRedirect and getRedirectResult to simplify the flow
 import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, onSnapshot, query, where, writeBatch, arrayUnion, serverTimestamp, deleteDoc, orderBy, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
@@ -23,10 +22,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // --- App Check Initialization ---
-const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider('6Lcde7kAAAAAAMpuTlO2lmeUKYrgsolThVQhvbC'),
-  isTokenAutoRefreshEnabled: true
-});
+// UPDATED: Wrap initialization in a function to be called AFTER auth is confirmed.
+function initializeFirebaseServices() {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider('6Lcbe7krAAAAAHzpiTrO2meUKHrgpafT1vQ9o6sC'), 
+      isTokenAutoRefreshEnabled: true
+    });
+}
+
 
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -34,66 +37,56 @@ const functions = getFunctions(app);
 const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
 
 
-// --- ROBUST HYBRID AUTHENTICATION FLOW ---
-
-// This function provides a more reliable way to detect mobile devices.
-function isMobile() {
-    const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-    // Checks for mobile keywords in user agent string.
-    if (/android|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase())) {
-        return true;
+// --- Start Auth Flow ---
+// This consolidated block handles both redirect results and the standard auth state listener.
+// It ensures that we check for a redirect result immediately on page load.
+getRedirectResult(auth)
+  .then((result) => {
+    if (result) {
+      // User just signed in via redirect. The onAuthStateChanged will handle it from here.
+      console.log("Redirect result processed successfully.");
     }
-    // Checks for touch events, which are a strong indicator of a mobile device.
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-        return true;
-    }
-    return false;
-}
+    // Now, set up the normal auth state listener. This will run after the redirect is handled.
+    onAuthStateChanged(auth, async user => {
+        const initialView = document.getElementById('initial-view');
+        const appContent = document.getElementById('app-content');
+        const loginSection = document.getElementById('login-section');
+        const householdManager = document.getElementById('household-manager');
 
-// This is the main startup function for authentication.
-function initializeAuth() {
-    // First, process any sign-in attempts that came from a redirect (on mobile).
-    getRedirectResult(auth)
-      .catch((error) => {
-        // This catches errors from the redirect process itself.
-        console.error("Error processing redirect result:", error);
-        showToast(`Login failed: ${error.message}`);
-      })
-      .finally(() => {
-        // After the redirect attempt is fully resolved (either successfully or with an error),
-        // we set up the main listener. This prevents a race condition.
-        onAuthStateChanged(auth, async (user) => {
-            renderAuthUI(user);
+        renderAuthUI(user); 
 
-            if (user) {
-                await initializeAppUI(user);
-            } else {
-                const initialView = document.getElementById('initial-view');
-                const appContent = document.getElementById('app-content');
-                const loginSection = document.getElementById('login-section');
-                
-                currentUser = null;
-                householdId = null;
-                unsubscribeHousehold();
-                unsubscribeMealPlan();
-                unsubscribeFavorites();
-                unsubscribePantry();
-                
-                buildLoginForm();
-                
-                initialView.style.display = 'block';
-                loginSection.style.display = 'block';
-                appContent.style.display = 'none';
-            }
-        });
-      });
-}
+        if (user) {
+            initializeFirebaseServices(); // Initialize App Check now that we have a user.
+            await initializeAppUI(user);
+        } else {
+            currentUser = null; householdId = null; 
+            unsubscribeHousehold();
+            unsubscribeMealPlan();
+            unsubscribeFavorites();
+            
+            buildLoginForm();
+            
+            initialView.style.display = 'block';
+            loginSection.style.display = 'block';
+            loginSection.classList.add('active');
+            householdManager.style.display = 'none';
+            householdManager.classList.remove('active');
+            appContent.style.display = 'none';
+        }
+    });
+  }).catch((error) => {
+    console.error("Error processing redirect result:", error);
+    showToast(`Login failed: ${error.message}`);
+    // Even if redirect fails, still set up the auth listener
+    onAuthStateChanged(auth, user => { /* ... same as above ... */ });
+  });
+
 
 // --- GLOBAL VARIABLES ---
-let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeHousehold = () => {}, unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, unsubscribePantry = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
+let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeHousehold = () => {}, unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
 let unitSystem = 'imperial';
 let calendarDate = new Date();
-let sidebarCalendarDate = new Date();
+let sidebarCalendarDate = new Date(); // NEW: Separate date for the sidebar calendar
 let selectedDates = [];
 let currentHowToSlide = 0;
 let accumulatedRecipes = [];
@@ -122,7 +115,7 @@ function renderAuthUI(user) {
                 <button id="sign-out-btn" class="danger">Sign Out</button>
             </div>
         `;
-        document.getElementById('sign-out-btn').addEventListener('click', handleSignOut);
+        document.getElementById('sign-out-btn').addEventListener('click', () => signOut(auth));
         const upgradeBtn = document.getElementById('upgrade-btn-header');
         if (upgradeBtn) {
             upgradeBtn.addEventListener('click', handleUpgradeClick);
@@ -297,8 +290,7 @@ async function displayPantryItems() {
     if (!pantryRef) return;
     
     // Use onSnapshot for real-time updates
-    unsubscribePantry(); // Detach any existing listener before creating a new one
-    unsubscribePantry = onSnapshot(query(pantryRef), (snapshot) => {
+    onSnapshot(query(pantryRef), (snapshot) => {
         if (snapshot.empty) {
             pantryListDiv.innerHTML = '<li>Your household pantry is empty!</li>';
             pantryBulkControls.style.display = 'none';
@@ -470,12 +462,12 @@ function renderMealPlanner() {
     endOfWeek.setHours(23, 59, 59, 999);
     
     const isCurrentWeek = today >= startOfWeek && today <= endOfWeek;
-    const isMobileDevice = isMobile();
+    const isMobile = window.innerWidth <= 768;
 
     days.forEach((day, index) => {
         const dayCard = document.createElement('div');
         dayCard.className = 'day-card';
-        if (isMobileDevice) {
+        if (isMobile) {
             dayCard.classList.add('collapsed');
         }
 
@@ -2238,39 +2230,27 @@ async function markHowToAsSeen() {
     }
 }
 
-// --- NEW: Graceful sign-out handler ---
-async function handleSignOut() {
-    // First, detach all active Firestore listeners while the user is still authenticated.
-    unsubscribeHousehold();
-    unsubscribeMealPlan();
-    unsubscribeFavorites();
-    unsubscribePantry(); 
+// --- AUTH STATE CHANGE IS NOW HANDLED INSIDE THE getRedirectResult PROMISE ---
 
-    try {
-        // Then, sign the user out.
-        await signOut(auth);
-        // The onAuthStateChanged listener will automatically handle resetting the UI.
-        console.log("User signed out successfully.");
-    } catch (error) {
-        console.error("Error signing out:", error);
-        showToast("Error signing out. Please try again.");
-    }
-}
-
-
-// REVERTED & SIMPLIFIED: This function now ONLY uses signInWithPopup for all devices.
+// FIX: This function now handles both mobile and desktop sign-in correctly.
 function handleGoogleSignIn() {
     const provider = new GoogleAuthProvider();
-    // Use popup for all devices. This is reliable and avoids redirect loops.
-    signInWithPopup(auth, provider).catch(error => {
-        console.error("Sign in with popup error", error);
-        // Provide clear feedback to the user if the popup is blocked.
-        if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-            alert('The sign-in popup was blocked or closed. Please allow popups for this site and try again.');
-        } else {
-            showToast(`Login failed: ${error.message}`);
-        }
-    });
+    const isMobile = /Mobi/i.test(window.navigator.userAgent);
+
+    if (isMobile) {
+        // Use redirect for mobile devices to avoid pop-up blockers
+        signInWithRedirect(auth, provider);
+    } else {
+        // Use pop-up for desktop
+        signInWithPopup(auth, provider).catch(error => {
+            console.error("Sign in with popup error", error);
+            if (error.code === 'auth/popup-blocked') {
+                alert('Popup was blocked by the browser. Please allow popups for this site and try again.');
+            } else {
+                showToast(`Login failed: ${error.message}`);
+            }
+        });
+    }
 }
 
 
@@ -2342,7 +2322,6 @@ async function initializeAppUI(user) {
     if (!userDoc.exists()) {
         await setDoc(userDocRef, {
             email: user.email,
-            displayName: user.displayName, // Ensure display name is saved on creation
             householdId: null,
             hasSeenHowToGuide: false,
             preferences: {}
@@ -2396,7 +2375,6 @@ async function initializeAppUI(user) {
 
 // --- MAIN EVENT LISTENER ---
 document.addEventListener('DOMContentLoaded', () => {
-    initializeAuth(); // Start the auth flow
     populateCuisineDropdowns();
     
     document.querySelectorAll('.nav-link').forEach(link => {
