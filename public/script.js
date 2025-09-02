@@ -2264,22 +2264,33 @@ async function markHowToAsSeen() {
 // FIX: This function now handles both mobile and desktop sign-in correctly.
 function handleGoogleSignIn() {
     const provider = new GoogleAuthProvider();
-    const isMobile = /Mobi/i.test(window.navigator.userAgent);
 
-    if (isMobile) {
-        // Use redirect for mobile devices to avoid pop-up blockers
-        signInWithRedirect(auth, provider);
-    } else {
-        // Use pop-up for desktop
-        signInWithPopup(auth, provider).catch(error => {
-            console.error("Sign in with popup error", error);
-            if (error.code === 'auth/popup-blocked') {
-                alert('Popup was blocked by the browser. Please allow popups for this site and try again.');
+    signInWithPopup(auth, provider)
+        .then((result) => {
+            // This will trigger onAuthStateChanged, so no further action is needed here.
+            console.log("Signed in with popup successfully.");
+        })
+        .catch((error) => {
+            // Handle errors, specifically popup-blocked errors.
+            console.error("Popup sign-in error:", error.code, error.message);
+            
+            // These error codes indicate that the popup was blocked or is not supported.
+            const isPopupError = ['auth/popup-blocked', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'].includes(error.code);
+
+            if (isPopupError) {
+                // If the popup fails, fall back to the more reliable redirect method.
+                console.log("Popup failed, falling back to redirect.");
+                showToast("Popup blocked. Redirecting to sign in page...");
+                signInWithRedirect(auth, provider).catch(redirectError => {
+                    // This inner catch handles rare errors where the redirect itself cannot be initiated.
+                    console.error("Error initiating Google sign-in redirect:", redirectError);
+                    showToast(`Could not start the sign-in process: ${redirectError.message}`);
+                });
             } else {
+                // Handle other errors (e.g., user closed popup, network error)
                 showToast(`Login failed: ${error.message}`);
             }
         });
-    }
 }
 
 
