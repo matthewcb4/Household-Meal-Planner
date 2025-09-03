@@ -90,60 +90,57 @@ const fetchWithTimeout = async (url, options, timeout = 530000) => {
 // --- HELPER: Delay function ---
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
-// --- NEW/UPDATED: Generic Usage Quota Management ---
+// --- MODIFIED: Generic Usage Quota Management for daily limits ---
 const checkAndIncrementUsage = async (householdId, feature) => {
     const householdRef = db.collection('households').doc(householdId);
     const householdDoc = await householdRef.get();
     const householdData = householdDoc.data();
 
-    if (isPremium(householdData)) {
-        return { allowed: true };
-    }
+    const isPremiumUser = isPremium(householdData);
+
+    const LIMITS = {
+        scan: { free: 20, premium: 100 }, // Assuming a premium limit for scans
+        recipeGeneration: { free: 3, premium: 7 }
+    };
+
+    const limit = isPremiumUser ? LIMITS[feature].premium : LIMITS[feature].free;
 
     const now = new Date();
-    // Use a new top-level `usage` map in your household document
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
+
     const usage = householdData.usage || {};
-    const featureUsage = usage[feature] || { count: 0, resetDate: new Date(0) };
-    const resetDate = featureUsage.resetDate.toDate ? featureUsage.resetDate.toDate() : featureUsage.resetDate;
+    const featureUsage = usage[feature] || { count: 0, lastUsageDate: new Date(0) };
     
+    // Firestore timestamps need to be converted to JS Dates
+    const lastUsageDate = featureUsage.lastUsageDate.toDate ? featureUsage.lastUsageDate.toDate() : new Date(0);
+    const lastUsageDay = new Date(lastUsageDate.getFullYear(), lastUsageDate.getMonth(), lastUsageDate.getDate());
+
     let currentCount = featureUsage.count;
-    
-    // Check if the reset date has passed
-    if (now > resetDate) {
+
+    // If last usage was before today, reset the count.
+    if (today > lastUsageDay) {
         currentCount = 0;
     }
 
-    const LIMITS = {
-        scan: 20,
-        recipeGeneration: 50 // Example: 50 AI recipe generations per month for free users
-    };
-
-    if (currentCount >= LIMITS[feature]) {
-        return { allowed: false, limit: LIMITS[feature] };
+    if (currentCount >= limit) {
+        return { allowed: false, limit: limit, remaining: 0, isPremium: isPremiumUser };
     }
 
-    // Increment usage
     const newCount = currentCount + 1;
-    let newResetDate = admin.firestore.Timestamp.fromDate(resetDate);
-
-    // If the count was reset, set a new reset date for next month
-    if (now > resetDate) {
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        newResetDate = admin.firestore.Timestamp.fromDate(nextMonth);
-    }
     
-    // Update Firestore
-    // Note the use of FieldPath to dynamically set the key in the usage map
+    // Update Firestore, preserving other feature usage data
     await householdRef.set({
         usage: {
+            ...usage,
             [feature]: {
                 count: newCount,
-                resetDate: newResetDate
+                lastUsageDate: admin.firestore.Timestamp.fromDate(now)
             }
         }
     }, { merge: true });
     
-    return { allowed: true };
+    const remaining = limit - newCount;
+    return { allowed: true, limit: limit, remaining: remaining, isPremium: isPremiumUser };
 };
 
 
@@ -158,9 +155,10 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
+    // UPDATED: Use daily scan limit logic
     const usageCheck = await checkAndIncrementUsage(householdId, 'scan');
     if (!usageCheck.allowed) {
-        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free scans for the month.`);
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free scans for the day.`);
     }
     
     const base64ImageData = request.data.image;
@@ -222,9 +220,10 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
+    // UPDATED: Use daily recipe generation limit logic
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
     if (!usageCheck.allowed) {
-        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free AI recipe generations for the month.`);
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
     }
 
     const { pantryItems, mealType, cuisine, criteria, unitSystem } = request.data;
@@ -274,7 +273,12 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
             for (const recipe of recipes) {
                 recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
             }
-            return recipes;
+            // UPDATED: Return object with recipes and usage info
+            return {
+                recipes: recipes,
+                remaining: usageCheck.remaining,
+                isPremium: usageCheck.isPremium
+            };
         } else {
             throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }
@@ -296,9 +300,10 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
+    // UPDATED: Use daily recipe generation limit logic
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
     if (!usageCheck.allowed) {
-        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free AI recipe generations for the month.`);
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
     }
 
     const { mealType, cuisine, criteria, unitSystem } = request.data;
@@ -347,7 +352,12 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
             for (const recipe of recipes) {
                 recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
             }
-            return recipes;
+            // UPDATED: Return object with recipes and usage info
+            return {
+                recipes: recipes,
+                remaining: usageCheck.remaining,
+                isPremium: usageCheck.isPremium
+            };
         } else {
             throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }
@@ -369,9 +379,10 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforc
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
+    // UPDATED: Use daily recipe generation limit logic
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
     if (!usageCheck.allowed) {
-        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free AI recipe generations for the month.`);
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
     }
 
     const { mealQuery, unitSystem } = request.data;
@@ -413,7 +424,12 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforc
             const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
             const recipe = JSON.parse(jsonTextResponse);
             recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
-            return recipe;
+            // UPDATED: Return object with recipe and usage info
+            return {
+                recipe: recipe,
+                remaining: usageCheck.remaining,
+                isPremium: usageCheck.isPremium
+            };
         } else {
             throw new HttpsError('internal', 'Failed to parse the response from the AI service.');
         }

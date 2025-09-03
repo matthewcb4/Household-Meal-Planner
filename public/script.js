@@ -121,6 +121,9 @@ let currentHowToSlide = 0;
 let accumulatedRecipes = [];
 let loadingInterval = null;
 let isCameraOpen = false;
+// NEW: Sets to track open category states
+let openPantryCategories = new Set();
+let openGroceryCategories = new Set();
 
 
 const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"];
@@ -216,6 +219,14 @@ function showToast(message) {
     toast.textContent = message;
     toast.className = 'show';
     setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
+}
+// NEW: Helper to get today's date as a YYYY-MM-DD string
+function getTodayDateString() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 const delay = ms => new Promise(res => setTimeout(res, ms));
 function escapeAttr(str) {
@@ -340,10 +351,20 @@ async function displayPantryItems() {
             if (groupedItems[category]) {
                 const categoryHeader = document.createElement('h4');
                 categoryHeader.className = 'category-header';
-                categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
-                pantryListDiv.appendChild(categoryHeader);
+                
                 const list = document.createElement('ul');
-                list.style.display = 'none'; // Initially collapsed
+
+                // MODIFIED: Check against openPantryCategories to set initial state
+                if (openPantryCategories.has(category)) {
+                    list.style.display = 'block';
+                    categoryHeader.innerHTML = `${category}<span class="category-toggle">−</span>`;
+                } else {
+                    list.style.display = 'none'; // Initially collapsed
+                    categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
+                }
+                
+                pantryListDiv.appendChild(categoryHeader);
+
                 groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
                     const listItem = document.createElement('li');
                     listItem.className = `pantry-item ${item.checked ? 'checked' : ''}`;
@@ -377,53 +398,63 @@ async function displayGroceryList() {
     if (!groceryRef) return;
     groceryList.innerHTML = '<p>Loading grocery list...</p>';
     const q = query(groceryRef, orderBy("createdAt"));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) {
-        groceryList.innerHTML = '<p>Your grocery list is empty!</p>';
-        groceryBulkControls.style.display = 'none';
-        return;
-    }
-
-    groceryBulkControls.style.display = 'flex';
-    const groupedItems = {};
-    snapshot.forEach(doc => {
-        const item = { id: doc.id, ...doc.data() };
-        const category = item.category || 'Other';
-        if (!groupedItems[category]) { groupedItems[category] = []; }
-        groupedItems[category].push(item);
-    });
-
-    groceryList.innerHTML = '';
-    PANTRY_CATEGORIES.forEach(category => {
-        if (groupedItems[category]) {
-            const categoryHeader = document.createElement('h4');
-            categoryHeader.className = 'category-header';
-            categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
-            groceryList.appendChild(categoryHeader);
-
-            const list = document.createElement('ul');
-            list.style.display = 'none';
-
-            groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
-                const listItem = document.createElement('li');
-                listItem.className = `grocery-item ${item.checked ? 'checked' : ''}`;
-                listItem.innerHTML = `
-                    <div class="item-info">
-                        <input type="checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
-                        <label>${item.name}</label>
-                    </div>
-                    <div class="grocery-item-controls">
-                        <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>Walmart</span></a>
-                        <button class="delete-grocery-btn" data-id="${item.id}">X</button>
-                    </div>
-                `;
-                list.appendChild(listItem);
-            });
-            groceryList.appendChild(list);
+    
+    // Using onSnapshot for real-time updates
+    onSnapshot(q, (snapshot) => {
+        if (snapshot.empty) {
+            groceryList.innerHTML = '<p>Your grocery list is empty!</p>';
+            groceryBulkControls.style.display = 'none';
+            return;
         }
+
+        groceryBulkControls.style.display = 'flex';
+        const groupedItems = {};
+        snapshot.forEach(doc => {
+            const item = { id: doc.id, ...doc.data() };
+            const category = item.category || 'Other';
+            if (!groupedItems[category]) { groupedItems[category] = []; }
+            groupedItems[category].push(item);
+        });
+
+        groceryList.innerHTML = '';
+        PANTRY_CATEGORIES.forEach(category => {
+            if (groupedItems[category]) {
+                const categoryHeader = document.createElement('h4');
+                categoryHeader.className = 'category-header';
+                
+                const list = document.createElement('ul');
+                
+                // MODIFIED: Check against openGroceryCategories
+                if (openGroceryCategories.has(category)) {
+                    list.style.display = 'block';
+                    categoryHeader.innerHTML = `${category}<span class="category-toggle">−</span>`;
+                } else {
+                    list.style.display = 'none';
+                    categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
+                }
+
+                groceryList.appendChild(categoryHeader);
+
+                groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+                    const listItem = document.createElement('li');
+                    listItem.className = `grocery-item ${item.checked ? 'checked' : ''}`;
+                    listItem.innerHTML = `
+                        <div class="item-info">
+                            <input type="checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
+                            <label>${item.name}</label>
+                        </div>
+                        <div class="grocery-item-controls">
+                            <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>Walmart</span></a>
+                            <button class="delete-grocery-btn" data-id="${item.id}">X</button>
+                        </div>
+                    `;
+                    list.appendChild(listItem);
+                });
+                groceryList.appendChild(list);
+            }
+        });
+        handleGroceryItemCheck();
     });
-    handleGroceryItemCheck();
 }
 
 function displayFavoriteRecipes(docs) {
@@ -842,7 +873,7 @@ function handlePantryClick(event) {
         if (target.classList.contains('delete-pantry-item-btn')) {
             const itemId = target.dataset.id;
             if (confirm("Are you sure you want to remove this item from your pantry?")) {
-                deleteDoc(doc(getPantryRef(), itemId)); // onSnapshot will handle the UI update
+                deleteDoc(doc(getPantryRef(), itemId));
             }
         }
 
@@ -853,7 +884,7 @@ function handlePantryClick(event) {
             const pantryRef = getPantryRef();
             if (pantryRef && itemId) {
                 const itemRef = doc(pantryRef, itemId);
-                updateDoc(itemRef, { checked: isChecked }); // Save state, onSnapshot will update UI
+                updateDoc(itemRef, { checked: isChecked });
             }
         }
         return; // Stop the function here to prevent collapsing the category.
@@ -862,12 +893,19 @@ function handlePantryClick(event) {
     // If the click was on the header itself, toggle the list.
     const header = target.closest('.category-header');
     if (header) {
+        const categoryName = header.textContent.replace(/[+−]$/, '').trim();
         const list = header.nextElementSibling;
         const toggle = header.querySelector('.category-toggle');
         if (list && list.tagName === 'UL') {
             const isVisible = list.style.display !== 'none';
             list.style.display = isVisible ? 'none' : 'block';
             if (toggle) toggle.textContent = isVisible ? '+' : '−';
+            // MODIFIED: Update the state of open categories
+            if (isVisible) {
+                openPantryCategories.delete(categoryName);
+            } else {
+                openPantryCategories.add(categoryName);
+            }
         }
     }
 }
@@ -1093,7 +1131,7 @@ function displayRecipeResults(recipes, mealType) {
 
 
 async function getRecipeSuggestions() {
-    await generateRecipes(null, 'Suggest from Pantry', false); // New search, not appending
+    await generateRecipes(null, 'Suggest from Pantry', true);
 }
 
 async function discoverNewRecipes() {
@@ -1150,12 +1188,24 @@ async function generateRecipes(items, source, append = false) {
             result = await discoverRecipesFunc(commonPayload);
         }
 
-        const newRecipes = result.data;
+        // MODIFIED: Handle new response format
+        const { recipes: newRecipes, remaining, isPremium } = result.data;
+
+        if (remaining !== undefined) {
+            showToast(`${remaining} ${isPremium ? '' : 'free '}suggestion(s) remaining today.`);
+        }
+
         accumulatedRecipes.unshift(...newRecipes);
         if (accumulatedRecipes.length > 18) { // Keep the list to a max of 18
             accumulatedRecipes.length = 18;
         }
         displayRecipeResults(accumulatedRecipes, selectedMealType);
+
+        // NEW: Save suggestions to Firestore for persistence
+        const todayString = getTodayDateString();
+        const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
+        await setDoc(suggestionsRef, { recipes: accumulatedRecipes, createdAt: serverTimestamp() });
+
 
     } catch (error) {
         console.error("Error getting recipes:", error);
@@ -1163,9 +1213,9 @@ async function generateRecipes(items, source, append = false) {
         const existingLoader = document.getElementById('loading-indicator');
         if (existingLoader) existingLoader.remove();
         if (!append) {
-            recipeResultsDiv.innerHTML = `<p>Sorry, couldn't get recipe suggestions at this time.</p>`;
+            recipeResultsDiv.innerHTML = `<p>Sorry, couldn't get recipe suggestions: ${error.message}</p>`;
         } else {
-            showToast("Could not fetch more recipes.");
+            showToast(`Could not fetch more recipes: ${error.message}`);
         }
     } finally {
         discoverBtn.disabled = false;
@@ -1204,7 +1254,7 @@ async function captureAndScan() {
     switch (scanMode) {
         case 'quickMeal':
             targetContainer = recipeResultsDiv;
-            showLoadingState('Scanning ingredients and finding recipes...', targetContainer);
+            showLoadingState('Scanning ingredients and finding recipes...', targetContainer, true);
             scanFunction = httpsCallable(functions, 'identifyItems');
             break;
         case 'receipt':
@@ -1240,7 +1290,7 @@ async function captureAndScan() {
 
         if (scanMode === 'quickMeal') {
             const itemNames = identifiedItems.map(item => item.name);
-            await generateRecipes(itemNames, 'Suggest from Pantry', false);
+            await generateRecipes(itemNames, 'Suggest from Pantry', true);
         } else if (scanMode === 'pantry' || scanMode === 'receipt') {
             displayConfirmationForm(identifiedItems);
         } else if (scanMode === 'grocery' || scanMode === 'groceryReceipt') {
@@ -1256,7 +1306,7 @@ async function captureAndScan() {
                 batch.set(newItemRef, { name: item.name.toLowerCase(), category: item.category || 'Other', checked: false, createdAt: serverTimestamp() });
             });
             await batch.commit();
-            displayGroceryList();
+            // displayGroceryList is now handled by onSnapshot
         }
 
     } catch (error) {
@@ -1385,7 +1435,7 @@ async function handleAddGroceryItem(event) {
             createdAt: serverTimestamp()
         });
         itemNameInput.value = '';
-        displayGroceryList();
+        // displayGroceryList(); // onSnapshot handles this
     }
 }
 
@@ -1393,14 +1443,22 @@ async function handleGroceryListClick(event) {
     const groceryRef = getGroceryListRef();
     if (!groceryRef) return;
 
+    // MODIFIED: Handle category expand/collapse and state saving
     const header = event.target.closest('.category-header');
     if (header) {
+        const categoryName = header.textContent.replace(/[+−]$/, '').trim();
         const list = header.nextElementSibling;
         const toggle = header.querySelector('.category-toggle');
         if (list && list.tagName === 'UL') {
             const isVisible = list.style.display !== 'none';
             list.style.display = isVisible ? 'none' : 'block';
             if(toggle) toggle.textContent = isVisible ? '+' : '−';
+            // Update state
+            if (isVisible) {
+                openGroceryCategories.delete(categoryName);
+            } else {
+                openGroceryCategories.add(categoryName);
+            }
         }
         return;
     }
@@ -1412,7 +1470,7 @@ async function handleGroceryListClick(event) {
             const itemRef = doc(groceryRef, itemId);
             await updateDoc(itemRef, { checked: isChecked });
         }
-        handleGroceryItemCheck();
+        handleGroceryItemCheck(); // onSnapshot will update UI, but this updates button states immediately
     }
 
     if (event.target.classList.contains('delete-grocery-btn')) {
@@ -1420,7 +1478,7 @@ async function handleGroceryListClick(event) {
         if (itemId) {
             if (confirm("Are you sure you want to remove this item from your grocery list?")) {
                 await deleteDoc(doc(groceryRef, itemId));
-                displayGroceryList();
+                // displayGroceryList(); // onSnapshot handles this
             }
         }
     }
@@ -1479,8 +1537,7 @@ async function moveSelectedItemsToPantryDirectly() {
         });
 
         await batch.commit();
-        displayPantryItems();
-        displayGroceryList();
+        // onSnapshot handles UI updates
     } catch (error) {
         console.error("Error moving items to pantry:", error);
         alert("There was an error moving items to the pantry.");
@@ -1502,7 +1559,7 @@ async function handleAddFromRecipe(buttonElement) {
             checked: false,
             createdAt: serverTimestamp()
         });
-        displayGroceryList();
+        // onSnapshot handles display
         showToast(`'${itemName}' added to your grocery list!`);
     }
 }
@@ -1732,11 +1789,7 @@ async function handleBulkDelete(collectionRef, checkedItemsSelector) {
             batch.delete(doc(collectionRef, checkbox.dataset.id));
         });
         await batch.commit();
-        if (collectionRef.path.includes('pantryItems')) {
-            displayPantryItems();
-        } else {
-            displayGroceryList();
-        }
+        // onSnapshot will update the UI
     }
 }
 
@@ -1745,12 +1798,23 @@ function handleToggleAll(listElement, buttonElement) {
     if (allLists.length === 0) return;
 
     const shouldExpand = allLists[0].style.display === 'none';
+    const categorySet = listElement.id === 'pantry-list' ? openPantryCategories : openGroceryCategories;
+
+    listElement.querySelectorAll('.category-header').forEach(header => {
+        const categoryName = header.textContent.replace(/[+−]$/, '').trim();
+        if (shouldExpand) {
+            categorySet.add(categoryName);
+        } else {
+            categorySet.delete(categoryName);
+        }
+    });
 
     const allToggles = listElement.querySelectorAll('.category-toggle');
     allLists.forEach(list => list.style.display = shouldExpand ? 'block' : 'none');
     allToggles.forEach(toggle => toggle.textContent = shouldExpand ? '−' : '+');
     buttonElement.textContent = shouldExpand ? 'Collapse All' : 'Expand All';
 }
+
 
 function handleRemoveConfirmedItem(event) {
     if (event.target.classList.contains('remove-item-btn')) {
@@ -1772,7 +1836,7 @@ async function generateAutomatedGroceryList() {
         const result = await generateList({ weekId: getWeekId(currentDate) });
         if (result.data.success) {
             showToast(result.data.message);
-            displayGroceryList();
+            // displayGroceryList(); // onSnapshot handles this
         } else {
             throw new Error(result.data.error || "Unknown error");
         }
@@ -2398,6 +2462,17 @@ async function initializeAppUI(user) {
                 configurePaywallUI();
             }
         });
+        
+        // NEW: Load today's suggestions
+        const todayString = getTodayDateString();
+        const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
+        const suggestionsDoc = await getDoc(suggestionsRef);
+        if (suggestionsDoc.exists()) {
+            accumulatedRecipes = suggestionsDoc.data().recipes || [];
+            displayRecipeResults(accumulatedRecipes, 'ideas');
+        } else {
+            accumulatedRecipes = [];
+        }
 
         startApp();
         if (!userDoc.data().hasSeenHowToGuide) {
@@ -2676,22 +2751,34 @@ document.addEventListener('DOMContentLoaded', () => {
             "Perfecting the instructions...",
             "Here comes your custom recipe!"
         ];
-        showLoadingState(loadingMessages, document.getElementById('recipe-results'));
+        showLoadingState(loadingMessages, document.getElementById('recipe-results'), true);
         try {
             const askTheChefFunc = httpsCallable(functions, 'askTheChef');
             const result = await askTheChefFunc({ mealQuery, unitSystem });
 
-            const newRecipe = result.data;
+            // MODIFIED: Handle new response format
+            const { recipe: newRecipe, remaining, isPremium } = result.data;
+
+            if (remaining !== undefined) {
+                 showToast(`${remaining} ${isPremium ? '' : 'free '}suggestion(s) remaining today.`);
+            }
+
             accumulatedRecipes.unshift(newRecipe);
             if (accumulatedRecipes.length > 18) {
                 accumulatedRecipes.length = 18;
             }
             displayRecipeResults(accumulatedRecipes, 'your custom');
             queryInput.value = '';
+
+            // NEW: Save suggestions to Firestore for persistence
+            const todayString = getTodayDateString();
+            const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
+            await setDoc(suggestionsRef, { recipes: accumulatedRecipes, createdAt: serverTimestamp() });
+            
         } catch (error) {
             if (loadingInterval) clearInterval(loadingInterval);
             console.error("Error asking the chef:", error);
-            document.getElementById('recipe-results').innerHTML = `<p>Sorry, the chef couldn't find a recipe for that.</p>`;
+            document.getElementById('recipe-results').innerHTML = `<p>Sorry, the chef couldn't find a recipe for that: ${error.message}</p>`;
         }
     });
     document.getElementById('toggle-all-pantry-btn')?.addEventListener('click', (e) => handleToggleAll(document.getElementById('pantry-list'), e.target));
