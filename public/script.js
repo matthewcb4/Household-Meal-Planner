@@ -2,7 +2,7 @@
 // Import all necessary functions from the Firebase SDKs at the top
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, onSnapshot, query, where, writeBatch, arrayUnion, serverTimestamp, deleteDoc, orderBy, deleteField } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, onSnapshot, query, where, writeBatch, arrayUnion, serverTimestamp, deleteDoc, orderBy, deleteField, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
 
@@ -121,6 +121,8 @@ let currentHowToSlide = 0;
 let accumulatedRecipes = [];
 let loadingInterval = null;
 let isCameraOpen = false;
+let currentTourStep = 0;
+let tourSteps = [];
 // NEW: Sets to track open category states
 let openPantryCategories = new Set();
 let openGroceryCategories = new Set();
@@ -770,11 +772,11 @@ function handlePantryItemCheck() {
                 selectAllPantryCheckbox.checked = true;
                 selectAllPantryCheckbox.indeterminate = false;
             } else if (checkedItems.length > 0) {
-                selectAllPantryCheckbox.checked = false;
-                selectAllPantryCheckbox.indeterminate = true;
+                selectAllGroceryCheckbox.checked = false;
+                selectAllGroceryCheckbox.indeterminate = true;
             } else {
-                selectAllPantryCheckbox.checked = false;
-                selectAllPantryCheckbox.indeterminate = false;
+                selectAllGroceryCheckbox.checked = false;
+                selectAllGroceryCheckbox.indeterminate = false;
             }
         }
     }
@@ -2058,6 +2060,269 @@ function listenToFavorites() {
     });
 }
 
+// --- ONBOARDING TOUR FUNCTIONS ---
+function defineTourSteps() {
+    tourSteps = [
+        {
+            element: '.sidebar-nav a[data-target="pantry-section"]',
+            title: 'Step 1: Your Pantry',
+            content: 'This is where you manage all the ingredients you have at home. Let\'s add your first item!',
+            placement: 'right',
+            onBefore: () => {
+                switchView('pantry-section');
+            }
+        },
+        {
+            element: '#show-manual-add-btn',
+            title: 'Add Items',
+            content: 'You can add items manually, scan a single item\'s image, or even scan a whole receipt (a premium feature!). Let\'s add one manually.',
+            placement: 'bottom'
+        },
+        {
+            element: '#manual-add-form',
+            title: 'Enter Item Details',
+            content: 'Fill in the name, quantity, and unit for your item. For example, "2 lbs Chicken Breast". Then click "Add".',
+            placement: 'bottom',
+            onBefore: () => {
+                document.getElementById('pantry-forms-container').style.display = 'block';
+                document.getElementById('manual-add-container').style.display = 'block';
+            }
+        },
+        {
+            element: '.sidebar-nav a[data-target="recipe-section"]',
+            title: 'Step 2: Find Recipes',
+            content: 'Now that you have something in your pantry, let\'s find a recipe. Go to the Recipes section.',
+            placement: 'right',
+            onBefore: () => {
+                // Close the manual add form if it's open
+                document.getElementById('pantry-forms-container').style.display = 'none';
+                switchView('recipe-section');
+            }
+        },
+        {
+            element: '#suggest-recipe-btn',
+            title: 'Get Suggestions',
+            content: 'Click here to get AI-powered recipe suggestions based on what\'s currently in your pantry.',
+            placement: 'bottom'
+        },
+        {
+            element: '#recipe-results .recipe-card:first-child',
+            title: 'Your First Recipe!',
+            content: 'Here is a recipe suggestion. Click on it to see more details.',
+            placement: 'bottom',
+            isOptional: true // This step might not exist if the AI fails
+        },
+        {
+            element: '.add-to-plan-btn',
+            title: 'Step 3: Add to Your Plan',
+            content: 'Like the recipe? Click here to add it to your weekly meal plan.',
+            placement: 'top',
+            onBefore: () => {
+                const firstCard = document.querySelector('#recipe-results .recipe-card:first-child');
+                if (firstCard) {
+                    populateRecipeDetailModal(JSON.parse(firstCard.dataset.recipe), false);
+                }
+            }
+        },
+         {
+            element: '#calendar-grid',
+            title: 'Select a Day',
+            content: 'Choose one or more days on the calendar to add this recipe to.',
+            placement: 'top'
+        },
+        {
+            element: '#add-to-plan-form button[type="submit"]',
+            title: 'Confirm',
+            content: 'Select a mealtime and click "Add to Plan" to finalize.',
+            placement: 'top'
+        },
+        {
+            element: '.sidebar-nav a[data-target="meal-plan-section"]',
+            title: 'Step 4: View Your Plan',
+            content: 'Great! Your meal is now on the planner. You can view, organize, and generate a grocery list from here.',
+            placement: 'right',
+            onBefore: () => {
+                document.getElementById('add-to-plan-modal').style.display = 'none';
+                switchView('meal-plan-section');
+            }
+        },
+        {
+            title: 'Tour Complete!',
+            content: 'You\'ve learned the basics! Explore the app to discover more features like the Community tab and premium perks. Enjoy your meal planning!',
+            isFinal: true
+        }
+    ];
+}
+
+function startTour() {
+    defineTourSteps();
+    currentTourStep = 0;
+    document.getElementById('tour-overlay').style.display = 'block';
+    showTourStep();
+}
+
+function showTourStep() {
+    const step = tourSteps[currentTourStep];
+    const tooltip = document.getElementById('tour-tooltip');
+    const overlay = document.getElementById('tour-overlay');
+    
+    document.querySelectorAll('.tour-highlight').forEach(el => {
+        el.classList.remove('tour-highlight');
+    });
+
+    overlay.style.pointerEvents = 'auto'; // Block clicks by default
+
+    if (step.isFinal) {
+        tooltip.style.left = '50%';
+        tooltip.style.top = '50%';
+        tooltip.style.transform = 'translate(-50%, -50%)';
+        tooltip.style.zIndex = '1002';
+    } else {
+        const targetElement = document.querySelector(step.element);
+        if (!targetElement) {
+            if (step.isOptional) {
+                nextTourStep();
+                return;
+            }
+            console.warn(`Tour element not found: ${step.element}`);
+            endTour();
+            return;
+        }
+
+        if (step.onBefore) {
+            step.onBefore();
+        }
+        
+        targetElement.classList.add('tour-highlight');
+        overlay.style.pointerEvents = 'none'; // Allow clicks to pass through overlay
+        
+        const targetRect = targetElement.getBoundingClientRect();
+
+        tooltip.style.display = 'block'; // Make it visible to calculate size
+        const tooltipHeight = tooltip.offsetHeight;
+
+        switch (step.placement) {
+            case 'right':
+                tooltip.style.left = `${targetRect.right + 15}px`;
+                tooltip.style.top = `${targetRect.top}px`;
+                break;
+            case 'bottom':
+                tooltip.style.left = `${targetRect.left}px`;
+                tooltip.style.top = `${targetRect.bottom + 15}px`;
+                break;
+             case 'top':
+                tooltip.style.left = `${targetRect.left}px`;
+                tooltip.style.top = `${targetRect.top - tooltipHeight - 15}px`;
+                break;
+            default: // bottom
+                 tooltip.style.left = `${targetRect.left}px`;
+                tooltip.style.top = `${targetRect.bottom + 15}px`;
+        }
+    }
+
+    tooltip.innerHTML = `
+        <h4>${step.title}</h4>
+        <p>${step.content}</p>
+        <div class="tour-navigation">
+            <span class="tour-step-counter">${currentTourStep + 1} / ${tourSteps.length}</span>
+            <div>
+                ${currentTourStep > 0 ? '<button id="tour-prev-btn" class="secondary">Prev</button>' : ''}
+                <button id="tour-next-btn">${step.isFinal ? 'Finish' : 'Next'}</button>
+            </div>
+        </div>
+        <button id="tour-skip-btn" class="link-button">Skip Tour</button>
+    `;
+
+    tooltip.style.display = 'block';
+
+    document.getElementById('tour-next-btn').addEventListener('click', nextTourStep);
+    if (document.getElementById('tour-prev-btn')) {
+        document.getElementById('tour-prev-btn').addEventListener('click', prevTourStep);
+    }
+    document.getElementById('tour-skip-btn').addEventListener('click', endTour);
+}
+
+function nextTourStep() {
+    if (currentTourStep < tourSteps.length - 1) {
+        currentTourStep++;
+        showTourStep();
+    } else {
+        endTour();
+    }
+}
+
+function prevTourStep() {
+    if (currentTourStep > 0) {
+        currentTourStep--;
+        showTourStep();
+    }
+}
+
+async function endTour() {
+    document.getElementById('tour-overlay').style.display = 'none';
+    document.getElementById('tour-tooltip').style.display = 'none';
+    document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+    await markTourAsSeen();
+}
+
+async function markTourAsSeen() {
+    if (currentUser) {
+        const userDocRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userDocRef, { hasSeenOnboardingTour: true });
+    }
+}
+// NEW: Fetch and display community recipes
+async function fetchAndDisplayCommunityRecipes() {
+    const container = document.getElementById('community-recipes-container');
+    container.innerHTML = '<p>Loading community recipes...</p>';
+
+    try {
+        const getCommunityRecipes = httpsCallable(functions, 'getCommunityRecipes');
+        const result = await getCommunityRecipes({
+            cuisine: document.getElementById('cuisine-select').value,
+            mealType: document.querySelector('input[name="mealType"]:checked').value
+        });
+        
+        const { todayRecipes, favoriteRecipes } = result.data;
+
+        container.innerHTML = ''; // Clear loader
+
+        // Display Today's Generated Recipes
+        if (todayRecipes.length > 0) {
+            container.innerHTML += '<h3>Freshly Suggested Today</h3>';
+            const todayRow = document.createElement('div');
+            todayRow.className = 'recipe-card-row';
+            todayRecipes.forEach(recipe => {
+                const recipeCard = createRecipeCard(recipe, false);
+                todayRow.appendChild(recipeCard);
+            });
+            container.appendChild(todayRow);
+        } else {
+            container.innerHTML += '<p>No new recipes suggested by the community today. Be the first!</p>';
+        }
+
+        // Display Community Favorites (Premium)
+        if (householdData.subscriptionTier === 'paid') {
+            if (favoriteRecipes.length > 0) {
+                container.innerHTML += '<h3>Top Community Favorites <span class="premium-tag">Premium</span></h3>';
+                const favRow = document.createElement('div');
+                favRow.className = 'recipe-card-row';
+                favoriteRecipes.forEach(recipe => {
+                    const recipeCard = createRecipeCard(recipe, true);
+                    favRow.appendChild(recipeCard);
+                });
+                container.appendChild(favRow);
+            }
+        } else {
+             container.innerHTML += '<div class="premium-feature disabled" style="margin-top: 2rem;"><h3>Top Community Favorites <span class="premium-tag">Premium</span></h3><p>Upgrade to Premium to see the top-rated recipes saved by the community!</p></div>';
+        }
+
+    } catch (error) {
+        console.error("Error fetching community recipes:", error);
+        container.innerHTML = `<p>Could not load community recipes: ${error.message}</p>`;
+    }
+}
+
 function startApp() {
     populateCategoryDropdown(document.getElementById('manual-category'));
     populateCategoryDropdown(document.getElementById('grocery-item-category'));
@@ -2426,7 +2691,7 @@ async function initializeAppUI(user) {
         await setDoc(userDocRef, {
             email: user.email,
             householdId: null,
-            hasSeenHowToGuide: false,
+            hasSeenOnboardingTour: false, 
             preferences: {}
         });
         userDoc = await getDoc(userDocRef);
@@ -2475,8 +2740,9 @@ async function initializeAppUI(user) {
         }
 
         startApp();
-        if (!userDoc.data().hasSeenHowToGuide) {
-            showHowToModal();
+        // MODIFIED: Check for new tour flag
+        if (!userDoc.data().hasSeenOnboardingTour) {
+            startTour();
         }
     } else {
         document.getElementById('initial-view').style.display = 'block';
@@ -2597,7 +2863,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (target.closest('#pantry-list')) handlePantryClick(event);
         if (target.closest('#grocery-list')) handleGroceryListClick(event);
-        if (target.closest('#recipe-results') || target.closest('#favorite-recipes-container')) handleCardClick(event);
+        if (target.closest('#recipe-results') || target.closest('#favorite-recipes-container') || target.closest('#community-recipes-container')) handleCardClick(event);
         if (target.closest('#meal-planner-grid')) {
             if (target.closest('.meal-slot')) {
                  handleMealSlotClick(event);
@@ -2670,20 +2936,37 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('generate-grocery-list-btn')?.addEventListener('click', generateAutomatedGroceryList);
     document.getElementById('prev-week-btn')?.addEventListener('click', () => navigateWeek('prev'));
     document.getElementById('next-week-btn')?.addEventListener('click', () => navigateWeek('next'));
+    
+    // TAB SWITCHING LOGIC
     document.getElementById('show-ideas-tab')?.addEventListener('click', (e) => {
         document.getElementById('ideas-content').style.display = 'block';
         document.getElementById('recipe-results').style.display = 'grid';
         document.getElementById('favorite-recipes-container').style.display = 'none';
+        document.getElementById('community-recipes-container').style.display = 'none';
         e.target.classList.add('active');
         document.getElementById('show-favorites-tab').classList.remove('active');
+        document.getElementById('show-community-tab').classList.remove('active');
     });
     document.getElementById('show-favorites-tab')?.addEventListener('click', (e) => {
         document.getElementById('ideas-content').style.display = 'none';
         document.getElementById('recipe-results').style.display = 'none';
         document.getElementById('favorite-recipes-container').style.display = 'block';
+        document.getElementById('community-recipes-container').style.display = 'none';
         e.target.classList.add('active');
         document.getElementById('show-ideas-tab').classList.remove('active');
+        document.getElementById('show-community-tab').classList.remove('active');
     });
+    document.getElementById('show-community-tab')?.addEventListener('click', (e) => {
+        document.getElementById('ideas-content').style.display = 'none';
+        document.getElementById('recipe-results').style.display = 'none';
+        document.getElementById('favorite-recipes-container').style.display = 'none';
+        document.getElementById('community-recipes-container').style.display = 'block';
+        e.target.classList.add('active');
+        document.getElementById('show-ideas-tab').classList.remove('active');
+        document.getElementById('show-favorites-tab').classList.remove('active');
+        fetchAndDisplayCommunityRecipes();
+    });
+
     document.getElementById('add-to-plan-form')?.addEventListener('submit', async (event) => {
         event.preventDefault();
         const meal = document.getElementById('meal-select').value;

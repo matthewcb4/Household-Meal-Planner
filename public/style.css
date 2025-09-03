@@ -304,7 +304,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-accent-color); background-color: #333; }
 
 /* --- Recipe Cards --- */
-#recipe-results, #favorite-recipes-container .recipe-card-row {
+#recipe-results, #favorite-recipes-container .recipe-card-row, #community-recipes-container .recipe-card-row {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 0.75rem;
@@ -797,7 +797,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     }
 }
 
-/* FIX: Added How-To Modal Styles */
+/* FIX: How-To Modal Styles */
 .how-to-slider {
     position: relative;
     min-height: 150px; /* Give it some space */
@@ -831,6 +831,44 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     background-color: var(--primary-accent-color);
 }
 
+/* NEW: Onboarding Tour Styles */
+#tour-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    pointer-events: none; /* Allows clicks to pass through */
+    display: none;
+}
+
+.tour-highlight {
+    position: relative;
+    z-index: 10001;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
+    border-radius: 4px;
+    pointer-events: all !important; /* Make sure highlighted element is clickable */
+}
+
+#tour-tooltip {
+    position: fixed;
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-md);
+    z-index: 10002;
+    max-width: 300px;
+    border: 1px solid var(--border-color);
+    display: none;
+}
+#tour-tooltip h4 { margin-top: 0; color: var(--primary-accent-color); }
+#tour-tooltip .tour-navigation { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
+#tour-tooltip .tour-navigation .tour-step-counter { font-size: 0.8rem; color: var(--text-secondary-color); }
+#tour-tooltip .tour-navigation div { display: flex; gap: 0.5rem; }
+#tour-tooltip #tour-skip-btn { margin-top: 0.5rem; display: block; margin-left: auto; margin-right: auto; }
+
 /* NEW: Mobile "More" Modal Styles */
 .mobile-links-container {
     display: flex;
@@ -857,28 +895,28 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 /* --- Responsive Styles --- */
 @media (min-width: 769px) {
     /* UPDATE: Horizontal scrolling for recipe results on desktop */
-    #recipe-results {
+    #recipe-results, #community-recipes-container .recipe-card-row {
         display: flex;
         overflow-x: auto;
         gap: 1rem;
         padding-bottom: 1rem; /* Make space for scrollbar if visible */
     }
-    #recipe-results .recipe-card {
+    #recipe-results .recipe-card, #community-recipes-container .recipe-card {
         flex: 0 0 220px; /* Don't shrink, don't grow, fixed width */
         width: 220px;
     }
     /* Hide scrollbar but keep it functional */
-    #recipe-results::-webkit-scrollbar {
+    #recipe-results::-webkit-scrollbar, #community-recipes-container .recipe-card-row::-webkit-scrollbar {
         height: 8px;
     }
-    #recipe-results::-webkit-scrollbar-track {
+    #recipe-results::-webkit-scrollbar-track, #community-recipes-container .recipe-card-row::-webkit-scrollbar-track {
         background: transparent;
     }
-    #recipe-results::-webkit-scrollbar-thumb {
+    #recipe-results::-webkit-scrollbar-thumb, #community-recipes-container .recipe-card-row::-webkit-scrollbar-thumb {
         background: var(--surface-highlight-color);
         border-radius: 4px;
     }
-    #recipe-results::-webkit-scrollbar-thumb:hover {
+    #recipe-results::-webkit-scrollbar-thumb:hover, #community-recipes-container .recipe-card-row::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
     #sidebar-calendar-container-mobile { display: none; } /* Hide mobile calendar on desktop */
@@ -960,7 +998,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     }
     .content-wrapper { padding: 0.75rem; }
     h2 { font-size: 1.4rem; }
-    #recipe-results, #favorite-recipes-container .recipe-card-row { 
+    #recipe-results, #favorite-recipes-container .recipe-card-row, #community-recipes-container .recipe-card-row { 
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); 
         gap: 0.75rem; 
     }
