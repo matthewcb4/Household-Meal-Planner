@@ -862,10 +862,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     max-width: 300px;
     border: 1px solid var(--border-color);
     display: none;
+    /* ADDED: visibility property for smoother rendering */
+    visibility: hidden;
 }
 #tour-tooltip h4 { margin-top: 0; color: var(--primary-accent-color); }
 #tour-tooltip .tour-navigation { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
-#tour-tooltip .tour-navigation .tour-step-counter { font-size: 0.8rem; color: var(--text-secondary-color); }
+#tour-tooltip .tour-navigation .tour-step-counter { font-size: 0.8rem; color: var(--text-secondary-color); white-space: nowrap; }
 #tour-tooltip .tour-navigation div { display: flex; gap: 0.5rem; }
 #tour-tooltip #tour-skip-btn { margin-top: 0.5rem; display: block; margin-left: auto; margin-right: auto; }
 

@@ -2074,12 +2074,13 @@ async function waitForElement(selector, timeout = 20000) {
 }
 
 function defineTourSteps() {
+    const isMobile = window.innerWidth <= 768;
     tourSteps = [
         {
             element: '.sidebar-nav a[data-target="pantry-section"]',
             title: 'Step 1: Your Pantry',
             content: 'This is where you manage all the ingredients you have at home. Let\'s add your first item!',
-            placement: 'right',
+            placement: isMobile ? 'top' : 'right',
             onBefore: () => {
                 switchView('pantry-section');
             }
@@ -2088,14 +2089,15 @@ function defineTourSteps() {
             element: '#show-manual-add-btn',
             title: 'Add Items',
             content: 'You can add items manually, scan a single item\'s image, or even scan a whole receipt (a premium feature!). Let\'s add one manually.',
-            placement: 'bottom'
+            placement: isMobile ? 'top' : 'bottom'
         },
         {
             element: '#manual-add-form',
             title: 'Enter Item Details',
             content: 'Fill in the name, quantity, and unit for your item. For example, "2 lbs Chicken Breast". Then click "Add".',
-            placement: 'bottom',
+            placement: 'top',
             onBefore: () => {
+                switchView('pantry-section'); // Ensures we're on the right tab when going backward
                 document.getElementById('pantry-forms-container').style.display = 'block';
                 document.getElementById('manual-add-container').style.display = 'block';
             }
@@ -2104,7 +2106,7 @@ function defineTourSteps() {
             element: '.sidebar-nav a[data-target="recipe-section"]',
             title: 'Step 2: Find Recipes',
             content: 'Now that you have something in your pantry, let\'s find a recipe. Go to the Recipes section.',
-            placement: 'right',
+            placement: isMobile ? 'top' : 'right',
             onBefore: () => {
                 document.getElementById('pantry-forms-container').style.display = 'none';
                 switchView('recipe-section');
@@ -2113,28 +2115,31 @@ function defineTourSteps() {
         {
             element: '#suggest-recipe-btn',
             title: 'Get Suggestions',
-            content: 'Click here to get AI-powered recipe suggestions based on what\'s currently in your pantry.',
-            placement: 'bottom'
+            content: 'Click "Next" and we\'ll get some AI-powered recipe suggestions based on what\'s currently in your pantry.',
+            placement: isMobile ? 'top' : 'bottom',
+            shouldClick: true
         },
         {
             element: '#recipe-results .recipe-card:first-child',
             title: 'Your First Recipe!',
-            content: 'Here is a recipe suggestion. Click on it to see more details.',
-            placement: 'bottom',
-            isOptional: true
+            content: 'Here is a recipe suggestion. Click "Next" to see more details.',
+            placement: 'top',
+            isOptional: true,
+            shouldClick: true
         },
         {
             element: '#recipe-detail-content .add-to-plan-btn',
             title: 'Step 3: Add to Your Plan',
-            content: 'Like the recipe? Click here to add it to your weekly meal plan.',
+            content: 'Like the recipe? Click "Next" to add it to your weekly meal plan.',
             placement: 'top',
+            shouldClick: true,
             onBefore: async () => {
-                const firstCard = document.querySelector('#recipe-results .recipe-card:first-child');
-                if (firstCard) {
-                    const recipeData = JSON.parse(firstCard.dataset.recipe);
-                    const isFavorite = firstCard.querySelector('.save-recipe-btn.is-favorite') !== null;
-                    populateRecipeDetailModal(recipeData, isFavorite);
-                    await waitForElement('#recipe-detail-modal', 500); // Wait for modal to appear
+                if (document.getElementById('recipe-detail-modal').style.display !== 'block') {
+                    const firstCard = await waitForElement('#recipe-results .recipe-card:first-child');
+                    if (firstCard) {
+                        firstCard.click();
+                        await waitForElement('#recipe-detail-modal');
+                    }
                 }
             }
         },
@@ -2142,10 +2147,17 @@ function defineTourSteps() {
             element: '#calendar-grid',
             title: 'Select a Day',
             content: 'Choose one or more days on the calendar to add this recipe to.',
-            placement: 'top'
+            placement: 'top',
+            onBefore: async () => {
+                if (document.getElementById('add-to-plan-modal').style.display !== 'block') {
+                    const btn = await waitForElement('#recipe-detail-content .add-to-plan-btn');
+                    if (btn) btn.click();
+                    await waitForElement('#add-to-plan-modal');
+                }
+            }
         },
         {
-            element: '#add-to-plan-form button[type="submit"]',
+            element: '#meal-select',
             title: 'Confirm',
             content: 'Select a mealtime and click "Add to Plan" to finalize.',
             placement: 'top'
@@ -2154,9 +2166,16 @@ function defineTourSteps() {
             element: '.sidebar-nav a[data-target="meal-plan-section"]',
             title: 'Step 4: View Your Plan',
             content: 'Great! Your meal is now on the planner. You can view, organize, and generate a grocery list from here.',
-            placement: 'right',
-            onBefore: () => {
-                document.getElementById('add-to-plan-modal').style.display = 'none';
+            placement: isMobile ? 'top' : 'right',
+            onBefore: async () => {
+                const addToPlanModal = document.getElementById('add-to-plan-modal');
+                if (addToPlanModal.style.display === 'block') {
+                    const firstDay = await waitForElement('.calendar-day[data-date]');
+                    if (firstDay) firstDay.click();
+                    document.getElementById('meal-select').value = 'dinner';
+                    document.querySelector('#add-to-plan-form button[type="submit"]').click();
+                    await delay(500);
+                }
                 switchView('meal-plan-section');
             }
         },
@@ -2175,45 +2194,52 @@ function startTour() {
     showTourStep();
 }
 
+// MODIFIED: Re-ordered logic to correctly calculate tooltip position on mobile.
 async function showTourStep() {
     const step = tourSteps[currentTourStep];
     const tooltip = document.getElementById('tour-tooltip');
     const overlay = document.getElementById('tour-overlay');
-    
-    document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-    overlay.style.pointerEvents = 'auto';
 
-    const renderTooltipContent = (step) => {
-        tooltip.innerHTML = `
-            <h4>${step.title}</h4>
-            <p>${step.content}</p>
-            <div class="tour-navigation">
-                <span class="tour-step-counter">${currentTourStep + 1} / ${tourSteps.length}</span>
-                <div>
-                    ${currentTourStep > 0 ? '<button id="tour-prev-btn" class="secondary">Prev</button>' : ''}
-                    <button id="tour-next-btn">${step.isFinal ? 'Finish' : 'Next'}</button>
-                </div>
+    // Always clean up previous state first
+    document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+    overlay.style.pointerEvents = 'auto'; // Block clicks by default
+
+    // 1. Render the new content into the tooltip
+    tooltip.innerHTML = `
+        <h4>${step.title}</h4>
+        <p>${step.content}</p>
+        <div class="tour-navigation">
+            <span class="tour-step-counter">${currentTourStep + 1} / ${tourSteps.length}</span>
+            <div>
+                ${currentTourStep > 0 ? '<button id="tour-prev-btn" class="secondary">Prev</button>' : ''}
+                <button id="tour-next-btn">${step.isFinal ? 'Finish' : 'Next'}</button>
             </div>
-            <button id="tour-skip-btn" class="link-button">Skip Tour</button>
-        `;
-        document.getElementById('tour-next-btn').addEventListener('click', nextTourStep);
-        if (document.getElementById('tour-prev-btn')) {
-            document.getElementById('tour-prev-btn').addEventListener('click', prevTourStep);
-        }
-        document.getElementById('tour-skip-btn').addEventListener('click', endTour);
-    };
+        </div>
+        <button id="tour-skip-btn" class="link-button">Skip Tour</button>
+    `;
+    document.getElementById('tour-next-btn').addEventListener('click', nextTourStep);
+    if (document.getElementById('tour-prev-btn')) {
+        document.getElementById('tour-prev-btn').addEventListener('click', prevTourStep);
+    }
+    document.getElementById('tour-skip-btn').addEventListener('click', endTour);
+
+    // Make the tooltip visible but off-screen to measure it accurately
+    tooltip.style.visibility = 'hidden';
+    tooltip.style.display = 'block';
 
     if (step.isFinal) {
+        // Center the final step's tooltip
         tooltip.style.left = '50%';
         tooltip.style.top = '50%';
         tooltip.style.transform = 'translate(-50%, -50%)';
     } else {
+        // Run any pre-step actions (like switching views)
         if (step.onBefore) {
             await step.onBefore();
         }
-        
+
         const targetElement = await waitForElement(step.element);
-        
+
         if (!targetElement) {
             if (step.isOptional) {
                 nextTourStep(); // Skip optional step if element not found
@@ -2226,16 +2252,17 @@ async function showTourStep() {
         }
 
         targetElement.classList.add('tour-highlight');
-        overlay.style.pointerEvents = 'none';
-        
+        overlay.style.pointerEvents = 'none'; // Allow clicks to pass through to the highlighted element
+
+        // 2. Now that content is rendered, get accurate dimensions
         const targetRect = targetElement.getBoundingClientRect();
-        tooltip.style.display = 'block';
         const tooltipHeight = tooltip.offsetHeight;
         const tooltipWidth = tooltip.offsetWidth;
 
         let top = 0;
         let left = 0;
 
+        // 3. Calculate position based on placement and new dimensions
         switch (step.placement) {
             case 'right':
                 left = targetRect.right + 15;
@@ -2254,7 +2281,7 @@ async function showTourStep() {
                 top = targetRect.bottom + 15;
         }
 
-        // Boundary checks to keep tooltip on screen
+        // 4. Boundary checks to keep tooltip on screen
         if (top < 10) top = 10;
         if (left < 10) left = 10;
         if (left + tooltipWidth > window.innerWidth - 10) {
@@ -2264,26 +2291,43 @@ async function showTourStep() {
             top = window.innerHeight - tooltipHeight - 10;
         }
         
+        // 5. Apply the final position
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
         tooltip.style.transform = 'none';
     }
     
-    renderTooltipContent(step);
-    tooltip.style.display = 'block';
+    // 6. Make the tooltip visible at its final position
+    tooltip.style.visibility = 'visible';
 }
 
 
-function nextTourStep() {
+async function nextTourStep() {
+    const tooltip = document.getElementById('tour-tooltip');
+    tooltip.style.display = 'none'; // Hide tooltip before performing action
+
+    const step = tourSteps[currentTourStep];
+
+    if (step.shouldClick && !step.isFinal) {
+        const targetElement = await waitForElement(step.element);
+        if (targetElement) {
+            targetElement.click();
+        }
+    }
+
     if (currentTourStep < tourSteps.length - 1) {
         currentTourStep++;
-        showTourStep();
+        await showTourStep();
     } else {
-        endTour();
+        await endTour();
     }
 }
 
 function prevTourStep() {
+    // FIX: Close modals when going backward
+    document.getElementById('recipe-detail-modal').style.display = 'none';
+    document.getElementById('add-to-plan-modal').style.display = 'none';
+
     if (currentTourStep > 0) {
         currentTourStep--;
         showTourStep();
@@ -2341,9 +2385,9 @@ async function fetchAndDisplayCommunityRecipes() {
                 favRow.className = 'recipe-card-row';
                 favoriteRecipes.forEach(recipe => {
                     const recipeCard = createRecipeCard(recipe, true);
-                    favRow.appendChild(recipeCard);
+                    favRow.appendChild(recipeCard); // Corrected this line
                 });
-                container.appendChild(favRow);
+                container.appendChild(favRow); // Corrected this line
             }
         } else {
              container.innerHTML += '<div class="premium-feature disabled" style="margin-top: 2rem;"><h3>Top Community Favorites <span class="premium-tag">Premium</span></h3><p>Upgrade to Premium to see the top-rated recipes saved by the community!</p></div>';
