@@ -1061,22 +1061,27 @@ exports.testStripeSecret = onCall({ enforceAppCheck: true }, async (request) => 
     }
 });
 
-// --- getCommunityRecipes (MODIFIED) ---
+// --- getCommunityRecipes (FIXED FOR TIMEZONES) ---
 exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: true }, async (request) => {
     try {
-        // 1. Get Today's Suggestions
+        // 1. Get Today's & Yesterday's Suggestions to cover all timezones
         const today = new Date();
-        const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        
-        const suggestionsSnapshot = await db.collectionGroup('dailySuggestions')
-            .where('__name__', '==', todayString)
-            .get();
+        const yesterday = new Date();
+        yesterday.setDate(today.getDate() - 1);
 
-        let todayRecipes = [];
+        const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const yesterdayString = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+        
+        const suggestionsSnapshot = await db.collectionGroup('dailySuggestions').get();
+
+        let recentRecipes = [];
         suggestionsSnapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.recipes && Array.isArray(data.recipes)) {
-                todayRecipes.push(...data.recipes);
+            // Filter for documents from today OR yesterday (server time)
+            if (doc.id === todayString || doc.id === yesterdayString) {
+                const data = doc.data();
+                if (data.recipes && Array.isArray(data.recipes)) {
+                    recentRecipes.push(...data.recipes);
+                }
             }
         });
 
@@ -1094,7 +1099,7 @@ exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: t
             .slice(0, 10);
 
         return {
-            todayRecipes: todayRecipes.slice(0, 10), // Limit to 10 for today as well
+            todayRecipes: recentRecipes.slice(0, 10), // Limit to 10 for today as well
             favoriteRecipes: favoriteRecipes
         };
 
