@@ -1,8 +1,6 @@
 // index.js (Cloud Functions) - Updated with App Check Enforcement and full Stripe Webhook logic
 
-const functions = require("firebase-functions");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onRequest } = require("firebase-functions/v2/https");
+const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineString } = require("firebase-functions/params");
 const { GoogleAuth } = require("google-auth-library");
@@ -91,34 +89,32 @@ const fetchWithTimeout = async (url, options, timeout = 530000) => {
 const delay = ms => new Promise(res => setTimeout(res, ms));
 
 // --- MODIFIED: Generic Usage Quota Management for daily limits ---
-const checkAndIncrementUsage = async (householdId, feature) => {
+const checkAndIncrementUsage = async (householdId, feature, timezone = 'UTC') => {
     const householdRef = db.collection('households').doc(householdId);
     const householdDoc = await householdRef.get();
     const householdData = householdDoc.data();
 
     const isPremiumUser = isPremium(householdData);
 
+    // UPDATED LIMITS
     const LIMITS = {
-        scan: { free: 20, premium: 100 }, // Assuming a premium limit for scans
-        recipeGeneration: { free: 3, premium: 7 }
+        scan: { free: 20, premium: 100 },
+        recipeGeneration: { free: 5, premium: 10 }
     };
 
     const limit = isPremiumUser ? LIMITS[feature].premium : LIMITS[feature].free;
 
+    // UPDATED: Use timezone to determine the current date for the user
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
+    const todayDateString = now.toLocaleDateString('en-CA', { timeZone: timezone }); // YYYY-MM-DD format
 
     const usage = householdData.usage || {};
-    const featureUsage = usage[feature] || { count: 0, lastUsageDate: new Date(0) };
+    const featureUsage = usage[feature] || { count: 0, date: '' };
     
-    // Firestore timestamps need to be converted to JS Dates
-    const lastUsageDate = featureUsage.lastUsageDate.toDate ? featureUsage.lastUsageDate.toDate() : new Date(0);
-    const lastUsageDay = new Date(lastUsageDate.getFullYear(), lastUsageDate.getMonth(), lastUsageDate.getDate());
-
     let currentCount = featureUsage.count;
 
-    // If last usage was before today, reset the count.
-    if (today > lastUsageDay) {
+    // If the last usage date string is not today's date string, reset the count.
+    if (featureUsage.date !== todayDateString) {
         currentCount = 0;
     }
 
@@ -134,7 +130,7 @@ const checkAndIncrementUsage = async (householdId, feature) => {
             ...usage,
             [feature]: {
                 count: newCount,
-                lastUsageDate: admin.firestore.Timestamp.fromDate(now)
+                date: todayDateString
             }
         }
     }, { merge: true });
@@ -154,9 +150,10 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
     if (!householdId) {
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
-
-    // UPDATED: Use daily scan limit logic
-    const usageCheck = await checkAndIncrementUsage(householdId, 'scan');
+    
+    // UPDATED to pass timezone
+    const timezone = request.data.timezone || 'UTC';
+    const usageCheck = await checkAndIncrementUsage(householdId, 'scan', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free scans for the day.`);
     }
@@ -219,14 +216,12 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
     if (!householdId) {
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
-
-    // UPDATED: Use daily recipe generation limit logic
-    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
+    
+    const { pantryItems, mealType, cuisine, criteria, unitSystem, timezone } = request.data;
+    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
     }
-
-    const { pantryItems, mealType, cuisine, criteria, unitSystem } = request.data;
 
     try {
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
@@ -249,7 +244,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
             }
         }
 
-        prompt += ` Include a mix of 3 simple recipes and 3 more complex recipes. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", and "instructions" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
+        prompt += ` Include a mix of 3 simple recipes and 3 more complex recipes. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. Also include an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -273,7 +268,6 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
             for (const recipe of recipes) {
                 recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
             }
-            // UPDATED: Return object with recipes and usage info
             return {
                 recipes: recipes,
                 remaining: usageCheck.remaining,
@@ -300,13 +294,11 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    // UPDATED: Use daily recipe generation limit logic
-    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
+    const { mealType, cuisine, criteria, unitSystem, timezone } = request.data;
+    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
     }
-
-    const { mealType, cuisine, criteria, unitSystem } = request.data;
 
     try {
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
@@ -328,7 +320,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
                 prompt += ` The recipes should also meet the following criteria: ${otherCriteria.join(', ')}.`;
             }
         }
-        prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", and "instructions" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
+        prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -352,7 +344,6 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
             for (const recipe of recipes) {
                 recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
             }
-            // UPDATED: Return object with recipes and usage info
             return {
                 recipes: recipes,
                 remaining: usageCheck.remaining,
@@ -369,7 +360,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
 });
 
 // --- CLOUD FUNCTION (V2): askTheChef ---
-exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforceAppCheck: true }, async (request) => {
+exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
@@ -378,14 +369,13 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforc
     if (!householdId) {
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
-
-    // UPDATED: Use daily recipe generation limit logic
-    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration');
+    
+    const { mealQuery, unitSystem, timezone } = request.data;
+    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
     }
 
-    const { mealQuery, unitSystem } = request.data;
     if (!mealQuery) {
         throw new HttpsError('invalid-argument', 'The function must be called with a "mealQuery".');
     }
@@ -397,9 +387,9 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforc
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
         const prompt = `You are an expert chef. A user wants a recipe for "${mealQuery}". Provide a single, detailed recipe for this meal.
-        For the recipe, provide a title, a brief description, a list of all necessary ingredients, a simple image search keyword, and step-by-step cooking instructions.
+        For the recipe, provide a title, a brief description, a list of all necessary ingredients, a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
         For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"].
-        Format your entire response as a single, valid JSON object with "title", "description", "ingredients", "imageQuery", and "instructions" as keys.
+        Format your entire response as a single, valid JSON object with "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition" as keys.
         The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
 
         const aiRequest = {
@@ -424,7 +414,6 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforc
             const jsonTextResponse = responseData.candidates[0].content.parts[0].text;
             const recipe = JSON.parse(jsonTextResponse);
             recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
-            // UPDATED: Return object with recipe and usage info
             return {
                 recipe: recipe,
                 remaining: usageCheck.remaining,
@@ -437,6 +426,118 @@ exports.askTheChef = onCall({ timeoutSeconds: 180, region: "us-central1", enforc
     } catch (error) {
         console.error("Internal Ask the Chef Function Error:", error);
         throw new HttpsError('internal', "AI recipe generation failed for the specified query.");
+    }
+});
+
+
+// --- CLOUD FUNCTION (V2): importRecipeFromUrl ---
+exports.importRecipeFromUrl = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+    const userDoc = await db.collection('users').doc(request.auth.uid).get();
+    const householdId = userDoc.data()?.householdId;
+    if (!householdId) {
+        throw new HttpsError('failed-precondition', 'User is not part of a household.');
+    }
+
+    const { url, unitSystem, timezone } = request.data;
+    const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
+    if (!usageCheck.allowed) {
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
+    }
+
+    if (!url) {
+        throw new HttpsError('invalid-argument', 'The function must be called with a "url".');
+    }
+
+    try {
+        const pageResponse = await fetch(url);
+        if (!pageResponse.ok) {
+            throw new HttpsError('not-found', `Could not fetch the content from the URL: ${url}`);
+        }
+        const htmlContent = await pageResponse.text();
+
+        const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
+        const authToken = await auth.getAccessToken();
+        const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
+        const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
+        
+        const prompt = `From the following HTML content, extract the recipe. Provide a title, a brief description, all ingredients, step-by-step cooking instructions, a simple image search keyword, and estimated nutritional information (calories, protein, carbs, fat). For each ingredient, extract its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and categorize it from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Your entire response MUST be ONLY the resulting valid JSON object, starting with { and ending with }, without any surrounding text, comments, or markdown code fences like \`\`\`json. The JSON object must contain these exact keys: "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition". The "ingredients" value must be an array of objects. The "instructions" value must be an array of strings. HTML content: ${htmlContent}`;
+
+        const aiRequest = {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { "responseMimeType": "application/json" }
+        };
+
+        const aiResponse = await fetchWithTimeout(apiUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(aiRequest),
+        });
+        
+        if (!aiResponse.ok) {
+            const errorText = await aiResponse.text();
+            throw new HttpsError('internal', `AI API request failed with status ${aiResponse.status}: ${errorText}`);
+        }
+
+        const responseData = await aiResponse.json();
+
+        if (responseData.candidates && responseData.candidates.length > 0 && responseData.candidates[0].content && responseData.candidates[0].content.parts && responseData.candidates[0].content.parts.length > 0) {
+            let jsonTextResponse = responseData.candidates[0].content.parts[0].text;
+            let recipe;
+            try {
+                // Find the start of the JSON object
+                const jsonStart = jsonTextResponse.indexOf('{');
+                if (jsonStart === -1) {
+                    throw new Error("Response does not contain a JSON object.");
+                }
+
+                // Find the end of the JSON object by balancing curly braces
+                let braceCount = 0;
+                let jsonEnd = -1;
+                for (let i = jsonStart; i < jsonTextResponse.length; i++) {
+                    if (jsonTextResponse[i] === '{') {
+                        braceCount++;
+                    } else if (jsonTextResponse[i] === '}') {
+                        braceCount--;
+                    }
+                    if (braceCount === 0) {
+                        jsonEnd = i + 1;
+                        break;
+                    }
+                }
+
+                if (jsonEnd === -1) {
+                    throw new Error("Could not find the end of the JSON object.");
+                }
+                
+                const jsonString = jsonTextResponse.substring(jsonStart, jsonEnd);
+                recipe = JSON.parse(jsonString);
+
+            } catch (parseError) {
+                console.error("Failed to parse JSON from AI response:", jsonTextResponse, parseError);
+                throw new HttpsError('internal', 'The AI returned a recipe in an invalid format. Please try another URL.');
+            }
+            
+            recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+            return {
+                recipe: recipe,
+                remaining: usageCheck.remaining,
+                isPremium: usageCheck.isPremium
+            };
+        } else {
+             console.error("Invalid response structure from AI:", JSON.stringify(responseData, null, 2));
+            throw new HttpsError('internal', 'Failed to parse the recipe from the provided URL. The response from the AI was empty or invalid.');
+        }
+
+    } catch (error) {
+        console.error("Internal Recipe Import Function Error:", error);
+        // Pass the original error message if it's an HttpsError, otherwise use a generic message
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', "AI recipe import failed.");
     }
 });
 
@@ -529,7 +630,7 @@ exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) 
 });
 
 // --- CLOUD FUNCTION (V2): planSingleDay ---
-exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1", enforceAppCheck: true }, async (request) => {
+exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
@@ -597,7 +698,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 180, region: "us-central1", enf
             prompt += ` Please prioritize using ingredients from the user's pantry, which contains: ${pantryItems.join(', ')}. You can still include other ingredients, but try to use these first.`;
         }
 
-        prompt += ` For each recipe, provide a title, a brief description, a list of ingredients (including quantity, unit in the ${unitSystem || 'imperial'} system, and category: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]), a simple image search keyword, and step-by-step cooking instructions.
+        prompt += ` For each recipe, provide a title, a brief description, a list of ingredients (including quantity, unit in the ${unitSystem || 'imperial'} system, and category: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]), a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
         
         VERY IMPORTANT: Structure your response as a single, valid JSON object. The top-level keys should be the meal types you planned (e.g., "breakfast", "dinner").
         Each meal's value should be an object where the key is a unique meal ID (e.g., "meal_1700000000") and the value is the full recipe object.`;
@@ -1108,4 +1209,3 @@ exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: t
         throw new HttpsError('internal', 'Could not fetch community recipes.');
     }
 });
-

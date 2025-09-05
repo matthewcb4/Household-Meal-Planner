@@ -996,6 +996,30 @@ function createRecipeCard(recipe, isFavorite) {
         }
         ratingHTML += '</div>';
     }
+    
+    let nutritionHTML = '';
+    if (recipe.nutrition) {
+        nutritionHTML = `
+            <div class="nutrition-info">
+                <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.calories || 'N/A'}</span>
+                    <span>Calories</span>
+                </div>
+                <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.protein || 'N/A'}</span>
+                    <span>Protein</span>
+                </div>
+                <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.carbs || 'N/A'}</span>
+                    <span>Carbs</span>
+                </div>
+                 <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.fat || 'N/A'}</span>
+                    <span>Fat</span>
+                </div>
+            </div>
+        `;
+    }
 
     const cardContent = `
         <div class="recipe-card-header">
@@ -1003,6 +1027,7 @@ function createRecipeCard(recipe, isFavorite) {
         </div>
         ${ratingHTML}
         <p>${recipe.description}</p>
+        ${nutritionHTML}
     `;
 
     recipeCard.innerHTML = `
@@ -1065,6 +1090,30 @@ function populateRecipeDetailModal(recipe, isFavorite) {
             </div>
         `;
     }
+    
+    let nutritionHTML = '';
+    if (recipe.nutrition) {
+        nutritionHTML = `
+            <div class="nutrition-info">
+                 <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.calories || 'N/A'}</span>
+                    <span>Calories</span>
+                </div>
+                <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.protein || 'N/A'}</span>
+                    <span>Protein</span>
+                </div>
+                <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.carbs || 'N/A'}</span>
+                    <span>Carbs</span>
+                </div>
+                 <div class="nutrition-item">
+                    <span class="nutrition-value">${recipe.nutrition.fat || 'N/A'}</span>
+                    <span>Fat</span>
+                </div>
+            </div>
+        `;
+    }
 
     const cardActionsHTML = `<div class="card-actions"><button class="add-to-plan-btn">Add to Plan</button></div>`;
 
@@ -1083,6 +1132,7 @@ function populateRecipeDetailModal(recipe, isFavorite) {
         <h3><a href="${googleSearchUrl}" target="_blank" title="Search on Google">${recipe.title} 🔗</a></h3>
         ${ratingHTML}
         <p>${recipe.description}</p>
+        ${nutritionHTML}
         ${cardActionsHTML}
         ${ingredientsHTML}
         ${instructionsHTML}
@@ -1687,6 +1737,18 @@ async function handleMealSlotClick(event) {
                 }
                 ratingHTML += '</div>';
 
+                let nutritionHTML = '';
+                if (recipe.nutrition) {
+                    nutritionHTML = `
+                        <div class="nutrition-info">
+                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.calories || 'N/A'}</span><span>Calories</span></div>
+                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.protein || 'N/A'}</span><span>Protein</span></div>
+                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.carbs || 'N/A'}</span><span>Carbs</span></div>
+                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.fat || 'N/A'}</span><span>Fat</span></div>
+                        </div>
+                    `;
+                }
+
                 recipeCard.innerHTML = `
                     <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">X</button>
                     <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
@@ -1697,6 +1759,7 @@ async function handleMealSlotClick(event) {
                     </div>
                     ${ratingHTML}
                     <p>${recipe.description}</p>
+                    ${nutritionHTML}
                     ${instructionsHTML}
                     <strong>Ingredients:</strong>
                     ${ingredientsHTML}
@@ -2830,6 +2893,52 @@ async function initializeAppUI(user) {
     }
 }
 
+// --- NEW FUNCTION: handleImportRecipe ---
+async function handleImportRecipe(event) {
+    event.preventDefault();
+    const urlInput = document.getElementById('recipe-url-input');
+    const url = urlInput.value.trim();
+    if (!url) {
+        showToast('Please enter a valid URL.');
+        return;
+    }
+
+    const recipeResultsDiv = document.getElementById('recipe-results');
+    showLoadingState(`Importing recipe...`, recipeResultsDiv, true);
+    recipeResultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+        const importRecipeFunc = httpsCallable(functions, 'importRecipeFromUrl');
+        const result = await importRecipeFunc({ url: url, unitSystem: unitSystem });
+
+        const { recipe: newRecipe, remaining, isPremium } = result.data;
+
+        if (remaining !== undefined) {
+            showToast(`${remaining} ${isPremium ? '' : 'free '}suggestion(s) remaining today.`);
+        }
+
+        accumulatedRecipes.unshift(newRecipe);
+        if (accumulatedRecipes.length > 18) {
+            accumulatedRecipes.length = 18;
+        }
+        displayRecipeResults(accumulatedRecipes, 'imported');
+        urlInput.value = '';
+
+        // Save suggestions to Firestore for persistence
+        const todayString = getTodayDateString();
+        const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
+        await setDoc(suggestionsRef, { recipes: accumulatedRecipes }, { merge: true });
+
+    } catch (error) {
+        console.error("Error importing recipe:", error);
+        if (loadingInterval) clearInterval(loadingInterval);
+        const existingLoader = document.getElementById('loading-indicator');
+        if (existingLoader) existingLoader.remove();
+        showToast(`Could not import recipe: ${error.message}`);
+    }
+}
+
+
 // --- MAIN EVENT LISTENER ---
 document.addEventListener('DOMContentLoaded', () => {
     populateCuisineDropdowns();
@@ -2985,6 +3094,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('capture-btn')?.addEventListener('click', captureAndScan);
     document.getElementById('add-grocery-item-form')?.addEventListener('submit', handleAddGroceryItem);
     document.getElementById('move-to-pantry-btn')?.addEventListener('click', moveSelectedItemsToPantryDirectly);
+    document.getElementById('import-recipe-form')?.addEventListener('submit', handleImportRecipe);
+
 
     document.getElementById('show-manual-add-btn').addEventListener('click', () => {
         if (isCameraOpen) stopCamera();

@@ -331,6 +331,26 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     margin-bottom: 0.5rem;
     flex-grow: 1; /* Allow description to take up space */
 }
+/* NEW: Nutrition Info on Recipe Card */
+.recipe-card .nutrition-info {
+    display: flex;
+    justify-content: space-around;
+    font-size: 0.7rem;
+    color: var(--text-secondary-color);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--surface-highlight-color);
+    gap: 4px;
+    text-align: center;
+}
+.nutrition-info .nutrition-item {
+    display: flex;
+    flex-direction: column;
+}
+.nutrition-info .nutrition-value {
+    font-weight: 700;
+    color: var(--text-color);
+}
 .recipe-card.expanded p {
     -webkit-line-clamp: unset;
 }
@@ -754,6 +774,15 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 #recipe-detail-content .star.filled {
     color: var(--primary-accent-color);
+}
+#recipe-detail-content .nutrition-info {
+    display: flex;
+    justify-content: space-around;
+    background-color: var(--bg-color);
+    padding: 0.75rem;
+    border-radius: var(--border-radius);
+    margin-top: 1rem;
+    text-align: center;
 }
 /* UPDATED: Unified margin for all button containers in recipe detail modal */
 #recipe-detail-content .card-actions,
