@@ -1060,3 +1060,47 @@ exports.testStripeSecret = onCall({ enforceAppCheck: true }, async (request) => 
         throw new HttpsError('internal', 'An error occurred while testing the secret.');
     }
 });
+
+// --- getCommunityRecipes (MODIFIED) ---
+exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: true }, async (request) => {
+    try {
+        // 1. Get Today's Suggestions
+        const today = new Date();
+        const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        
+        const suggestionsSnapshot = await db.collectionGroup('dailySuggestions')
+            .where('__name__', '==', todayString)
+            .get();
+
+        let todayRecipes = [];
+        suggestionsSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.recipes && Array.isArray(data.recipes)) {
+                todayRecipes.push(...data.recipes);
+            }
+        });
+
+        // 2. Get Community Favorites
+        const favoritesSnapshot = await db.collectionGroup('favoriteRecipes').get();
+        let allFavorites = [];
+        favoritesSnapshot.forEach(doc => {
+            allFavorites.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Sort by rating in the function, then take the top 10
+        const favoriteRecipes = allFavorites
+            .filter(recipe => recipe.rating && recipe.rating > 0) // Ensure there's a rating
+            .sort((a, b) => b.rating - a.rating)
+            .slice(0, 10);
+
+        return {
+            todayRecipes: todayRecipes.slice(0, 10), // Limit to 10 for today as well
+            favoriteRecipes: favoriteRecipes
+        };
+
+    } catch (error) {
+        console.error("Error in getCommunityRecipes:", error);
+        throw new HttpsError('internal', 'Could not fetch community recipes.');
+    }
+});
+

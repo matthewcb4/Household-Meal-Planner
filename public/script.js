@@ -772,11 +772,11 @@ function handlePantryItemCheck() {
                 selectAllPantryCheckbox.checked = true;
                 selectAllPantryCheckbox.indeterminate = false;
             } else if (checkedItems.length > 0) {
-                selectAllGroceryCheckbox.checked = false;
-                selectAllGroceryCheckbox.indeterminate = true;
+                selectAllPantryCheckbox.checked = false;
+                selectAllPantryCheckbox.indeterminate = true;
             } else {
-                selectAllGroceryCheckbox.checked = false;
-                selectAllGroceryCheckbox.indeterminate = false;
+                selectAllPantryCheckbox.checked = false;
+                selectAllPantryCheckbox.indeterminate = false;
             }
         }
     }
@@ -2060,7 +2060,19 @@ function listenToFavorites() {
     });
 }
 
-// --- ONBOARDING TOUR FUNCTIONS ---
+// --- ONBOARDING TOUR FUNCTIONS (MODIFIED) ---
+async function waitForElement(selector, timeout = 20000) {
+    const start = Date.now();
+    while (Date.now() - start < timeout) {
+        const el = document.querySelector(selector);
+        if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) { // Check if element is visible
+            return el;
+        }
+        await delay(250); // Poll every 250ms
+    }
+    return null; // Return null if timed out
+}
+
 function defineTourSteps() {
     tourSteps = [
         {
@@ -2094,7 +2106,6 @@ function defineTourSteps() {
             content: 'Now that you have something in your pantry, let\'s find a recipe. Go to the Recipes section.',
             placement: 'right',
             onBefore: () => {
-                // Close the manual add form if it's open
                 document.getElementById('pantry-forms-container').style.display = 'none';
                 switchView('recipe-section');
             }
@@ -2110,17 +2121,20 @@ function defineTourSteps() {
             title: 'Your First Recipe!',
             content: 'Here is a recipe suggestion. Click on it to see more details.',
             placement: 'bottom',
-            isOptional: true // This step might not exist if the AI fails
+            isOptional: true
         },
         {
-            element: '.add-to-plan-btn',
+            element: '#recipe-detail-content .add-to-plan-btn',
             title: 'Step 3: Add to Your Plan',
             content: 'Like the recipe? Click here to add it to your weekly meal plan.',
             placement: 'top',
-            onBefore: () => {
+            onBefore: async () => {
                 const firstCard = document.querySelector('#recipe-results .recipe-card:first-child');
                 if (firstCard) {
-                    populateRecipeDetailModal(JSON.parse(firstCard.dataset.recipe), false);
+                    const recipeData = JSON.parse(firstCard.dataset.recipe);
+                    const isFavorite = firstCard.querySelector('.save-recipe-btn.is-favorite') !== null;
+                    populateRecipeDetailModal(recipeData, isFavorite);
+                    await waitForElement('#recipe-detail-modal', 500); // Wait for modal to appear
                 }
             }
         },
@@ -2161,86 +2175,104 @@ function startTour() {
     showTourStep();
 }
 
-function showTourStep() {
+async function showTourStep() {
     const step = tourSteps[currentTourStep];
     const tooltip = document.getElementById('tour-tooltip');
     const overlay = document.getElementById('tour-overlay');
     
-    document.querySelectorAll('.tour-highlight').forEach(el => {
-        el.classList.remove('tour-highlight');
-    });
+    document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+    overlay.style.pointerEvents = 'auto';
 
-    overlay.style.pointerEvents = 'auto'; // Block clicks by default
+    const renderTooltipContent = (step) => {
+        tooltip.innerHTML = `
+            <h4>${step.title}</h4>
+            <p>${step.content}</p>
+            <div class="tour-navigation">
+                <span class="tour-step-counter">${currentTourStep + 1} / ${tourSteps.length}</span>
+                <div>
+                    ${currentTourStep > 0 ? '<button id="tour-prev-btn" class="secondary">Prev</button>' : ''}
+                    <button id="tour-next-btn">${step.isFinal ? 'Finish' : 'Next'}</button>
+                </div>
+            </div>
+            <button id="tour-skip-btn" class="link-button">Skip Tour</button>
+        `;
+        document.getElementById('tour-next-btn').addEventListener('click', nextTourStep);
+        if (document.getElementById('tour-prev-btn')) {
+            document.getElementById('tour-prev-btn').addEventListener('click', prevTourStep);
+        }
+        document.getElementById('tour-skip-btn').addEventListener('click', endTour);
+    };
 
     if (step.isFinal) {
         tooltip.style.left = '50%';
         tooltip.style.top = '50%';
         tooltip.style.transform = 'translate(-50%, -50%)';
-        tooltip.style.zIndex = '1002';
     } else {
-        const targetElement = document.querySelector(step.element);
+        if (step.onBefore) {
+            await step.onBefore();
+        }
+        
+        const targetElement = await waitForElement(step.element);
+        
         if (!targetElement) {
             if (step.isOptional) {
-                nextTourStep();
+                nextTourStep(); // Skip optional step if element not found
                 return;
             }
-            console.warn(`Tour element not found: ${step.element}`);
+            console.warn(`Tour element not found and timed out: ${step.element}`);
+            showToast("Something went wrong with the tour, skipping ahead.");
             endTour();
             return;
         }
 
-        if (step.onBefore) {
-            step.onBefore();
-        }
-        
         targetElement.classList.add('tour-highlight');
-        overlay.style.pointerEvents = 'none'; // Allow clicks to pass through overlay
+        overlay.style.pointerEvents = 'none';
         
         const targetRect = targetElement.getBoundingClientRect();
-
-        tooltip.style.display = 'block'; // Make it visible to calculate size
+        tooltip.style.display = 'block';
         const tooltipHeight = tooltip.offsetHeight;
+        const tooltipWidth = tooltip.offsetWidth;
+
+        let top = 0;
+        let left = 0;
 
         switch (step.placement) {
             case 'right':
-                tooltip.style.left = `${targetRect.right + 15}px`;
-                tooltip.style.top = `${targetRect.top}px`;
+                left = targetRect.right + 15;
+                top = targetRect.top;
                 break;
             case 'bottom':
-                tooltip.style.left = `${targetRect.left}px`;
-                tooltip.style.top = `${targetRect.bottom + 15}px`;
+                left = targetRect.left;
+                top = targetRect.bottom + 15;
                 break;
-             case 'top':
-                tooltip.style.left = `${targetRect.left}px`;
-                tooltip.style.top = `${targetRect.top - tooltipHeight - 15}px`;
+            case 'top':
+                left = targetRect.left;
+                top = targetRect.top - tooltipHeight - 15;
                 break;
             default: // bottom
-                 tooltip.style.left = `${targetRect.left}px`;
-                tooltip.style.top = `${targetRect.bottom + 15}px`;
+                left = targetRect.left;
+                top = targetRect.bottom + 15;
         }
+
+        // Boundary checks to keep tooltip on screen
+        if (top < 10) top = 10;
+        if (left < 10) left = 10;
+        if (left + tooltipWidth > window.innerWidth - 10) {
+            left = window.innerWidth - tooltipWidth - 10;
+        }
+        if (top + tooltipHeight > window.innerHeight - 10) {
+            top = window.innerHeight - tooltipHeight - 10;
+        }
+        
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+        tooltip.style.transform = 'none';
     }
-
-    tooltip.innerHTML = `
-        <h4>${step.title}</h4>
-        <p>${step.content}</p>
-        <div class="tour-navigation">
-            <span class="tour-step-counter">${currentTourStep + 1} / ${tourSteps.length}</span>
-            <div>
-                ${currentTourStep > 0 ? '<button id="tour-prev-btn" class="secondary">Prev</button>' : ''}
-                <button id="tour-next-btn">${step.isFinal ? 'Finish' : 'Next'}</button>
-            </div>
-        </div>
-        <button id="tour-skip-btn" class="link-button">Skip Tour</button>
-    `;
-
+    
+    renderTooltipContent(step);
     tooltip.style.display = 'block';
-
-    document.getElementById('tour-next-btn').addEventListener('click', nextTourStep);
-    if (document.getElementById('tour-prev-btn')) {
-        document.getElementById('tour-prev-btn').addEventListener('click', prevTourStep);
-    }
-    document.getElementById('tour-skip-btn').addEventListener('click', endTour);
 }
+
 
 function nextTourStep() {
     if (currentTourStep < tourSteps.length - 1) {
@@ -2333,6 +2365,7 @@ function startApp() {
     if(selectAllGroceryCheckbox) selectAllGroceryCheckbox.addEventListener('change', handleSelectAllGrocery);
     if(document.getElementById('delete-selected-grocery-btn')) document.getElementById('delete-selected-grocery-btn').addEventListener('click', () => handleBulkDelete(getGroceryListRef(), '.grocery-item input[type="checkbox"]:checked'));
     if(selectAllPantryCheckbox) selectAllPantryCheckbox.addEventListener('change', handleSelectAllPantry);
+    if(document.getElementById('delete-selected-pantry-btn')) document.getElementById('delete-selected-pantry-btn').addEventListener('click', () => handleBulkDelete(getPantryRef(), '.pantry-item-checkbox:checked'));
 
     displayPantryItems();
     updateWeekView();
