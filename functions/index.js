@@ -69,7 +69,7 @@ const getPexelsImage = async (query) => {
 };
 
 // --- CONSTANT: Define the AI model name ---
-const GEMINI_MODEL_NAME = "gemini-2.5-flash";
+const GEMINI_MODEL_NAME = "gemini-2.5-flash-lite";
 
 // Helper function to add a timeout to fetch calls
 const fetchWithTimeout = async (url, options, timeout = 530000) => {
