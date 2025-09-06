@@ -1,10 +1,12 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Pantry Pilot is your AI kitchen assistant. Effortlessly plan meals, generate grocery lists from your pantry, and discover new recipes with smart suggestions.">
-    <title>Pantry Pilot - Your AI Kitchen Assistant</title>
+    <!-- UPDATED: Added meta description for SEO -->
+    <meta name="description" content="Effortlessly plan your household meals, generate grocery lists from your pantry, and discover new recipes with AI-powered suggestions. Simplify your kitchen today!">
+    <title>Household Meal Planner</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,15 +18,17 @@
 <body>
 
     <div id="app-container">
+        <!-- Sidebar Navigation -->
         <nav class="sidebar">
             <div class="sidebar-header">
-                <img src="header.png" alt="Pantry Pilot Logo" class="sidebar-logo">
+                <img src="header.png" alt="Logo" class="sidebar-logo">
             </div>
             <ul class="sidebar-nav">
                 <li><a href="#" class="nav-link active" data-target="meal-plan-section"><i class="fas fa-calendar-alt fa-fw"></i> <span>Meal Planner</span></a></li>
                 <li><a href="#" class="nav-link" data-target="recipe-section"><i class="fas fa-book-open fa-fw"></i> <span>Recipes</span></a></li>
                 <li><a href="#" class="nav-link" data-target="pantry-section"><i class="fas fa-box fa-fw"></i> <span>Pantry</span></a></li>
                 <li><a href="#" class="nav-link" data-target="grocery-list-section"><i class="fas fa-shopping-cart fa-fw"></i> <span>Grocery List</span></a></li>
+                <!-- UPDATED: Added a class to hide this by default until user logs in -->
                 <li class="mobile-only-nav" style="display: none;"><a href="#" id="more-nav-link"><i class="fas fa-ellipsis-h fa-fw"></i> <span>More</span></a></li>
             </ul>
             <div class="sidebar-footer">
@@ -32,16 +36,20 @@
             </div>
         </nav>
 
+        <!-- Main Content -->
         <div class="main-content">
             <header class="top-bar">
                  <div id="auth-container">
-                    </div>
+                    <!-- Auth UI will be dynamically populated by script.js -->
+                 </div>
             </header>
 
             <main class="content-wrapper">
+                <!-- Login/Household Management View -->
                 <div id="initial-view">
                     <section id="login-section" class="content-section active">
-                        </section>
+                        <!-- Login form will be injected here by script.js -->
+                    </section>
                     <section id="household-manager" class="content-section">
                         <h2>Welcome! Join or Create a Household</h2>
                         <p>To share a pantry, create a new household or join one using an invite code.</p>
@@ -51,6 +59,7 @@
                     </section>
                 </div>
 
+                <!-- Main App Content (Initially Hidden) -->
                 <div id="app-content" style="display: none;">
                     <section id="meal-plan-section" class="content-section active">
                         <h2>Weekly Meal Planner</h2>
@@ -191,6 +200,7 @@
                             <div id="ask-the-chef-section" class="recipe-criteria premium-feature">
                                 <h3>Ask the Chef <span class="premium-tag">Premium</span></h3>
                                 <form id="ask-the-chef-form" class="inline-form">
+                                    <!-- UPDATED: Better placeholder text -->
                                     <input type="text" id="chef-query-input" placeholder="e.g., 'Spicy chicken and rice'">
                                     <button type="submit">Get Recipe</button>
                                 </form>
@@ -292,6 +302,7 @@
         </div>
     </div>
 
+    <!-- Modals and other floating elements -->
     <div id="scan-item-container" style="display: none;">
         <div class="scan-modal-content">
             <span class="close-btn" id="close-scan-btn">&times;</span>
@@ -314,6 +325,7 @@
     <div id="sync-calendar-modal" class="modal"><div class="modal-content"><span class="close-btn" id="sync-calendar-modal-close-btn">&times;</span><h3>Sync Your Meal Plan</h3><p>Subscribe to this calendar URL in your favorite calendar app.</p><div class="calendar-url-container"><input type="text" id="calendar-url-input" readonly><button id="copy-calendar-url-btn" title="Copy URL"><i class="far fa-copy"></i></button></div><hr><h4>How to add:</h4><ul class="instructions-list-modal"><li><strong>Google Calendar:</strong> Other calendars &rarr; "+" &rarr; From URL.</li><li><strong>Apple Calendar:</strong> File &rarr; New Calendar Subscription.</li></ul></div></div>
     <div id="feedback-modal" class="modal"><div class="modal-content"><span class="close-btn" id="feedback-modal-close-btn">&times;</span><h3>Share Your Feedback</h3><p>Have a suggestion or found a bug? Let us know!</p><form id="feedback-form"><textarea id="feedback-textarea" placeholder="Your feedback..." required></textarea><button type="submit">Submit Feedback</button></form></div></div>
 
+    <!-- NEW: "More" Modal for Mobile -->
     <div id="more-modal" class="modal">
         <div class="modal-content">
             <span class="close-btn" id="more-modal-close-btn">&times;</span>
@@ -327,23 +339,7 @@
         </div>
     </div>
     
-    <div id="go-premium-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-btn">&times;</span>
-            <h3>Upgrade to Pantry Pilot Premium</h3>
-            <p>Unlock the full power of your AI kitchen assistant!</p>
-            <ul class="premium-features-list">
-                <li><i class="fas fa-infinity"></i> Additional AI recipe suggestions & creations.</li>
-                <li><i class="fas fa-receipt"></i> Scan receipts to instantly update your pantry.</li>
-                <li><i class="fas fa-magic-wand-sparkles"></i> Automatically plan your entire week with one click.</li>
-                <li><i class="fas fa-sync-alt"></i> Sync your meal plan to your personal calendar.</li>
-                <li><i class="fas fa-star"></i> Access top-rated recipes from the community.</li>
-                <li><i class="fas fa-users"></i> Support the ongoing development of Pantry Pilot!</li>
-            </ul>
-            <button id="modal-upgrade-btn" class="upgrade-button">Upgrade Now</button>
-        </div>
-    </div>
-    
+    <!-- NEW: Onboarding Tour Elements -->
     <div id="tour-overlay"></div>
     <div id="tour-tooltip" style="display: none;"></div>
 
