@@ -22,8 +22,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // --- FIX: Initialize App Check immediately after Firebase App initialization ---
-// App Check needs to be initialized BEFORE any other Firebase service (like Auth or Firestore) is used.
-// This ensures that even the initial login request is verified.
 try {
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider('6Lcbe7krAAAAAHzpiTrO2meUKHrgpafT1vQ9o6sC'),
@@ -42,15 +40,11 @@ const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna
 
 
 // --- Start Auth Flow ---
-// This consolidated block handles both redirect results and the standard auth state listener.
-// It ensures that we check for a redirect result immediately on page load.
 getRedirectResult(auth)
   .then((result) => {
     if (result) {
-      // User just signed in via redirect. The onAuthStateChanged will handle it from here.
       console.log("Redirect result processed successfully.");
     }
-    // Now, set up the normal auth state listener. This will run after the redirect is handled.
     onAuthStateChanged(auth, async user => {
         const initialView = document.getElementById('initial-view');
         const appContent = document.getElementById('app-content');
@@ -60,7 +54,6 @@ getRedirectResult(auth)
         renderAuthUI(user);
 
         if (user) {
-            // App Check is already initialized, so we proceed to set up the UI.
             await initializeAppUI(user);
         } else {
             currentUser = null; householdId = null;
@@ -81,7 +74,6 @@ getRedirectResult(auth)
   }).catch((error) => {
     console.error("Error processing redirect result:", error);
     showToast(`Login failed: ${error.message}`);
-    // Even if redirect fails, still set up the auth listener as a fallback.
     onAuthStateChanged(auth, async user => {
         const initialView = document.getElementById('initial-view');
         const appContent = document.getElementById('app-content');
@@ -115,7 +107,7 @@ getRedirectResult(auth)
 let currentUser = null, householdId = null, stream = null, scanMode = 'pantry', currentDate = new Date(), unsubscribeHousehold = () => {}, unsubscribeMealPlan = () => {}, unsubscribeFavorites = () => {}, selectAllGroceryCheckbox = null, selectAllPantryCheckbox = null, currentRecipeToPlan = null, householdData = null, userPreferences = {};
 let unitSystem = 'imperial';
 let calendarDate = new Date();
-let sidebarCalendarDate = new Date(); // NEW: Separate date for the sidebar calendar
+let sidebarCalendarDate = new Date();
 let selectedDates = [];
 let currentHowToSlide = 0;
 let accumulatedRecipes = [];
@@ -123,7 +115,6 @@ let loadingInterval = null;
 let isCameraOpen = false;
 let currentTourStep = 0;
 let tourSteps = [];
-// NEW: Sets to track open category states
 let openPantryCategories = new Set();
 let openGroceryCategories = new Set();
 
@@ -178,7 +169,7 @@ function buildLoginForm() {
     const loginSection = document.getElementById('login-section');
     loginSection.innerHTML = `
         <div class="auth-view">
-            <h3>Welcome to the Meal Planner</h3>
+            <h3>Welcome to Pantry Pilot</h3>
             <div id="sign-in-options">
                 <button id="sign-in-btn" class="social-signin-btn google"><i class="fab fa-google"></i> Sign in with Google</button>
                 <hr class="auth-divider">
@@ -222,7 +213,6 @@ function showToast(message) {
     toast.className = 'show';
     setTimeout(() => { toast.className = toast.className.replace('show', ''); }, 3000);
 }
-// NEW: Helper to get today's date as a YYYY-MM-DD string
 function getTodayDateString() {
     const today = new Date();
     const year = today.getFullYear();
@@ -323,6 +313,13 @@ function showLoadingState(message, container, append = false) {
     }
 }
 
+// --- NEW: Function to show the "Go Premium" modal ---
+function showGoPremiumModal() {
+    const modal = document.getElementById('go-premium-modal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
 
 // --- UI DISPLAY FUNCTIONS ---
 async function displayPantryItems() {
@@ -331,7 +328,6 @@ async function displayPantryItems() {
     const pantryRef = getPantryRef();
     if (!pantryRef) return;
 
-    // Use onSnapshot for real-time updates
     onSnapshot(query(pantryRef), (snapshot) => {
         if (snapshot.empty) {
             pantryListDiv.innerHTML = '<li>Your household pantry is empty!</li>';
@@ -356,12 +352,11 @@ async function displayPantryItems() {
                 
                 const list = document.createElement('ul');
 
-                // MODIFIED: Check against openPantryCategories to set initial state
                 if (openPantryCategories.has(category)) {
                     list.style.display = 'block';
                     categoryHeader.innerHTML = `${category}<span class="category-toggle">−</span>`;
                 } else {
-                    list.style.display = 'none'; // Initially collapsed
+                    list.style.display = 'none';
                     categoryHeader.innerHTML = `${category}<span class="category-toggle">+</span>`;
                 }
                 
@@ -401,7 +396,6 @@ async function displayGroceryList() {
     groceryList.innerHTML = '<p>Loading grocery list...</p>';
     const q = query(groceryRef, orderBy("createdAt"));
     
-    // Using onSnapshot for real-time updates
     onSnapshot(q, (snapshot) => {
         if (snapshot.empty) {
             groceryList.innerHTML = '<p>Your grocery list is empty!</p>';
@@ -426,7 +420,6 @@ async function displayGroceryList() {
                 
                 const list = document.createElement('ul');
                 
-                // MODIFIED: Check against openGroceryCategories
                 if (openGroceryCategories.has(category)) {
                     list.style.display = 'block';
                     categoryHeader.innerHTML = `${category}<span class="category-toggle">−</span>`;
@@ -641,7 +634,7 @@ function renderAddToPlanCalendar(year, month) {
     if (!calendarGrid || !monthYearDisplay) return;
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today's date
+    today.setHours(0, 0, 0, 0);
 
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -649,7 +642,6 @@ function renderAddToPlanCalendar(year, month) {
     monthYearDisplay.textContent = new Date(year, month).toLocaleString('default', { month: 'long', year: 'numeric' });
     calendarGrid.innerHTML = '';
 
-    // Add day names
     ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].forEach(day => {
         const dayNameEl = document.createElement('div');
         dayNameEl.className = 'calendar-day-name';
@@ -657,12 +649,10 @@ function renderAddToPlanCalendar(year, month) {
         calendarGrid.appendChild(dayNameEl);
     });
 
-    // Add empty cells for the start of the month
     for (let i = 0; i < firstDay; i++) {
         calendarGrid.appendChild(document.createElement('div'));
     }
 
-    // Add days of the month
     for (let day = 1; day <= daysInMonth; day++) {
         const dayEl = document.createElement('div');
         dayEl.className = 'calendar-day';
@@ -671,7 +661,6 @@ function renderAddToPlanCalendar(year, month) {
         const thisDate = new Date(year, month, day);
         thisDate.setHours(0, 0, 0, 0);
 
-        // Format date as YYYY-MM-DD for the dataset
         const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         dayEl.dataset.date = dateString;
 
@@ -826,7 +815,7 @@ async function handleDrop(event) {
     const targetDay = slot.dataset.day;
     const targetMeal = slot.dataset.meal;
 
-    if (data.source) { // It's a move from within the calendar
+    if (data.source) {
         const { recipe, source } = data;
         const mealPlanRef = getMealPlanRef();
         const batch = writeBatch(db);
@@ -839,7 +828,7 @@ async function handleDrop(event) {
         batch.set(mealPlanRef, { meals: { [targetDay]: { [targetMeal]: { [newMealId]: recipe } } } }, { merge: true });
 
         await batch.commit();
-    } else { // It's a new recipe from the list
+    } else {
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
         const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(targetDay);
@@ -870,7 +859,6 @@ function handleDragLeave(event) {
 function handlePantryClick(event) {
     const target = event.target;
 
-    // If a checkbox or delete button was clicked, handle that action specifically.
     if (target.matches('.pantry-item-checkbox, .delete-pantry-item-btn')) {
         if (target.classList.contains('delete-pantry-item-btn')) {
             const itemId = target.dataset.id;
@@ -889,10 +877,9 @@ function handlePantryClick(event) {
                 updateDoc(itemRef, { checked: isChecked });
             }
         }
-        return; // Stop the function here to prevent collapsing the category.
+        return;
     }
 
-    // If the click was on the header itself, toggle the list.
     const header = target.closest('.category-header');
     if (header) {
         const categoryName = header.textContent.replace(/[+−]$/, '').trim();
@@ -902,7 +889,6 @@ function handlePantryClick(event) {
             const isVisible = list.style.display !== 'none';
             list.style.display = isVisible ? 'none' : 'block';
             if (toggle) toggle.textContent = isVisible ? '+' : '−';
-            // MODIFIED: Update the state of open categories
             if (isVisible) {
                 openPantryCategories.delete(categoryName);
             } else {
@@ -981,7 +967,7 @@ async function addItemsToPantry() {
     document.getElementById('pantry-forms-container').style.display = 'none';
 }
 
-// --- RECIPE FUNCTIONS (MODIFIED) ---
+// --- RECIPE FUNCTIONS ---
 function createRecipeCard(recipe, isFavorite) {
     const recipeCard = document.createElement('div');
     recipeCard.className = 'recipe-card';
@@ -1154,7 +1140,6 @@ function displayRecipeResults(recipes, mealType) {
         existingLoader.remove();
     }
 
-    // Always re-render the full list from the accumulated array.
     recipeResultsDiv.innerHTML = "";
 
     if (!recipes || recipes.length === 0) {
@@ -1187,7 +1172,7 @@ async function getRecipeSuggestions() {
 }
 
 async function discoverNewRecipes() {
-    await generateRecipes(null, 'Discover New Recipes', true); // Append new recipes
+    await generateRecipes(null, 'Discover New Recipes', true);
 }
 
 async function generateRecipes(items, source, append = false) {
@@ -1196,7 +1181,7 @@ async function generateRecipes(items, source, append = false) {
     const suggestBtn = document.getElementById('suggest-recipe-btn');
 
     if (!append) {
-        accumulatedRecipes = []; // Clear recipes for a new search
+        accumulatedRecipes = [];
     }
 
     const selectedMealType = document.querySelector('input[name="mealType"]:checked').value;
@@ -1240,7 +1225,6 @@ async function generateRecipes(items, source, append = false) {
             result = await discoverRecipesFunc(commonPayload);
         }
 
-        // MODIFIED: Handle new response format
         const { recipes: newRecipes, remaining, isPremium } = result.data;
 
         if (remaining !== undefined) {
@@ -1248,12 +1232,11 @@ async function generateRecipes(items, source, append = false) {
         }
 
         accumulatedRecipes.unshift(...newRecipes);
-        if (accumulatedRecipes.length > 18) { // Keep the list to a max of 18
+        if (accumulatedRecipes.length > 18) {
             accumulatedRecipes.length = 18;
         }
         displayRecipeResults(accumulatedRecipes, selectedMealType);
 
-        // NEW: Save suggestions to Firestore for persistence
         const todayString = getTodayDateString();
         const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
         await setDoc(suggestionsRef, { recipes: accumulatedRecipes, createdAt: serverTimestamp() });
@@ -1358,7 +1341,6 @@ async function captureAndScan() {
                 batch.set(newItemRef, { name: item.name.toLowerCase(), category: item.category || 'Other', checked: false, createdAt: serverTimestamp() });
             });
             await batch.commit();
-            // displayGroceryList is now handled by onSnapshot
         }
 
     } catch (error) {
@@ -1487,7 +1469,6 @@ async function handleAddGroceryItem(event) {
             createdAt: serverTimestamp()
         });
         itemNameInput.value = '';
-        // displayGroceryList(); // onSnapshot handles this
     }
 }
 
@@ -1495,7 +1476,6 @@ async function handleGroceryListClick(event) {
     const groceryRef = getGroceryListRef();
     if (!groceryRef) return;
 
-    // MODIFIED: Handle category expand/collapse and state saving
     const header = event.target.closest('.category-header');
     if (header) {
         const categoryName = header.textContent.replace(/[+−]$/, '').trim();
@@ -1505,7 +1485,6 @@ async function handleGroceryListClick(event) {
             const isVisible = list.style.display !== 'none';
             list.style.display = isVisible ? 'none' : 'block';
             if(toggle) toggle.textContent = isVisible ? '+' : '−';
-            // Update state
             if (isVisible) {
                 openGroceryCategories.delete(categoryName);
             } else {
@@ -1522,7 +1501,7 @@ async function handleGroceryListClick(event) {
             const itemRef = doc(groceryRef, itemId);
             await updateDoc(itemRef, { checked: isChecked });
         }
-        handleGroceryItemCheck(); // onSnapshot will update UI, but this updates button states immediately
+        handleGroceryItemCheck();
     }
 
     if (event.target.classList.contains('delete-grocery-btn')) {
@@ -1530,7 +1509,6 @@ async function handleGroceryListClick(event) {
         if (itemId) {
             if (confirm("Are you sure you want to remove this item from your grocery list?")) {
                 await deleteDoc(doc(groceryRef, itemId));
-                // displayGroceryList(); // onSnapshot handles this
             }
         }
     }
@@ -1589,7 +1567,6 @@ async function moveSelectedItemsToPantryDirectly() {
         });
 
         await batch.commit();
-        // onSnapshot handles UI updates
     } catch (error) {
         console.error("Error moving items to pantry:", error);
         alert("There was an error moving items to the pantry.");
@@ -1611,7 +1588,6 @@ async function handleAddFromRecipe(buttonElement) {
             checked: false,
             createdAt: serverTimestamp()
         });
-        // onSnapshot handles display
         showToast(`'${itemName}' added to your grocery list!`);
     }
 }
@@ -1854,7 +1830,6 @@ async function handleBulkDelete(collectionRef, checkedItemsSelector) {
             batch.delete(doc(collectionRef, checkbox.dataset.id));
         });
         await batch.commit();
-        // onSnapshot will update the UI
     }
 }
 
@@ -1901,7 +1876,6 @@ async function generateAutomatedGroceryList() {
         const result = await generateList({ weekId: getWeekId(currentDate) });
         if (result.data.success) {
             showToast(result.data.message);
-            // displayGroceryList(); // onSnapshot handles this
         } else {
             throw new Error(result.data.error || "Unknown error");
         }
@@ -1935,12 +1909,18 @@ function configurePaywallUI() {
         const scansLeft = 20 - scansUsed;
         statusText += ` (${scansLeft} / 20 Scans Left)`;
         if (upgradeBtnHeader) upgradeBtnHeader.style.display = 'block';
+        
         premiumFeatures.forEach(el => {
             el.classList.add('disabled');
             el.querySelectorAll('input, button, select').forEach(input => input.disabled = true);
+            // NEW: Add click listener to show premium modal
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showGoPremiumModal();
+            }, { capture: true }); // Use capture to intercept clicks on disabled elements
         });
 
-        // UPDATED: Disable scan buttons if quota is exceeded
         if(scansLeft <= 0) {
             document.querySelectorAll('#show-scan-item-btn, #show-scan-receipt-btn, #show-scan-grocery-btn, #show-scan-receipt-grocery-btn, #quick-meal-btn').forEach(btn => {
                 btn.disabled = true;
@@ -1971,6 +1951,8 @@ function configurePaywallUI() {
         premiumFeatures.forEach(el => {
             el.classList.remove('disabled');
             el.querySelectorAll('input, button, select').forEach(input => input.disabled = false);
+            // Remove the modal listener if they are premium
+            el.replaceWith(el.cloneNode(true)); // Simple way to remove all listeners
         });
         if (updateCuisineBtn) {
             updateCuisineBtn.style.display = 'block';
@@ -1985,11 +1967,9 @@ function configurePaywallUI() {
     if(householdStatusInfo) householdStatusInfo.textContent = statusText;
 }
 
-// NEW FUNCTION TO HANDLE PREFERENCE TOGGLES
 function handlePreferenceChange(event) {
     const changedElement = event.target;
 
-    // Sync checkboxes with the same value across different sections
     if (changedElement.type === 'checkbox' && changedElement.value) {
         const value = changedElement.value;
         const isChecked = changedElement.checked;
@@ -2000,15 +1980,12 @@ function handlePreferenceChange(event) {
         });
     }
 
-    // Now save the updated preferences
     saveUserPreferences();
 }
 
-// FIX: This function now saves all relevant criteria to the user's profile.
 async function saveUserPreferences() {
     if (!currentUser) return;
 
-    // Consolidate criteria from both planner and recipe sections
     const criteriaCheckboxes = document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]');
     const allCriteria = new Set();
     criteriaCheckboxes.forEach(cb => {
@@ -2025,17 +2002,14 @@ async function saveUserPreferences() {
     showToast('Preferences saved!');
 }
 
-// FIX: This function now loads all relevant criteria from the user's profile.
 function loadUserPreferences() {
     const savedCriteria = userPreferences.criteria || [];
     const savedUnitSystem = userPreferences.unitSystem || 'imperial';
 
-    // Set criteria checkboxes across the app
     document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]').forEach(checkbox => {
         checkbox.checked = savedCriteria.includes(checkbox.value);
     });
 
-    // Set unit system radio buttons
     const unitRadio = document.querySelector(`input[name="unitSystem"][value="${savedUnitSystem}"]`);
     if (unitRadio) {
         unitRadio.checked = true;
@@ -2123,17 +2097,16 @@ function listenToFavorites() {
     });
 }
 
-// --- ONBOARDING TOUR FUNCTIONS (MODIFIED) ---
 async function waitForElement(selector, timeout = 20000) {
     const start = Date.now();
     while (Date.now() - start < timeout) {
         const el = document.querySelector(selector);
-        if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) { // Check if element is visible
+        if (el && (el.offsetWidth > 0 || el.offsetHeight > 0)) {
             return el;
         }
-        await delay(250); // Poll every 250ms
+        await delay(250);
     }
-    return null; // Return null if timed out
+    return null;
 }
 
 function defineTourSteps() {
@@ -2160,7 +2133,7 @@ function defineTourSteps() {
             content: 'Fill in the name, quantity, and unit for your item. For example, "2 lbs Chicken Breast". Then click "Add".',
             placement: 'top',
             onBefore: () => {
-                switchView('pantry-section'); // Ensures we're on the right tab when going backward
+                switchView('pantry-section');
                 document.getElementById('pantry-forms-container').style.display = 'block';
                 document.getElementById('manual-add-container').style.display = 'block';
             }
@@ -2257,17 +2230,14 @@ function startTour() {
     showTourStep();
 }
 
-// MODIFIED: Re-ordered logic to correctly calculate tooltip position on mobile.
 async function showTourStep() {
     const step = tourSteps[currentTourStep];
     const tooltip = document.getElementById('tour-tooltip');
     const overlay = document.getElementById('tour-overlay');
 
-    // Always clean up previous state first
     document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-    overlay.style.pointerEvents = 'auto'; // Block clicks by default
+    overlay.style.pointerEvents = 'auto';
 
-    // 1. Render the new content into the tooltip
     tooltip.innerHTML = `
         <h4>${step.title}</h4>
         <p>${step.content}</p>
@@ -2286,17 +2256,14 @@ async function showTourStep() {
     }
     document.getElementById('tour-skip-btn').addEventListener('click', endTour);
 
-    // Make the tooltip visible but off-screen to measure it accurately
     tooltip.style.visibility = 'hidden';
     tooltip.style.display = 'block';
 
     if (step.isFinal) {
-        // Center the final step's tooltip
         tooltip.style.left = '50%';
         tooltip.style.top = '50%';
         tooltip.style.transform = 'translate(-50%, -50%)';
     } else {
-        // Run any pre-step actions (like switching views)
         if (step.onBefore) {
             await step.onBefore();
         }
@@ -2305,7 +2272,7 @@ async function showTourStep() {
 
         if (!targetElement) {
             if (step.isOptional) {
-                nextTourStep(); // Skip optional step if element not found
+                nextTourStep();
                 return;
             }
             console.warn(`Tour element not found and timed out: ${step.element}`);
@@ -2315,9 +2282,8 @@ async function showTourStep() {
         }
 
         targetElement.classList.add('tour-highlight');
-        overlay.style.pointerEvents = 'none'; // Allow clicks to pass through to the highlighted element
+        overlay.style.pointerEvents = 'none';
 
-        // 2. Now that content is rendered, get accurate dimensions
         const targetRect = targetElement.getBoundingClientRect();
         const tooltipHeight = tooltip.offsetHeight;
         const tooltipWidth = tooltip.offsetWidth;
@@ -2325,7 +2291,6 @@ async function showTourStep() {
         let top = 0;
         let left = 0;
 
-        // 3. Calculate position based on placement and new dimensions
         switch (step.placement) {
             case 'right':
                 left = targetRect.right + 15;
@@ -2339,12 +2304,11 @@ async function showTourStep() {
                 left = targetRect.left;
                 top = targetRect.top - tooltipHeight - 15;
                 break;
-            default: // bottom
+            default:
                 left = targetRect.left;
                 top = targetRect.bottom + 15;
         }
 
-        // 4. Boundary checks to keep tooltip on screen
         if (top < 10) top = 10;
         if (left < 10) left = 10;
         if (left + tooltipWidth > window.innerWidth - 10) {
@@ -2354,20 +2318,18 @@ async function showTourStep() {
             top = window.innerHeight - tooltipHeight - 10;
         }
         
-        // 5. Apply the final position
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
         tooltip.style.transform = 'none';
     }
     
-    // 6. Make the tooltip visible at its final position
     tooltip.style.visibility = 'visible';
 }
 
 
 async function nextTourStep() {
     const tooltip = document.getElementById('tour-tooltip');
-    tooltip.style.display = 'none'; // Hide tooltip before performing action
+    tooltip.style.display = 'none';
 
     const step = tourSteps[currentTourStep];
 
@@ -2387,7 +2349,6 @@ async function nextTourStep() {
 }
 
 function prevTourStep() {
-    // FIX: Close modals when going backward
     document.getElementById('recipe-detail-modal').style.display = 'none';
     document.getElementById('add-to-plan-modal').style.display = 'none';
 
@@ -2410,7 +2371,6 @@ async function markTourAsSeen() {
         await updateDoc(userDocRef, { hasSeenOnboardingTour: true });
     }
 }
-// NEW: Fetch and display community recipes
 async function fetchAndDisplayCommunityRecipes() {
     const container = document.getElementById('community-recipes-container');
     container.innerHTML = '<p>Loading community recipes...</p>';
@@ -2424,9 +2384,8 @@ async function fetchAndDisplayCommunityRecipes() {
         
         const { todayRecipes, favoriteRecipes } = result.data;
 
-        container.innerHTML = ''; // Clear loader
+        container.innerHTML = '';
 
-        // Display Today's Generated Recipes
         if (todayRecipes.length > 0) {
             container.innerHTML += '<h3>Freshly Suggested Today</h3>';
             const todayRow = document.createElement('div');
@@ -2440,7 +2399,6 @@ async function fetchAndDisplayCommunityRecipes() {
             container.innerHTML += '<p>No new recipes suggested by the community today. Be the first!</p>';
         }
 
-        // Display Community Favorites (Premium)
         if (householdData.subscriptionTier === 'paid') {
             if (favoriteRecipes.length > 0) {
                 container.innerHTML += '<h3>Top Community Favorites <span class="premium-tag">Premium</span></h3>';
@@ -2448,9 +2406,9 @@ async function fetchAndDisplayCommunityRecipes() {
                 favRow.className = 'recipe-card-row';
                 favoriteRecipes.forEach(recipe => {
                     const recipeCard = createRecipeCard(recipe, true);
-                    favRow.appendChild(recipeCard); // Corrected this line
+                    favRow.appendChild(recipeCard);
                 });
-                container.appendChild(favRow); // Corrected this line
+                container.appendChild(favRow);
             }
         } else {
              container.innerHTML += '<div class="premium-feature disabled" style="margin-top: 2rem;"><h3>Top Community Favorites <span class="premium-tag">Premium</span></h3><p>Upgrade to Premium to see the top-rated recipes saved by the community!</p></div>';
@@ -2481,15 +2439,12 @@ function startApp() {
     configurePaywallUI();
     loadUserPreferences();
 
-    // UPDATED: Handle payment status from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('payment_success')) {
         showToast("Upgrade successful! Welcome to Premium.");
-        // Clean the URL
         window.history.replaceState({}, document.title, "/");
     } else if (urlParams.has('payment_cancel')) {
         showToast("Payment was canceled. You can upgrade anytime!");
-        // Clean the URL
         window.history.replaceState({}, document.title, "/");
     }
 }
@@ -2497,7 +2452,7 @@ function startApp() {
 async function handlePlanMyWeek() {
     const planMyWeekBtn = document.getElementById('plan-my-week-btn');
     if (planMyWeekBtn.classList.contains('disabled')) {
-        alert('This is a premium feature! Please upgrade to use automatic week planning.');
+        showGoPremiumModal();
         return;
     }
 
@@ -2640,7 +2595,7 @@ async function renderSidebarCalendar() {
 
             dayEl.addEventListener('click', () => {
                 currentDate = thisDate;
-                sidebarCalendarDate = new Date(currentDate); // Sync sidebar date on click
+                sidebarCalendarDate = new Date(currentDate);
                 updateWeekView();
                 const moreModal = document.getElementById('more-modal');
                 if (moreModal) moreModal.style.display = 'none';
@@ -2728,35 +2683,26 @@ async function markHowToAsSeen() {
     }
 }
 
-// --- AUTH STATE CHANGE IS NOW HANDLED INSIDE THE getRedirectResult PROMISE ---
-
-// FIX: This function now handles both mobile and desktop sign-in correctly.
 function handleGoogleSignIn() {
     const provider = new GoogleAuthProvider();
 
     signInWithPopup(auth, provider)
         .then((result) => {
-            // This will trigger onAuthStateChanged, so no further action is needed here.
             console.log("Signed in with popup successfully.");
         })
         .catch((error) => {
-            // Handle errors, specifically popup-blocked errors.
             console.error("Popup sign-in error:", error.code, error.message);
             
-            // These error codes indicate that the popup was blocked or is not supported.
             const isPopupError = ['auth/popup-blocked', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'].includes(error.code);
 
             if (isPopupError) {
-                // If the popup fails, fall back to the more reliable redirect method.
                 console.log("Popup failed, falling back to redirect.");
                 showToast("Popup blocked. Redirecting to sign in page...");
                 signInWithRedirect(auth, provider).catch(redirectError => {
-                    // This inner catch handles rare errors where the redirect itself cannot be initiated.
                     console.error("Error initiating Google sign-in redirect:", redirectError);
                     showToast(`Could not start the sign-in process: ${redirectError.message}`);
                 });
             } else {
-                // Handle other errors (e.g., user closed popup, network error)
                 showToast(`Login failed: ${error.message}`);
             }
         });
@@ -2868,7 +2814,6 @@ async function initializeAppUI(user) {
             }
         });
         
-        // NEW: Load today's suggestions
         const todayString = getTodayDateString();
         const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
         const suggestionsDoc = await getDoc(suggestionsRef);
@@ -2880,7 +2825,6 @@ async function initializeAppUI(user) {
         }
 
         startApp();
-        // MODIFIED: Check for new tour flag
         if (!userDoc.data().hasSeenOnboardingTour) {
             startTour();
         }
@@ -2893,7 +2837,6 @@ async function initializeAppUI(user) {
     }
 }
 
-// --- NEW FUNCTION: handleImportRecipe ---
 async function handleImportRecipe(event) {
     event.preventDefault();
     const urlInput = document.getElementById('recipe-url-input');
@@ -2924,7 +2867,6 @@ async function handleImportRecipe(event) {
         displayRecipeResults(accumulatedRecipes, 'imported');
         urlInput.value = '';
 
-        // Save suggestions to Firestore for persistence
         const todayString = getTodayDateString();
         const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
         await setDoc(suggestionsRef, { recipes: accumulatedRecipes }, { merge: true });
@@ -3000,7 +2942,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // UPDATED: Added loading state to join household button
     document.getElementById('join-household-btn').addEventListener('click', async () => {
         if (!currentUser) return;
         const code = document.getElementById('household-code-input').value.trim().toUpperCase();
@@ -3033,6 +2974,10 @@ document.addEventListener('DOMContentLoaded', () => {
             joinButton.textContent = 'Join';
         }
     });
+    
+    // NEW: Add event listener for the modal's upgrade button
+    document.getElementById('modal-upgrade-btn')?.addEventListener('click', handleUpgradeClick);
+
 
     document.body.addEventListener('click', (event) => {
         const target = event.target;
@@ -3057,7 +3002,6 @@ document.addEventListener('DOMContentLoaded', () => {
             handlePlanSingleDayClick(event);
         }
 
-        // FIX: Moved calendar navigation to event delegation to prevent duplicate listeners
         if (target.closest('.sidebar-cal-nav-btn')) {
             const direction = target.closest('.sidebar-cal-nav-btn').dataset.calNav;
             if (direction === 'prev') {
@@ -3125,7 +3069,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('prev-week-btn')?.addEventListener('click', () => navigateWeek('prev'));
     document.getElementById('next-week-btn')?.addEventListener('click', () => navigateWeek('next'));
     
-    // TAB SWITCHING LOGIC
     document.getElementById('show-ideas-tab')?.addEventListener('click', (e) => {
         document.getElementById('ideas-content').style.display = 'block';
         document.getElementById('recipe-results').style.display = 'grid';
@@ -3160,12 +3103,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const meal = document.getElementById('meal-select').value;
         if (currentRecipeToPlan && selectedDates.length > 0 && meal) {
             for (const dateString of selectedDates) {
-                // FIX: Create date object in UTC to prevent timezone shift issues
-                const parts = dateString.split('-'); // "YYYY-MM-DD"
+                const parts = dateString.split('-');
                 const dateObject = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 12, 0, 0));
                 await addRecipeToPlan(dateObject, meal, currentRecipeToPlan);
             }
-            // Also set currentDate using UTC to ensure the view switches to the correct week
             const firstDateParts = selectedDates[0].split('-');
             currentDate = new Date(Date.UTC(firstDateParts[0], firstDateParts[1] - 1, firstDateParts[2], 12, 0, 0));
 
@@ -3227,7 +3168,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const askTheChefFunc = httpsCallable(functions, 'askTheChef');
             const result = await askTheChefFunc({ mealQuery, unitSystem });
 
-            // MODIFIED: Handle new response format
             const { recipe: newRecipe, remaining, isPremium } = result.data;
 
             if (remaining !== undefined) {
@@ -3241,7 +3181,6 @@ document.addEventListener('DOMContentLoaded', () => {
             displayRecipeResults(accumulatedRecipes, 'your custom');
             queryInput.value = '';
 
-            // NEW: Save suggestions to Firestore for persistence
             const todayString = getTodayDateString();
             const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
             await setDoc(suggestionsRef, { recipes: accumulatedRecipes, createdAt: serverTimestamp() });
@@ -3306,7 +3245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sync-calendar-btn')?.addEventListener('click', () => {
         const syncCalendarBtn = document.getElementById('sync-calendar-btn');
         if (syncCalendarBtn.classList.contains('disabled')) {
-            alert('This is a premium feature! Please upgrade to use calendar sync.');
+            showGoPremiumModal();
             return;
         }
         if (householdId) {

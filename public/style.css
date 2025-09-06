@@ -42,7 +42,6 @@ h1, h2, h3, h4, h5 {
 }
 h2 { font-size: 1.5rem; margin-bottom: 1rem; text-align: left; } /* Reduced font size and margin */
 h3 { font-size: 1.1rem; margin-bottom: 0.75rem; } /* Reduced font size and margin */
-/* UPDATE: Added styles for links within headers */
 h3 a {
     color: inherit;
     text-decoration: none;
@@ -78,7 +77,7 @@ a:hover { color: var(--primary-accent-color); }
     height: 100vh; /* Fallback for older browsers */
     height: 100dvh; /* Dynamic viewport height */
     width: 100vw;
-    position: relative; /* ADDED: This makes it the positioning context for the toast */
+    position: relative; /* Positioning context for the toast */
 }
 
 /* --- Sidebar --- */
@@ -122,7 +121,7 @@ a:hover { color: var(--primary-accent-color); }
 
 /* --- Sidebar Calendar --- */
 #sidebar-calendar-container-desktop, #sidebar-calendar-container-mobile {
-    background-color: transparent; /* Removed background */
+    background-color: transparent;
     border-radius: var(--border-radius);
     padding: 0.75rem;
     margin-top: 1rem;
@@ -139,7 +138,6 @@ a:hover { color: var(--primary-accent-color); }
     flex-grow: 1;
     text-align: center;
 }
-/* UPDATED: Styles for the new navigation buttons */
 .sidebar-calendar-header button {
     background: none;
     border: none;
@@ -147,9 +145,9 @@ a:hover { color: var(--primary-accent-color); }
     cursor: pointer;
     font-size: 1rem;
     padding: 0 0.5rem;
-    line-height: 1; /* Ensure button height is minimal */
-    text-transform: none; /* Override global button styles */
-    letter-spacing: normal; /* Override global button styles */
+    line-height: 1;
+    text-transform: none;
+    letter-spacing: normal;
 }
 .sidebar-calendar-header button:hover {
     color: var(--text-color);
@@ -181,12 +179,12 @@ a:hover { color: var(--primary-accent-color); }
 }
 
 
-/* --- Main Content Area (MODIFIED) --- */
+/* --- Main Content Area --- */
 .main-content {
     display: grid;
-    grid-template-rows: auto 1fr; /* Header takes auto height, wrapper takes the rest */
-    overflow: hidden; /* Prevent this container from scrolling */
-    min-width: 0; /* ADDED: Prevents grid blowout */
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
+    min-width: 0;
 }
 .top-bar {
     background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0));
@@ -199,7 +197,7 @@ a:hover { color: var(--primary-accent-color); }
     align-items: center;
 }
 .content-wrapper {
-    overflow-y: auto; /* This is now the main scrollable area */
+    overflow-y: auto;
     padding: 0.75rem 1.5rem;
 }
 .content-section { display: none; }
@@ -209,7 +207,7 @@ a:hover { color: var(--primary-accent-color); }
 #auth-container {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start; /* Align items to the top */
+    align-items: flex-start;
     width: 100%;
     gap: 1rem;
 }
@@ -272,11 +270,11 @@ section {
 button {
     background-color: var(--primary-accent-color);
     color: #000;
-    padding: 10px 20px; /* Reduced padding */
+    padding: 10px 20px;
     border: none;
     border-radius: 50px;
     cursor: pointer;
-    font-size: 0.9em; /* Reduced font size */
+    font-size: 0.9em;
     font-weight: 700;
     transition: transform 0.1s ease-in-out, background-color 0.2s;
     text-transform: uppercase;
@@ -296,10 +294,10 @@ input, select, textarea {
     border: 1px solid transparent;
     border-radius: 4px;
     color: var(--text-color);
-    padding: 10px; /* Reduced padding */
-    font-size: 0.9em; /* Reduced font size */
+    padding: 10px;
+    font-size: 0.9em;
     width: 100%;
-    margin-bottom: 8px; /* Reduced margin */
+    margin-bottom: 8px;
 }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-accent-color); background-color: #333; }
 
@@ -314,13 +312,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     border-radius: var(--border-radius);
     overflow: hidden;
     transition: background-color 0.3s;
-    /* cursor: pointer; */
-    padding: 0.75rem; /* Reduced padding */
+    padding: 0.75rem;
     position: relative;
     display: flex;
     flex-direction: column;
 }
-/*.recipe-card:hover { background-color: var(--surface-highlight-color); }*/
 .recipe-card img.recipe-image { width: 100%; height: 150px; object-fit: cover; border-radius: var(--border-radius); margin-bottom: 0.75rem; }
 .recipe-card h3 { font-size: 0.95rem; margin: 0 0 0.25rem 0; white-space: normal; }
 .recipe-card p {
@@ -329,9 +325,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     -webkit-box-orient: vertical;
     overflow: hidden;
     margin-bottom: 0.5rem;
-    flex-grow: 1; /* Allow description to take up space */
+    flex-grow: 1;
 }
-/* NEW: Nutrition Info on Recipe Card */
 .recipe-card .nutrition-info {
     display: flex;
     justify-content: space-around;
@@ -398,6 +393,42 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .close-btn { color: var(--secondary-accent-color); position: absolute; top: 0.75rem; right: 1rem; font-size: 2rem; font-weight: bold; cursor: pointer; }
 .close-btn:hover { color: var(--text-color); }
 
+/* --- Go Premium Modal --- */
+#go-premium-modal .modal-content {
+    text-align: center;
+    max-width: 450px;
+}
+#go-premium-modal h3 {
+    color: var(--primary-accent-color);
+    font-size: 1.8rem;
+}
+.premium-features-list {
+    text-align: left;
+    margin: 1.5rem 0;
+    padding: 0;
+    list-style: none;
+}
+.premium-features-list li {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 1rem;
+}
+.premium-features-list i {
+    color: var(--primary-accent-color);
+    font-size: 1.2rem;
+    width: 20px;
+}
+#modal-upgrade-btn {
+    width: 100%;
+    padding: 14px;
+    font-size: 1.1rem;
+}
+
 /* --- Add to Plan Calendar --- */
 #calendar-container {
     margin: 1rem 0;
@@ -437,7 +468,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     font-weight: 700;
 }
 
-/* --- Specific Component Styles (Adapted) --- */
+/* --- Specific Component Styles --- */
 .inline-form {
     display: flex;
     gap: 0.75rem;
@@ -445,19 +476,19 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 .inline-form > input,
 .inline-form > select {
-    flex: 1; /* Allows the element to grow and fill available space */
-    min-width: 0; /* Prevents overflow in flex containers */
+    flex: 1;
+    min-width: 0;
 }
 .pantry-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap; /* Allow wrapping on small screens */
+    flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 1rem;
 }
 .pantry-header h2 {
-    margin-bottom: 0; /* Remove default margin from h2 */
+    margin-bottom: 0;
 }
 .pantry-controls, .button-group {
     display: flex;
@@ -469,18 +500,17 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-grow: 1; /* Allow this section to take up available space */
-    min-width: 0; /* Crucial for allowing long text to wrap correctly in a flex item */
+    flex-grow: 1;
+    min-width: 0;
 }
 .pantry-item.checked .item-info {
     text-decoration: line-through;
     color: var(--text-secondary-color);
 }
 .pantry-item .item-info input[type="checkbox"] {
-    /* Override global input styles for the checkbox */
-    width: auto; /* Prevent it from taking 100% width */
-    margin-bottom: 0; /* Remove the default margin for inputs */
-    flex-shrink: 0; /* Prevent the checkbox from being squished */
+    width: auto;
+    margin-bottom: 0;
+    flex-shrink: 0;
 }
 .pantry-item .item-info span {
     white-space: normal;
@@ -489,10 +519,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .grocery-item .item-info { display: flex; align-items: center; gap: 0.5rem; }
 .grocery-item.checked .item-info { text-decoration: line-through; color: var(--text-secondary-color); }
 .grocery-item .item-info input[type="checkbox"] {
-    /* Override global input styles for the checkbox */
-    width: auto; /* Prevent it from taking 100% width */
-    margin-bottom: 0; /* Remove the default margin for inputs */
-    flex-shrink: 0; /* Prevent the checkbox from being squished */
+    width: auto;
+    margin-bottom: 0;
+    flex-shrink: 0;
 }
 .grocery-item-controls { display: flex; align-items: center; gap: 0.5rem; }
 .walmart-search-btn {
@@ -532,8 +561,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .meal-type-selector label { cursor: pointer; flex: 1; min-width: 120px; }
 .meal-type-selector input { position: absolute; opacity: 0; }
 .meal-type-selector span {
-    display: block; /* Make span fill the label */
-    text-align: center; /* Center the text */
+    display: block;
+    text-align: center;
     padding: 6px 14px;
     border-radius: 50px;
     border: 1px solid var(--surface-highlight-color);
@@ -551,7 +580,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
-    align-items: flex-end; /* Vertically align items to their bottom edge */
+    align-items: flex-end;
     width: 100%;
     margin-bottom: 1rem;
 }
@@ -561,7 +590,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     flex-direction: column;
     gap: 0.25rem;
     flex-grow: 1;
-    flex-basis: 200px; /* Base width before wrapping */
+    flex-basis: 200px;
 }
 
 .form-control-wrapper label {
@@ -572,11 +601,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 }
 
 .form-control-wrapper button {
-    width: 100%; /* Make button fill its wrapper */
+    width: 100%;
 }
 
 .form-control-wrapper .toggle-switch {
-   width: fit-content; /* Prevent the toggle switch from expanding */
+   width: fit-content;
 }
 
 .criteria-controls {
@@ -598,9 +627,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     gap: 0.75rem;
 }
 .sub-criteria-group {
-    min-width: 0; /* Fix for flexbox overflow */
-    overflow: hidden; /* Contain the horizontally-scrolling checkbox group */
-    display: grid; /* Use grid layout for more robust containment of the scrolling child */
+    min-width: 0;
+    overflow: hidden;
+    display: grid;
 }
 .sub-criteria-group h4 {
     margin-top: 0;
@@ -616,15 +645,15 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 .checkbox-group {
     display: flex;
-    flex-wrap: nowrap; /* Reverted to horizontal scroll */
+    flex-wrap: nowrap;
     gap: 0.5rem;
     overflow-x: auto;
-    padding-bottom: 10px; /* Space for scrollbar */
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
+    padding-bottom: 10px;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 .checkbox-group::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
 }
 .checkbox-group label {
     display: block;
@@ -654,13 +683,16 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     border-color: var(--primary-accent-color);
 }
 
-.premium-feature.disabled { opacity: 0.5; pointer-events: none; }
+.premium-feature.disabled { 
+    opacity: 0.5; 
+    /* REMOVED: pointer-events: none; */
+}
 .premium-tag { background-color: var(--primary-accent-color); color: #000; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin-left: 0.5rem; font-weight: bold; }
 .toggle-switch {
     display: flex;
     border: 1px solid var(--surface-highlight-color);
     border-radius: 50px;
-    overflow: hidden; /* Ensures children conform to the rounded corners */
+    overflow: hidden;
     background-color: var(--surface-highlight-color);
 }
 .toggle-switch input {
@@ -670,12 +702,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     height: 0;
 }
 .toggle-switch label {
-    flex: 1; /* Each label takes up equal space */
+    flex: 1;
     padding: 6px 14px;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s ease;
-    margin-bottom: 0; /* Override global input/label margins */
+    margin-bottom: 0;
     font-size: 0.9rem;
 }
 .toggle-switch input:checked + label {
@@ -685,7 +717,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     border-radius: 50px;
 }
 
-/* --- Scan Modal (MODIFIED) --- */
+/* --- Scan Modal --- */
 #scan-item-container {
     position: fixed;
     top: 0;
@@ -694,7 +726,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     height: 100vh;
     background-color: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(5px);
-    display: none; /* Toggled by JS to 'flex' */
+    display: none;
     align-items: center;
     justify-content: center;
     z-index: 1001;
@@ -711,7 +743,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     display: flex;
     flex-direction: column;
     align-items: center;
-    position: relative; /* For the close button */
+    position: relative;
 }
 
 #camera-controls { display: flex; gap: 1rem; justify-content: center; margin-top: 1rem; }
@@ -728,7 +760,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     text-align: center;
     border-radius: 4px;
     padding: 16px;
-    position: absolute; /* Changed from fixed */
+    position: absolute;
     z-index: 2000;
     left: 50%;
     transform: translateX(-50%);
@@ -748,7 +780,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
 
 
-/* --- NEW RECIPE DETAIL MODAL --- */
+/* --- Recipe Detail Modal --- */
 #recipe-detail-content {
     max-height: 80vh;
     overflow-y: auto;
@@ -784,15 +816,14 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     margin-top: 1rem;
     text-align: center;
 }
-/* UPDATED: Unified margin for all button containers in recipe detail modal */
 #recipe-detail-content .card-actions,
 #recipe-detail-content .ingredients-container,
 #recipe-detail-content .instructions-container {
     margin-top: 1rem;
-    margin-bottom: 0.75rem; /* Ensures spacing below each button/group */
+    margin-bottom: 0.75rem;
 }
 
-/* --- NEW: Loading Animation --- */
+/* --- Loading Animation --- */
 .loading-card {
     display: flex;
     flex-direction: column;
@@ -826,17 +857,17 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     }
 }
 
-/* FIX: How-To Modal Styles */
+/* --- How-To Modal --- */
 .how-to-slider {
     position: relative;
-    min-height: 150px; /* Give it some space */
+    min-height: 150px;
     text-align: center;
 }
 .how-to-slide {
-    display: none; /* Hide all slides by default */
+    display: none;
 }
 .how-to-slide.active {
-    display: block; /* Show only the active slide */
+    display: block;
     animation: fadein 0.5s;
 }
 .how-to-navigation {
@@ -860,7 +891,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     background-color: var(--primary-accent-color);
 }
 
-/* NEW: Onboarding Tour Styles */
+/* --- Onboarding Tour --- */
 #tour-overlay {
     position: fixed;
     top: 0;
@@ -868,7 +899,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     width: 100%;
     height: 100%;
     z-index: 10000;
-    pointer-events: none; /* Allows clicks to pass through */
+    pointer-events: none;
     display: none;
 }
 
@@ -877,7 +908,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     z-index: 10001;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.7);
     border-radius: 4px;
-    pointer-events: all !important; /* Make sure highlighted element is clickable */
+    pointer-events: all !important;
 }
 
 #tour-tooltip {
@@ -891,7 +922,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     max-width: 300px;
     border: 1px solid var(--border-color);
     display: none;
-    /* ADDED: visibility property for smoother rendering */
     visibility: hidden;
 }
 #tour-tooltip h4 { margin-top: 0; color: var(--primary-accent-color); }
@@ -900,7 +930,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 #tour-tooltip .tour-navigation div { display: flex; gap: 0.5rem; }
 #tour-tooltip #tour-skip-btn { margin-top: 0.5rem; display: block; margin-left: auto; margin-right: auto; }
 
-/* NEW: Mobile "More" Modal Styles */
+/* --- Mobile "More" Modal --- */
 .mobile-links-container {
     display: flex;
     flex-direction: column;
@@ -925,18 +955,16 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 /* --- Responsive Styles --- */
 @media (min-width: 769px) {
-    /* UPDATE: Horizontal scrolling for recipe results on desktop */
     #recipe-results, #community-recipes-container .recipe-card-row {
         display: flex;
         overflow-x: auto;
         gap: 1rem;
-        padding-bottom: 1rem; /* Make space for scrollbar if visible */
+        padding-bottom: 1rem;
     }
     #recipe-results .recipe-card, #community-recipes-container .recipe-card {
-        flex: 0 0 220px; /* Don't shrink, don't grow, fixed width */
+        flex: 0 0 220px;
         width: 220px;
     }
-    /* Hide scrollbar but keep it functional */
     #recipe-results::-webkit-scrollbar, #community-recipes-container .recipe-card-row::-webkit-scrollbar {
         height: 8px;
     }
@@ -950,8 +978,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     #recipe-results::-webkit-scrollbar-thumb:hover, #community-recipes-container .recipe-card-row::-webkit-scrollbar-thumb:hover {
         background: #555;
     }
-    #sidebar-calendar-container-mobile { display: none; } /* Hide mobile calendar on desktop */
-    .mobile-only-nav { display: none; } /* Hide "More" button on desktop */
+    #sidebar-calendar-container-mobile { display: none; }
+    .mobile-only-nav { display: none; }
 }
 
 @media (max-width: 1400px) {
@@ -962,31 +990,30 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 
 @media (max-width: 768px) {
     #app-container {
-        grid-template-columns: 1fr; /* Single column layout */
-        grid-template-rows: 1fr auto; /* Content on top, sidebar at bottom */
-        height: 100vh; /* Fallback for older browsers */
-        height: 100dvh; /* Dynamic viewport height */
-        overflow: hidden; /* Prevent the whole container from scrolling */
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+        height: 100vh;
+        height: 100dvh;
+        overflow: hidden;
     }
     .main-content {
         grid-row: 1 / 2;
     }
     .sidebar { 
         grid-row: 2 / 3;
-        position: static; /* No longer fixed */
+        position: static;
         flex-direction: row; 
         align-items: stretch;
         justify-content: space-around; 
         padding: 0; 
         border-top: 1px solid var(--border-color);
         background-color: var(--sidebar-bg-color);
-        height: 55px; /* Fixed height for the nav bar */
-        overflow: hidden; /* Prevent nav bar itself from scrolling */
+        height: 55px;
+        overflow: hidden;
     }
     .sidebar-header { display: none; }
-    /* UPDATED: Hide the desktop footer and show the mobile "More" button */
     .sidebar-footer { display: none; }
-    .mobile-only-nav { display: list-item; } /* Use list-item to match other nav items */
+    .mobile-only-nav { display: list-item; }
 
     .sidebar-nav { display: flex; justify-content: space-around; width: 100%; }
     .sidebar-nav li {
@@ -1008,7 +1035,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         background: var(--surface-highlight-color);
     }
     .sidebar-nav li a i { font-size: 1.1rem; }
-    #sidebar-calendar-container-desktop { display: none; } /* Hide desktop calendar on mobile */
+    #sidebar-calendar-container-desktop { display: none; }
 
     .top-bar { background: var(--bg-color); padding: 0.75rem; }
     #auth-container {
@@ -1041,49 +1068,36 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
         flex-direction: column;
     }
     .meal-type-selector {
-        display: grid; /* Switch to grid on mobile */
-        grid-template-columns: repeat(2, 1fr); /* 2x2 grid on mobile */
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
     }
-    /* UPDATE: Smaller bulk action buttons on mobile */
     .bulk-controls button {
         padding: 6px 12px;
         font-size: 0.8rem;
     }
 }
-/* Style for the 'Remove from Plan' button in the modal */
 .modal-recipe-item .remove-from-plan-btn {
-    /* Positioning */
     position: absolute;
     top: 1rem;
     right: 1rem;
-    z-index: 10; /* Make sure it's on top of the image */
-
-    /* Appearance */
-    background-color: rgba(0, 0, 0, 0.6); /* Dark semi-transparent background */
-    color: #FFFFFF; /* White 'X' */
+    z-index: 10;
+    background-color: rgba(0, 0, 0, 0.6);
+    color: #FFFFFF;
     border: none;
-    border-radius: 50%; /* Make it circular */
+    border-radius: 50%;
     width: 32px;
     height: 32px;
     font-size: 16px;
     font-weight: bold;
-    line-height: 32px; /* Vertically center the 'X' */
+    line-height: 32px;
     text-align: center;
-    
-    /* Remove default button padding and text transformations */
     padding: 0;
     text-transform: none;
     letter-spacing: normal;
-    
-    /* Add a subtle shadow for depth */
     text-shadow: none;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-
-    /* Smooth transition for hover effect */
     transition: background-color 0.2s, transform 0.2s;
 }
-
-/* Hover effect */
 .modal-recipe-item .remove-from-plan-btn:hover {
     background-color: rgba(0, 0, 0, 0.8);
     transform: scale(1.1);
