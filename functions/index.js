@@ -697,8 +697,10 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         if (pantryItems && pantryItems.length > 0) {
             prompt += ` Please prioritize using ingredients from the user's pantry, which contains: ${pantryItems.join(', ')}. You can still include other ingredients, but try to use these first.`;
         }
-
-        prompt += ` For each recipe, provide a title, a brief description, a list of ingredients (including quantity, unit in the ${unitSystem || 'imperial'} system, and category: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]), a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
+        
+        // FIX: Added explicit instructions for the ingredient object structure.
+        prompt += ` For each recipe, provide a title, a brief description, a list of ingredients, a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
+        The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit" (in the ${unitSystem || 'imperial'} system), and "category" keys from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"].
         
         VERY IMPORTANT: Structure your response as a single, valid JSON object. The top-level keys should be the meal types you planned (e.g., "breakfast", "dinner").
         Each meal's value should be an object where the key is a unique meal ID (e.g., "meal_1700000000") and the value is the full recipe object.`;
