@@ -1,7 +1,7 @@
 // public/script.js
 // Import all necessary functions from the Firebase SDKs at the top
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, onAuthStateChanged, signOut, signInWithRedirect, getRedirectResult, sendEmailVerification } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, addDoc, getDocs, onSnapshot, query, where, writeBatch, arrayUnion, serverTimestamp, deleteDoc, orderBy, deleteField, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 import { initializeAppCheck, ReCaptchaV3Provider } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app-check.js";
@@ -60,8 +60,52 @@ getRedirectResult(auth)
         renderAuthUI(user);
 
         if (user) {
-            // App Check is already initialized, so we proceed to set up the UI.
-            await initializeAppUI(user);
+            // Check if the user is using email/password and if their email is verified
+            const isEmailProvider = user.providerData.some(provider => provider.providerId === 'password');
+            
+            if (isEmailProvider && !user.emailVerified) {
+                // If email is not verified, show a verification prompt instead of the app
+                initialView.style.display = 'block';
+                appContent.style.display = 'none';
+                loginSection.style.display = 'none'; // Hide login form
+                householdManager.style.display = 'block'; // Show a section
+                householdManager.classList.add('active');
+                householdManager.innerHTML = `
+                    <div class="auth-view">
+                        <h3><i class="fas fa-envelope"></i> Please Verify Your Email</h3>
+                        <p>A verification link was sent to <strong>${user.email}</strong>.</p>
+                        <p>Please check your email (including spam folder) and click the link to continue.</p>
+                        <button id="resend-verification-email-btn">Resend Verification Email</button>
+                        <button id="check-verification-status-btn" class="secondary">I've Verified, Continue</button>
+                        <hr>
+                        <button id="sign-out-unverified-btn" class="link-button">Use a different account</button>
+                    </div>
+                `;
+
+                document.getElementById('resend-verification-email-btn').addEventListener('click', async () => {
+                    try {
+                        await sendEmailVerification(user);
+                        showToast("Another verification email has been sent!");
+                    } catch (error) {
+                        console.error("Error resending verification email:", error);
+                        showToast(`Error: ${error.message}`);
+                    }
+                });
+
+                document.getElementById('check-verification-status-btn').addEventListener('click', async () => {
+                    await user.reload();
+                    if (auth.currentUser.emailVerified) {
+                        window.location.reload(); // Simple way to re-trigger onAuthStateChanged
+                    } else {
+                        showToast("Email not verified yet. Please check your inbox.");
+                    }
+                });
+
+                document.getElementById('sign-out-unverified-btn').addEventListener('click', () => signOut(auth));
+            } else {
+                // User is verified or using a different provider (like Google)
+                await initializeAppUI(user);
+            }
         } else {
             currentUser = null; householdId = null;
             unsubscribeHousehold();
@@ -2148,13 +2192,13 @@ function defineTourSteps() {
             element: '#show-manual-add-btn',
             title: 'Add Items',
             content: 'You can add items manually, scan a single item\'s image, or even scan a whole receipt (a premium feature!). Let\'s add one manually.',
-            placement: isMobile ? 'top' : 'bottom'
+            placement: isMobile ? 'bottom' : 'bottom'
         },
         {
             element: '#manual-add-form',
             title: 'Enter Item Details',
             content: 'Fill in the name, quantity, and unit for your item. For example, "2 lbs Chicken Breast". Then click "Add".',
-            placement: 'top',
+            placement: isMobile ? 'top': 'bottom',
             onBefore: () => {
                 switchView('pantry-section'); // Ensures we're on the right tab when going backward
                 document.getElementById('pantry-forms-container').style.display = 'block';
@@ -2175,7 +2219,7 @@ function defineTourSteps() {
             element: '#suggest-recipe-btn',
             title: 'Get Suggestions',
             content: 'Click "Next" and we\'ll get some AI-powered recipe suggestions based on what\'s currently in your pantry.',
-            placement: isMobile ? 'top' : 'bottom',
+            placement: isMobile ? 'top' : 'top',
             shouldClick: true
         },
         {
@@ -2766,12 +2810,14 @@ async function handleEmailSignIn(e) {
     const authError = document.getElementById('auth-error');
     authError.style.display = 'none';
     try {
+        // This will trigger the onAuthStateChanged listener which will handle verification checks
         await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
         authError.textContent = error.message;
         authError.style.display = 'block';
     }
 }
+
 async function handleEmailSignUp(e) {
     e.preventDefault();
     const email = document.getElementById('signup-email-input').value;
@@ -2782,11 +2828,31 @@ async function handleEmailSignUp(e) {
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: displayName });
+
+        // Send verification email
+        await sendEmailVerification(userCredential.user);
+        
+        // Sign the user out until they are verified. This simplifies the logic.
+        await signOut(auth);
+
+        // Update the UI to show a confirmation message
+        const loginSection = document.getElementById('login-section');
+        loginSection.innerHTML = `
+            <div class="auth-view">
+                <h3><i class="fas fa-envelope-check"></i> Verify Your Email</h3>
+                <p>A verification email has been sent to <strong>${email}</strong>. Please check your inbox and click the link to activate your account before signing in.</p>
+                <button id="back-to-login-btn" class="link-button">Back to Sign In</button>
+            </div>
+        `;
+        document.getElementById('back-to-login-btn').addEventListener('click', buildLoginForm);
+        showToast("Verification email sent!");
+
     } catch (error) {
         authError.textContent = error.message;
         authError.style.display = 'block';
     }
 }
+
 function toggleAuthMode() {
     const emailSigninForm = document.getElementById('email-signin-form');
     const emailSignupForm = document.getElementById('email-signup-form');
