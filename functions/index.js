@@ -244,7 +244,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
             }
         }
 
-        prompt += ` Include a mix of 3 simple recipes and 3 more complex recipes. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, and a step-by-step list of cooking instructions. Also include an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
+        prompt += ` Include a mix of 3 simple recipes and 3 more complex recipes. For each recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -320,7 +320,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
                 prompt += ` The recipes should also meet the following criteria: ${otherCriteria.join(', ')}.`;
             }
         }
-        prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
+        prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -387,9 +387,9 @@ exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforc
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
         const prompt = `You are an expert chef. A user wants a recipe for "${mealQuery}". Provide a single, detailed recipe for this meal.
-        For the recipe, provide a title, a brief description, a list of all necessary ingredients, a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
+        For the recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of all necessary ingredients, a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
         For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"].
-        Format your entire response as a single, valid JSON object with "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition" as keys.
+        Format your entire response as a single, valid JSON object with "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys.
         The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
 
         const aiRequest = {
@@ -463,7 +463,7 @@ exports.importRecipeFromUrl = onCall({ timeoutSeconds: 540, region: "us-central1
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
         
-        const prompt = `From the following HTML content, extract the recipe. Provide a title, a brief description, all ingredients, step-by-step cooking instructions, a simple image search keyword, and estimated nutritional information (calories, protein, carbs, fat). For each ingredient, extract its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and categorize it from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Your entire response MUST be ONLY the resulting valid JSON object, starting with { and ending with }, without any surrounding text, comments, or markdown code fences like \`\`\`json. The JSON object must contain these exact keys: "title", "description", "ingredients", "imageQuery", "instructions", and "nutrition". The "ingredients" value must be an array of objects. The "instructions" value must be an array of strings. HTML content: ${htmlContent}`;
+        const prompt = `From the following HTML content, extract the recipe. Provide a title, a brief description, a serving size (e.g., "4 servings"), all ingredients, step-by-step cooking instructions, a simple image search keyword, and estimated nutritional information (calories, protein, carbs, fat). For each ingredient, extract its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and categorize it from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Your entire response MUST be ONLY the resulting valid JSON object, starting with { and ending with }, without any surrounding text, comments, or markdown code fences like \`\`\`json. The JSON object must contain these exact keys: "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition". The "ingredients" value must be an array of objects. The "instructions" value must be an array of strings. HTML content: ${htmlContent}`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -698,10 +698,15 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
             prompt += ` Please prioritize using ingredients from the user's pantry, which contains: ${pantryItems.join(', ')}. You can still include other ingredients, but try to use these first.`;
         }
 
-        prompt += ` For each recipe, provide a title, a brief description, a list of ingredients (including quantity, unit in the ${unitSystem || 'imperial'} system, and category: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]), a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
+        prompt += ` For each recipe, provide a full recipe object. Each recipe object must have the following keys: "title", "description", "ingredients", "servingSize", "imageQuery", "instructions", and "nutrition".
+        - The "ingredients" value must be an array of objects, with each object having "name", "quantity", "unit" (in the ${unitSystem || 'imperial'} system), and "category" keys.
+        - The "servingSize" value should be a string like "4 servings".
+        - The "imageQuery" value should be a simple keyword for an image search.
+        - The "instructions" value must be an array of strings.
+        - The "nutrition" value must be an object with "calories", "protein", "carbs", and "fat" as string values (e.g., "450 kcal", "30g").
         
-        VERY IMPORTANT: Structure your response as a single, valid JSON object. The top-level keys should be the meal types you planned (e.g., "breakfast", "dinner").
-        Each meal's value should be an object where the key is a unique meal ID (e.g., "meal_1700000000") and the value is the full recipe object.`;
+        VERY IMPORTANT: Structure your entire response as a single, valid JSON object. The top-level keys should be the meal types you planned (e.g., "breakfast", "dinner").
+        Each meal's value should be an object where the key is a unique meal ID (e.g., "meal_1700000000") and the value is the full recipe object described above.`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],

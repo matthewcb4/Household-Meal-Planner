@@ -539,9 +539,10 @@ function renderMealPlanner() {
 
         const dayHeader = document.createElement('div');
         dayHeader.className = 'day-header';
+        // FIX: Add premium-feature class to the plan-day-btn
         dayHeader.innerHTML = `
             <span>${day}</span>
-            <button class="plan-day-btn secondary" data-day="${day.toLowerCase()}" data-day-full-name="${fullDayNames[index]}">✨</button>
+            <button class="plan-day-btn secondary premium-feature" data-day="${day.toLowerCase()}" data-day-full-name="${fullDayNames[index]}">✨</button>
         `;
 
         dayHeader.addEventListener('click', (e) => {
@@ -942,13 +943,11 @@ async function addItemsToPantry() {
     const itemConfirmationList = document.getElementById('item-confirmation-list');
     const pantryRef = getPantryRef();
     if (!pantryRef) {
-        // MODIFICATION: Replaced alert with showToast
         showToast("Error: Not in a household. Cannot add items to pantry.");
         return;
     }
     const confirmedItems = itemConfirmationList.querySelectorAll('.confirmation-item');
     if (confirmedItems.length === 0) {
-        // MODIFICATION: Replaced alert with showToast
         showToast("No items to add!");
         return;
     }
@@ -1023,10 +1022,13 @@ function createRecipeCard(recipe, isFavorite) {
         `;
     }
 
+    const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
+
     const cardContent = `
         <div class="recipe-card-header">
              <h3>${recipe.title}</h3>
         </div>
+        ${servingSizeHTML}
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${nutritionHTML}
@@ -1128,10 +1130,13 @@ function populateRecipeDetailModal(recipe, isFavorite) {
         ratingHTML += '</div>';
     }
 
+    const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
+
     modalContent.innerHTML = `
         <span class="close-btn" id="recipe-detail-modal-close-btn">&times;</span>
         <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
         <h3><a href="${googleSearchUrl}" target="_blank" title="Search on Google">${recipe.title} 🔗</a></h3>
+        ${servingSizeHTML}
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${nutritionHTML}
@@ -1750,15 +1755,17 @@ async function handleMealSlotClick(event) {
                         </div>
                     `;
                 }
+                const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
 
                 recipeCard.innerHTML = `
-                    <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${id}">X</button>
+                    <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">X</button>
                     <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
                     <h3><a href="${googleSearchUrl}" target="_blank">${recipe.title} 🔗</a></h3>
                     <div class="modal-card-actions">
                         <button class="favorite-from-modal-btn secondary">Favorite ⭐</button>
                         <button class="add-to-plan-btn secondary">Add to Plan Again</button>
                     </div>
+                    ${servingSizeHTML}
                     ${ratingHTML}
                     <p>${recipe.description}</p>
                     ${nutritionHTML}
@@ -2486,7 +2493,6 @@ function startApp() {
 async function handlePlanMyWeek() {
     const planMyWeekBtn = document.getElementById('plan-my-week-btn');
     if (planMyWeekBtn.classList.contains('disabled')) {
-        // MODIFICATION: Replaced alert with modal
         document.getElementById('upgrade-modal').style.display = 'block';
         return;
     }
@@ -3310,7 +3316,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sync-calendar-btn')?.addEventListener('click', () => {
         const syncCalendarBtn = document.getElementById('sync-calendar-btn');
         if (syncCalendarBtn.classList.contains('disabled')) {
-            // MODIFICATION: Replaced alert with modal
             document.getElementById('upgrade-modal').style.display = 'block';
             return;
         }

@@ -90,7 +90,7 @@ a:hover { color: var(--primary-accent-color); }
     overflow-y: auto;
 }
 .sidebar-header { margin-bottom: 1.5rem; }
-.sidebar-logo { width: 100%; max-width: 140px; height: auto; }
+.sidebar-logo { width: 100%; max-width: 200px; height: auto; }
 .sidebar-nav { list-style: none; padding: 0; margin: 0; }
 .sidebar-nav li a {
     display: flex;
@@ -330,6 +330,21 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     overflow: hidden;
     margin-bottom: 0.5rem;
     flex-grow: 1; /* Allow description to take up space */
+}
+/* NEW: Serving size info */
+.serving-size-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary-color);
+    margin: 0.25rem 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+/* NEW: Adjust modal serving size style */
+#recipe-detail-content .serving-size-info,
+.modal-recipe-item .serving-size-info {
+    font-size: 1rem;
+    margin-bottom: 1rem;
 }
 /* NEW: Nutrition Info on Recipe Card */
 .recipe-card .nutrition-info {
@@ -654,10 +669,9 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     border-color: var(--primary-accent-color);
 }
 
-/* MODIFIED: This is the key change to allow clicks */
 .premium-feature.disabled { 
     opacity: 0.5; 
-    /* pointer-events: none; <-- REMOVED THIS LINE */
+    /* pointer-events: none; - REMOVED */
 }
 .premium-tag { background-color: var(--primary-accent-color); color: #000; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin-left: 0.5rem; font-weight: bold; }
 .toggle-switch {
