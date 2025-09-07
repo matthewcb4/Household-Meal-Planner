@@ -654,7 +654,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     border-color: var(--primary-accent-color);
 }
 
-.premium-feature.disabled { opacity: 0.5; pointer-events: none; }
+/* MODIFIED: This is the key change to allow clicks */
+.premium-feature.disabled { 
+    opacity: 0.5; 
+    /* pointer-events: none; <-- REMOVED THIS LINE */
+}
 .premium-tag { background-color: var(--primary-accent-color); color: #000; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; margin-left: 0.5rem; font-weight: bold; }
 .toggle-switch {
     display: flex;

@@ -942,12 +942,14 @@ async function addItemsToPantry() {
     const itemConfirmationList = document.getElementById('item-confirmation-list');
     const pantryRef = getPantryRef();
     if (!pantryRef) {
-        alert("Error: Not in a household. Cannot add items to pantry.");
+        // MODIFICATION: Replaced alert with showToast
+        showToast("Error: Not in a household. Cannot add items to pantry.");
         return;
     }
     const confirmedItems = itemConfirmationList.querySelectorAll('.confirmation-item');
     if (confirmedItems.length === 0) {
-        alert("No items to add!");
+        // MODIFICATION: Replaced alert with showToast
+        showToast("No items to add!");
         return;
     }
 
@@ -1541,7 +1543,7 @@ async function moveSelectedItemsToPantryDirectly() {
     const groceryList = document.getElementById('grocery-list');
     const checkedItems = groceryList.querySelectorAll('input[type="checkbox"]:checked');
     if (checkedItems.length === 0) {
-        alert("Please select items to move.");
+        showToast("Please select items to move.");
         return;
     }
 
@@ -1592,13 +1594,13 @@ async function moveSelectedItemsToPantryDirectly() {
         // onSnapshot handles UI updates
     } catch (error) {
         console.error("Error moving items to pantry:", error);
-        alert("There was an error moving items to the pantry.");
+        showToast("There was an error moving items to the pantry.");
     }
 }
 
 async function handleAddFromRecipe(buttonElement) {
     if (!householdId) {
-        alert("Error: Household not found. Please sign in again.");
+        showToast("Error: Household not found. Please sign in again.");
         return;
     }
     const itemName = buttonElement.dataset.itemName;
@@ -1750,7 +1752,7 @@ async function handleMealSlotClick(event) {
                 }
 
                 recipeCard.innerHTML = `
-                    <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">X</button>
+                    <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${id}">X</button>
                     <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
                     <h3><a href="${googleSearchUrl}" target="_blank">${recipe.title} 🔗</a></h3>
                     <div class="modal-card-actions">
@@ -1845,7 +1847,7 @@ async function handleModalClick(event) {
 async function handleBulkDelete(collectionRef, checkedItemsSelector) {
     const checkedItems = document.querySelectorAll(checkedItemsSelector);
     if (checkedItems.length === 0) {
-        alert("Please select items to delete.");
+        showToast("Please select items to delete.");
         return;
     }
     if (confirm(`Are you sure you want to delete ${checkedItems.length} item(s)?`)) {
@@ -2055,7 +2057,7 @@ async function handlePlanSingleDayClick(event) {
     };
 
     if (existingMealsForDay.breakfast && existingMealsForDay.lunch && existingMealsForDay.dinner) {
-        alert(`${dayFullName} is already fully planned!`);
+        showToast(`${dayFullName} is already fully planned!`);
         button.textContent = originalButtonText;
         button.disabled = false;
         return;
@@ -2093,7 +2095,7 @@ async function handlePlanSingleDayClick(event) {
 
     } catch (error) {
         console.error(`Error planning day ${dayFullName}:`, error);
-        alert(`Could not plan ${dayFullName}: ${error.message}`);
+        showToast(`Could not plan ${dayFullName}: ${error.message}`);
     } finally {
         button.textContent = originalButtonText;
         button.disabled = false;
@@ -2484,7 +2486,8 @@ function startApp() {
 async function handlePlanMyWeek() {
     const planMyWeekBtn = document.getElementById('plan-my-week-btn');
     if (planMyWeekBtn.classList.contains('disabled')) {
-        alert('This is a premium feature! Please upgrade to use automatic week planning.');
+        // MODIFICATION: Replaced alert with modal
+        document.getElementById('upgrade-modal').style.display = 'block';
         return;
     }
 
@@ -2564,9 +2567,9 @@ async function handlePlanMyWeek() {
     planMyWeekBtn.disabled = false;
 
     if (hasErrors) {
-        alert("Your week has been planned, but one or more days failed to generate.");
+        showToast("Your week has been planned, but one or more days failed to generate.");
     } else {
-        alert("Your week's empty slots have been filled!");
+        showToast("Your week's empty slots have been filled!");
     }
 }
 
@@ -2804,7 +2807,7 @@ async function handleUpgradeClick() {
         }
     } catch (error) {
         console.error("Error redirecting to Stripe Checkout:", error);
-        alert("Could not initiate payment. Please try again.");
+        showToast("Could not initiate payment. Please try again.");
     }
 }
 
@@ -2991,7 +2994,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('join-household-btn').addEventListener('click', async () => {
         if (!currentUser) return;
         const code = document.getElementById('household-code-input').value.trim().toUpperCase();
-        if (!code) return alert("Please enter a household code.");
+        if (!code) {
+             showToast("Please enter a household code.");
+             return;
+        }
 
         const joinButton = document.getElementById('join-household-btn');
         joinButton.disabled = true;
@@ -3001,7 +3007,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const householdRef = doc(db, 'households', code);
             const householdDoc = await getDoc(householdRef);
             if (!householdDoc.exists()) {
-                alert("Household not found.");
+                showToast("Household not found.");
                 return;
             }
 
@@ -3014,7 +3020,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await initializeAppUI(currentUser);
         } catch (error) {
             console.error("Error joining household:", error);
-            alert("Failed to join household. Please check the code and try again.");
+            showToast("Failed to join household. Please check the code and try again.");
         } finally {
             joinButton.disabled = false;
             joinButton.textContent = 'Join';
@@ -3079,7 +3085,7 @@ document.addEventListener('DOMContentLoaded', () => {
             householdData.cuisine = newCuisine;
             householdData.lastCuisineUpdate = { toDate: () => new Date() };
             configurePaywallUI();
-            alert('Cuisine preference updated!');
+            showToast('Cuisine preference updated!');
         }
     });
 
@@ -3173,7 +3179,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Recipe added to selected dates!');
             updateWeekView();
         } else {
-            alert('Please select at least one date.');
+            showToast('Please select at least one date.');
         }
     });
     document.getElementById('plan-my-week-btn')?.addEventListener('click', handlePlanMyWeek);
@@ -3211,7 +3217,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const queryInput = document.getElementById('chef-query-input');
         const mealQuery = queryInput.value.trim();
         if (!mealQuery) {
-            alert('Please enter a meal to ask the chef!');
+            showToast('Please enter a meal to ask the chef!');
             return;
         }
         const loadingMessages = [
@@ -3304,7 +3310,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('sync-calendar-btn')?.addEventListener('click', () => {
         const syncCalendarBtn = document.getElementById('sync-calendar-btn');
         if (syncCalendarBtn.classList.contains('disabled')) {
-            alert('This is a premium feature! Please upgrade to use calendar sync.');
+            // MODIFICATION: Replaced alert with modal
+            document.getElementById('upgrade-modal').style.display = 'block';
             return;
         }
         if (householdId) {
@@ -3312,7 +3319,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('calendar-url-input').value = functionUrl;
             document.getElementById('sync-calendar-modal').style.display = 'block';
         } else {
-            alert('Could not generate calendar link. Household not found.');
+            showToast('Could not generate calendar link. Household not found.');
         }
     });
 
