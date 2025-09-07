@@ -892,8 +892,8 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
                                 start: [eventDate.getFullYear(), eventDate.getMonth() + 1, eventDate.getDate(), hour, 0],
                                 duration: { hours: 1 },
                                 description: `Recipe: ${recipe.title}\\n\\n${recipe.description || ''}`,
-                                calName: 'Household Meal Plan',
-                                productId: 'household-meal-planner/ics'
+                                calName: 'Auto Meal Chef Plan',
+                                productId: 'automchef/ics'
                             };
                             events.push(event);
                         }
@@ -955,8 +955,8 @@ exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request)
                 quantity: 1,
             }],
             mode: 'subscription', 
-            success_url: `https://householdmealplanner.online?payment_success=true`,
-            cancel_url: `https://householdmealplanner.online?payment_cancel=true`,
+            success_url: `https://automchef.com?payment_success=true`,
+            cancel_url: `https://automchef.com?payment_cancel=true`,
             // UPDATED: Pass metadata to the subscription for future reference in webhooks
             subscription_data: {
                 metadata: {

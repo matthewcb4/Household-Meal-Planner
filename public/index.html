@@ -5,11 +5,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- UPDATED: Added meta description for SEO -->
-    <meta name="description" content="Effortlessly plan your household meals, generate grocery lists from your pantry, and discover new recipes with AI-powered suggestions. Simplify your kitchen today!">
-    <title>Household Meal Planner</title>
+    <meta name="description" content="Effortlessly plan your household meals, generate grocery lists from your pantry, and discover new recipes with AI-powered suggestions. Simplify your kitchen today with Auto Meal Chef!">
+    <title>Auto Meal Chef</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstaticA.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -21,7 +21,7 @@
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
             <div class="sidebar-header">
-                <img src="header.png" alt="Logo" class="sidebar-logo">
+                <img src="header.png" alt="Auto Meal Chef Logo" class="sidebar-logo">
             </div>
             <ul class="sidebar-nav">
                 <li><a href="#" class="nav-link active" data-target="meal-plan-section"><i class="fas fa-calendar-alt fa-fw"></i> <span>Meal Planner</span></a></li>
@@ -339,6 +339,23 @@
         </div>
     </div>
     
+    <!-- NEW: Upgrade Modal -->
+    <div id="upgrade-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="upgrade-modal-close-btn">&times;</span>
+            <h3><i class="fas fa-gem"></i> Upgrade to Premium</h3>
+            <p>Unlock powerful features to supercharge your meal planning!</p>
+            <ul class="premium-features-list">
+                <li><i class="fas fa-check-circle"></i> Unlimited AI Recipe Generations</li>
+                <li><i class="fas fa-receipt"></i> Scan Receipts to Instantly Add Items</li>
+                <li><i class="fas fa-users"></i> See Top Community Favorite Recipes</li>
+                <li><i class="fas fa-brain"></i> Advanced AI Planning Features</li>
+                <li><i class="fas fa-calendar-alt"></i> Sync with your Personal Calendar</li>
+            </ul>
+            <button id="modal-upgrade-btn" class="upgrade-button">Upgrade Now</button>
+        </div>
+    </div>
+
     <!-- NEW: Onboarding Tour Elements -->
     <div id="tour-overlay"></div>
     <div id="tour-tooltip" style="display: none;"></div>

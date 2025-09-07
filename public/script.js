@@ -178,7 +178,7 @@ function buildLoginForm() {
     const loginSection = document.getElementById('login-section');
     loginSection.innerHTML = `
         <div class="auth-view">
-            <h3>Welcome to the Meal Planner</h3>
+            <h3>Welcome to Auto Meal Chef</h3>
             <div id="sign-in-options">
                 <button id="sign-in-btn" class="social-signin-btn google"><i class="fab fa-google"></i> Sign in with Google</button>
                 <hr class="auth-divider">
@@ -1083,7 +1083,7 @@ function populateRecipeDetailModal(recipe, isFavorite) {
     } else {
          instructionsHTML = `
             <div class="instructions-container disabled">
-                 <button class="instructions-toggle secondary" disabled>Show Instructions</button>
+                 <button class="instructions-toggle secondary">Show Instructions</button>
                  <div class="premium-overlay">
                      <span class="premium-tag">Premium</span>
                  </div>
@@ -1937,16 +1937,7 @@ function configurePaywallUI() {
         if (upgradeBtnHeader) upgradeBtnHeader.style.display = 'block';
         premiumFeatures.forEach(el => {
             el.classList.add('disabled');
-            el.querySelectorAll('input, button, select').forEach(input => input.disabled = true);
         });
-
-        // UPDATED: Disable scan buttons if quota is exceeded
-        if(scansLeft <= 0) {
-            document.querySelectorAll('#show-scan-item-btn, #show-scan-receipt-btn, #show-scan-grocery-btn, #show-scan-receipt-grocery-btn, #quick-meal-btn').forEach(btn => {
-                btn.disabled = true;
-                btn.title = "You have used all your free scans for the month.";
-            });
-        }
 
         if (updateCuisineBtn && householdData.lastCuisineUpdate) {
             const lastUpdate = householdData.lastCuisineUpdate.toDate();
@@ -1954,12 +1945,8 @@ function configurePaywallUI() {
             const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
 
             if (now - lastUpdate < thirtyDaysInMillis) {
-                updateCuisineBtn.disabled = true;
-                if(cuisineSelect) cuisineSelect.disabled = true;
                 updateCuisineBtn.textContent = `Update available on ${new Date(lastUpdate.getTime() + thirtyDaysInMillis).toLocaleDateString()}`;
             } else {
-                updateCuisineBtn.disabled = false;
-                if(cuisineSelect) cuisineSelect.disabled = false;
                 updateCuisineBtn.textContent = 'Update Cuisine (1 free change)';
             }
             updateCuisineBtn.style.display = 'block';
@@ -3037,6 +3024,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.addEventListener('click', (event) => {
         const target = event.target;
 
+        // NEW LOGIC: Check for premium feature clicks by free users
+        const premiumFeature = target.closest('.premium-feature');
+        if (premiumFeature && householdData && householdData.subscriptionTier === 'free') {
+            if (premiumFeature.classList.contains('disabled')) {
+                event.preventDefault();
+                event.stopPropagation();
+                document.getElementById('upgrade-modal').style.display = 'block';
+                return; 
+            }
+        }
+
         if (target.closest('.close-btn')) target.closest('.modal').style.display = 'none';
         if (event.target.classList.contains('modal')) event.target.style.display = 'none';
         if (target.closest('#feedback-btn-sidebar') || target.closest('#feedback-btn-modal')) {
@@ -3326,4 +3324,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="unitSystem"]').forEach(element => {
         element.addEventListener('change', handlePreferenceChange);
     });
+
+    // NEW: Upgrade Modal Listener
+    document.getElementById('modal-upgrade-btn')?.addEventListener('click', handleUpgradeClick);
 });
