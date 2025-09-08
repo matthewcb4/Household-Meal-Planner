@@ -279,6 +279,14 @@
                             <select id="grocery-item-category"></select>
                             <button type="submit">Add</button>
                         </form>
+                        <!-- ADDED: Confirmation section for grocery scans -->
+                        <div id="grocery-forms-container" style="display: none;">
+                            <div id="confirmation-section-grocery" style="display: none;">
+                                <h3>Confirm Scanned Items</h3>
+                                <div id="item-confirmation-list-grocery"></div>
+                                <button id="add-to-grocery-btn">Add Items to Grocery List</button>
+                            </div>
+                        </div>
                         <div class="pantry-header" style="margin-top: 24px;">
                             <h3>Your Items</h3>
                             <div class="pantry-controls">
@@ -312,7 +320,8 @@
             <img id="captured-image" alt="Captured from pantry" style="display: none;">
             <div id="camera-controls">
                 <button id="start-camera-btn">Start Camera</button>
-                <button id="capture-btn" style="display: none;">Capture & Scan</button>
+                <!-- UPDATED: Changed button text for clarity -->
+                <button id="capture-btn" style="display: none;">Capture & Continue</button>
             </div>
         </div>
     </div>

@@ -1241,6 +1241,7 @@ async function discoverNewRecipes() {
     await generateRecipes(null, 'Discover New Recipes', true); // Append new recipes
 }
 
+// UPDATED: This function now correctly handles scanned items vs. the full pantry.
 async function generateRecipes(items, source, append = false) {
     const recipeResultsDiv = document.getElementById('recipe-results');
     const discoverBtn = document.getElementById('discover-recipes-btn');
@@ -1277,21 +1278,31 @@ async function generateRecipes(items, source, append = false) {
         };
 
         if (source === 'Suggest from Pantry') {
-            const pantryRef = getPantryRef();
-            const snapshot = await getDocs(pantryRef);
-            const pantryItems = snapshot.docs.map(doc => doc.data().name);
-            if (pantryItems.length === 0) {
-                recipeResultsDiv.innerHTML = "<p>Your pantry is empty. Add some items to get suggestions.</p>";
+            // FIX: Use provided items (from photo scan) if available, otherwise fetch the full pantry.
+            let ingredientsForSuggestion = [];
+            if (items && items.length > 0) {
+                ingredientsForSuggestion = items; // Use items from the photo scan
+            } else {
+                const pantryRef = getPantryRef();
+                const snapshot = await getDocs(pantryRef);
+                ingredientsForSuggestion = snapshot.docs.map(doc => doc.data().name); // Use full pantry
+            }
+
+            if (ingredientsForSuggestion.length === 0) {
+                if (items) { // This means it came from a scan
+                    recipeResultsDiv.innerHTML = "<p>Couldn't identify any items in the photo to suggest recipes from.</p>";
+                } else { // This means it came from the pantry button
+                    recipeResultsDiv.innerHTML = "<p>Your pantry is empty. Add some items to get suggestions.</p>";
+                }
                 return;
             }
             const suggestRecipesFunc = httpsCallable(functions, 'suggestRecipes');
-            result = await suggestRecipesFunc({ ...commonPayload, pantryItems: pantryItems });
-        } else {
+            result = await suggestRecipesFunc({ ...commonPayload, pantryItems: ingredientsForSuggestion });
+        } else { // This handles "Discover New Recipes"
             const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
             result = await discoverRecipesFunc(commonPayload);
         }
 
-        // MODIFIED: Handle new response format
         const { recipes: newRecipes, remaining, isPremium } = result.data;
 
         if (remaining !== undefined) {
@@ -1299,12 +1310,11 @@ async function generateRecipes(items, source, append = false) {
         }
 
         accumulatedRecipes.unshift(...newRecipes);
-        if (accumulatedRecipes.length > 18) { // Keep the list to a max of 18
+        if (accumulatedRecipes.length > 18) {
             accumulatedRecipes.length = 18;
         }
         displayRecipeResults(accumulatedRecipes, selectedMealType);
 
-        // NEW: Save suggestions to Firestore for persistence
         const todayString = getTodayDateString();
         const suggestionsRef = doc(db, 'households', householdId, 'dailySuggestions', todayString);
         await setDoc(suggestionsRef, { recipes: accumulatedRecipes, createdAt: serverTimestamp() });
@@ -1327,16 +1337,14 @@ async function generateRecipes(items, source, append = false) {
 }
 
 
+// UPDATED: This function is now fully refactored to handle all scan modes,
+// close the camera immediately, and delegate to the correct confirmation UI.
 async function captureAndScan() {
     const canvasElement = document.getElementById('capture-canvas');
     const videoElement = document.getElementById('camera-stream');
-    const capturedImageElement = document.getElementById('captured-image');
-    const itemConfirmationList = document.getElementById('item-confirmation-list');
-    const confirmationSection = document.getElementById('confirmation-section');
-    const recipeResultsDiv = document.getElementById('recipe-results');
-    const pantryFormsContainer = document.getElementById('pantry-forms-container');
     const context = canvasElement.getContext('2d');
 
+    // 1. Capture the image data
     const MAX_WIDTH = 800;
     const scale = MAX_WIDTH / videoElement.videoWidth;
     canvasElement.width = MAX_WIDTH;
@@ -1344,52 +1352,67 @@ async function captureAndScan() {
     context.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
     const base64ImageData = canvasElement.toDataURL('image/jpeg', 0.8).split(',')[1];
 
-    capturedImageElement.src = `data:image/jpeg;base64,${base64ImageData}`;
-    capturedImageElement.style.display = 'block';
+    // 2. Immediately close the camera modal to provide instant feedback
+    stopCamera();
 
-    if (stream) { stream.getTracks().forEach(track => track.stop()); }
-    stream = null;
-    document.getElementById('camera-container').style.display = 'none';
-
-    let targetContainer;
-    let scanFunction;
+    // 3. Determine the correct function and UI containers based on the scanMode
+    let targetContainer, scanFunction, loadingMessage;
 
     switch (scanMode) {
         case 'quickMeal':
-            targetContainer = recipeResultsDiv;
-            showLoadingState('Scanning ingredients and finding recipes...', targetContainer, true);
+            targetContainer = document.getElementById('recipe-results');
+            loadingMessage = 'Scanning ingredients and finding recipes...';
             scanFunction = httpsCallable(functions, 'identifyItems');
             break;
         case 'receipt':
-            targetContainer = itemConfirmationList;
-            pantryFormsContainer.style.display = 'block';
-            confirmationSection.style.display = 'block';
-            targetContainer.innerHTML = '<p>🧠 Reading receipt for Pantry...</p>';
+            targetContainer = document.getElementById('item-confirmation-list');
+            loadingMessage = '🧠 Reading receipt for Pantry...';
             scanFunction = httpsCallable(functions, 'scanReceipt');
+            document.getElementById('pantry-forms-container').style.display = 'block';
+            document.getElementById('confirmation-section').style.display = 'block';
             break;
         case 'groceryReceipt':
-            targetContainer = document.getElementById('grocery-list');
-            showLoadingState("Reading receipt for Grocery List...", targetContainer);
+            targetContainer = document.getElementById('item-confirmation-list-grocery');
+            loadingMessage = '🧠 Reading receipt for Grocery List...';
             scanFunction = httpsCallable(functions, 'scanReceipt');
+            document.getElementById('grocery-forms-container').style.display = 'block';
+            document.getElementById('confirmation-section-grocery').style.display = 'block';
             break;
         case 'grocery':
-             targetContainer = document.getElementById('grocery-list');
-             showLoadingState("Scanning items for Grocery List...", targetContainer);
+             targetContainer = document.getElementById('item-confirmation-list-grocery');
+             loadingMessage = '🧠 Identifying items for Grocery List...';
              scanFunction = httpsCallable(functions, 'identifyItems');
+             document.getElementById('grocery-forms-container').style.display = 'block';
+             document.getElementById('confirmation-section-grocery').style.display = 'block';
              break;
         case 'pantry':
         default:
-            targetContainer = itemConfirmationList;
-            pantryFormsContainer.style.display = 'block';
-            confirmationSection.style.display = 'block';
-            targetContainer.innerHTML = '<p>🧠 Identifying items...</p>';
+            targetContainer = document.getElementById('item-confirmation-list');
+            loadingMessage = '🧠 Identifying items for Pantry...';
             scanFunction = httpsCallable(functions, 'identifyItems');
+            document.getElementById('pantry-forms-container').style.display = 'block';
+            document.getElementById('confirmation-section').style.display = 'block';
             break;
     }
 
+    // 4. Show loading state in the appropriate main content area
+    if (targetContainer) {
+        if(scanMode === 'quickMeal') {
+            showLoadingState(loadingMessage, targetContainer, true);
+        } else {
+             targetContainer.innerHTML = `<p>${loadingMessage}</p>`;
+        }
+    }
+
+    // 5. Call the backend function and process the results
     try {
         const result = await scanFunction({ image: base64ImageData });
         const identifiedItems = result.data;
+
+        if (!identifiedItems || identifiedItems.length === 0) {
+             if(targetContainer) targetContainer.innerHTML = `<p>The AI couldn't identify any items. Please try again.</p>`;
+             return;
+        }
 
         if (scanMode === 'quickMeal') {
             const itemNames = identifiedItems.map(item => item.name);
@@ -1397,32 +1420,17 @@ async function captureAndScan() {
         } else if (scanMode === 'pantry' || scanMode === 'receipt') {
             displayConfirmationForm(identifiedItems);
         } else if (scanMode === 'grocery' || scanMode === 'groceryReceipt') {
-            const groceryRef = getGroceryListRef();
-            if (!groceryRef || !identifiedItems || identifiedItems.length === 0) {
-                 targetContainer.innerHTML = '<p>No items found to add.</p>';
-                 setTimeout(() => { displayGroceryList(); }, 3000);
-                 return;
-            }
-            const batch = writeBatch(db);
-            identifiedItems.forEach(item => {
-                const newItemRef = doc(groceryRef);
-                batch.set(newItemRef, { name: item.name.toLowerCase(), category: item.category || 'Other', checked: false, createdAt: serverTimestamp() });
-            });
-            await batch.commit();
-            // displayGroceryList is now handled by onSnapshot
+            displayConfirmationFormGrocery(identifiedItems);
         }
 
     } catch (error) {
         console.error('Error calling scan function:', error);
         if (targetContainer) {
-            targetContainer.innerHTML = `<p>Sorry, the AI scan failed. Please try again.</p>`;
-        }
-    } finally {
-        if (scanMode === 'quickMeal' || scanMode === 'grocery' || scanMode === 'groceryReceipt') {
-            stopCamera();
+            targetContainer.innerHTML = `<p>Sorry, the AI scan failed: ${error.message}. Please try again.</p>`;
         }
     }
 }
+
 
 function displayConfirmationForm(items) {
     const itemConfirmationList = document.getElementById('item-confirmation-list');
@@ -1450,6 +1458,35 @@ function displayConfirmationForm(items) {
         }
     });
 }
+
+// NEW: Confirmation form specifically for the Grocery List
+function displayConfirmationFormGrocery(items) {
+    const itemConfirmationList = document.getElementById('item-confirmation-list-grocery');
+    itemConfirmationList.innerHTML = '';
+    if (!items || items.length === 0) {
+        itemConfirmationList.innerHTML = `<p>The AI couldn't identify any items.</p>`;
+        return;
+    }
+
+    items.forEach((item, index) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'confirmation-item'; // Re-use the same class for styling simplicity
+        const categorySelectId = `grocery-category-select-${index}`;
+        // Simplified for grocery list: just name and category
+        itemDiv.innerHTML = `
+            <input type="text" class="item-name" value="${item.name.toLowerCase()}">
+            <select class="item-category" id="${categorySelectId}"></select>
+            <button class="remove-item-btn">X</button>
+        `;
+        itemConfirmationList.appendChild(itemDiv);
+        const categorySelect = document.getElementById(categorySelectId);
+        populateCategoryDropdown(categorySelect);
+        if (item.category && PANTRY_CATEGORIES.includes(item.category)) {
+            categorySelect.value = item.category;
+        }
+    });
+}
+
 
 async function startCamera() {
     const videoElement = document.getElementById('camera-stream');
@@ -1492,9 +1529,10 @@ function toggleScanView(mode) {
         stopCamera();
         return;
     }
-
+    // Hide all forms before opening the camera
     document.getElementById('pantry-forms-container').style.display = 'none';
     document.getElementById('add-grocery-item-form').style.display = 'none';
+    document.getElementById('grocery-forms-container').style.display = 'none';
 
     openCameraFor(mode);
 }
@@ -1510,13 +1548,15 @@ function openCameraFor(mode) {
 
     capturedImage.style.display = 'none';
     capturedImage.src = '';
+    
+    // Reset all confirmation forms
+    document.getElementById('pantry-forms-container').style.display = 'none';
+    document.getElementById('confirmation-section').style.display = 'none';
+    document.getElementById('item-confirmation-list').innerHTML = '';
+    document.getElementById('grocery-forms-container').style.display = 'none';
+    document.getElementById('confirmation-section-grocery').style.display = 'none';
+    document.getElementById('item-confirmation-list-grocery').innerHTML = '';
 
-    const pantryFormsContainer = document.getElementById('pantry-forms-container');
-    if (pantryFormsContainer) pantryFormsContainer.style.display = 'none';
-    const confirmationSection = document.getElementById('confirmation-section');
-    if (confirmationSection) confirmationSection.style.display = 'none';
-    const itemConfirmationList = document.getElementById('item-confirmation-list');
-    if (itemConfirmationList) itemConfirmationList.innerHTML = '';
 
     startCameraBtn.style.display = 'block';
     captureBtn.style.display = 'none';
@@ -1538,9 +1578,46 @@ async function handleAddGroceryItem(event) {
             createdAt: serverTimestamp()
         });
         itemNameInput.value = '';
-        // displayGroceryList(); // onSnapshot handles this
+        // onSnapshot handles display
     }
 }
+
+// NEW: Function to add confirmed scanned items to the grocery list
+async function addItemsToGroceryList() {
+    const itemConfirmationList = document.getElementById('item-confirmation-list-grocery');
+    const groceryRef = getGroceryListRef();
+    if (!groceryRef) {
+        showToast("Error: Not in a household. Cannot add items.");
+        return;
+    }
+    const confirmedItems = itemConfirmationList.querySelectorAll('.confirmation-item');
+    if (confirmedItems.length === 0) {
+        showToast("No items to add!");
+        return;
+    }
+
+    const batch = writeBatch(db);
+    confirmedItems.forEach(itemEl => {
+        const name = itemEl.querySelector('.item-name').value.trim().toLowerCase();
+        const category = itemEl.querySelector('.item-category').value;
+
+        if (name) {
+            const newItemRef = doc(groceryRef);
+            batch.set(newItemRef, { name, category, checked: false, createdAt: serverTimestamp() });
+        }
+    });
+
+    try {
+        await batch.commit();
+        showToast(`${confirmedItems.length} item(s) added to your grocery list.`);
+        document.getElementById('grocery-forms-container').style.display = 'none';
+        document.getElementById('confirmation-section-grocery').style.display = 'none';
+    } catch (error) {
+        console.error("Error adding items to grocery list:", error);
+        showToast("An error occurred while adding items.");
+    }
+}
+
 
 async function handleGroceryListClick(event) {
     const groceryRef = getGroceryListRef();
@@ -3164,6 +3241,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('manual-add-form')?.addEventListener('submit', handleManualAdd);
     document.getElementById('add-to-pantry-btn')?.addEventListener('click', addItemsToPantry);
     document.getElementById('item-confirmation-list')?.addEventListener('click', handleRemoveConfirmedItem);
+    // NEW: Listener for the grocery confirmation list
+    document.getElementById('add-to-grocery-btn')?.addEventListener('click', addItemsToGroceryList);
+    document.getElementById('item-confirmation-list-grocery')?.addEventListener('click', handleRemoveConfirmedItem);
+    
     document.getElementById('suggest-recipe-btn')?.addEventListener('click', getRecipeSuggestions);
     document.getElementById('discover-recipes-btn')?.addEventListener('click', discoverNewRecipes);
     document.getElementById('start-camera-btn')?.addEventListener('click', startCamera);
@@ -3181,12 +3262,15 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.display = isVisible ? 'none' : 'block';
         manualContainer.style.display = 'block';
         document.getElementById('confirmation-section').style.display = 'none';
+        document.getElementById('grocery-forms-container').style.display = 'none';
     });
 
     document.getElementById('show-add-grocery-form-btn').addEventListener('click', () => {
         if (isCameraOpen) stopCamera();
         const form = document.getElementById('add-grocery-item-form');
         form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+        document.getElementById('pantry-forms-container').style.display = 'none';
+        document.getElementById('grocery-forms-container').style.display = 'none';
     });
 
     document.getElementById('show-scan-item-btn').addEventListener('click', () => toggleScanView('pantry'));
