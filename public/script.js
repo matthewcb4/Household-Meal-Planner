@@ -3090,6 +3090,16 @@ window.grantTrial = grantTrial;
 
 // --- MAIN EVENT LISTENER ---
 document.addEventListener('DOMContentLoaded', () => {
+    // PWA: Register the service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+                console.log('Service Worker registered with scope:', registration.scope);
+            })
+            .catch(error => {
+                console.error('Service Worker registration failed:', error);
+            });
+    }
     populateCuisineDropdowns();
 
     document.querySelectorAll('.nav-link').forEach(link => {

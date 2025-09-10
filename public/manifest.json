@@ -1,0 +1,24 @@
+{
+  "name": "Auto Meal Chef",
+  "short_name": "Meal Chef",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1DB954",
+  "theme_color": "#1DB954",
+  "description": "Effortlessly plan your household meals, generate grocery lists, and discover new recipes with AI.",
+  "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "header.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

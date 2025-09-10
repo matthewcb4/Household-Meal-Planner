@@ -939,7 +939,7 @@ exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request)
         const uid = request.auth.uid;
         const userDoc = await db.collection('users').doc(uid).get();
 
-        if (!userDoc.exists) {
+        if (!userDoc.exists()) {
             throw new HttpsError('not-found', 'Could not find user data.');
         }
         const householdId = userDoc.data().householdId;
@@ -1102,17 +1102,18 @@ exports.grantTrialAccess = onCall({ enforceAppCheck: true }, async (request) => 
         const householdRef = db.collection('households').doc(householdIdToGrant);
         const householdDoc = await householdRef.get();
 
-        if (!householdDoc.exists()) {
+        if (!householdDoc.exists) {
             throw new HttpsError('not-found', `Household with ID ${householdIdToGrant} not found.`);
         }
 
         const now = new Date();
         const trialEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
 
-        await householdRef.update({
+        // FIX: Use set with merge:true instead of update for better reliability.
+        await householdRef.set({
             subscriptionTier: 'paid',
             premiumAccessUntil: admin.firestore.Timestamp.fromDate(trialEndDate)
-        });
+        }, { merge: true });
 
         return { success: true, message: `Trial granted to ${householdIdToGrant} until ${trialEndDate.toLocaleDateString()}.` };
 
@@ -1124,6 +1125,7 @@ exports.grantTrialAccess = onCall({ enforceAppCheck: true }, async (request) => 
         throw new HttpsError('internal', 'An error occurred while granting trial access.');
     }
 });
+
 
 // --- NEW CLOUD FUNCTION (V2): setAdminStatus ---
 // This function allows a designated owner to make other users admins.
@@ -1246,4 +1248,3 @@ exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: t
         throw new HttpsError('internal', `Could not fetch community recipes: ${error.message}`);
     }
 });
-
