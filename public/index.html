@@ -9,13 +9,17 @@
     <title>Auto Meal Chef</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstaticA.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <!-- ADDED: Three.js library for particle background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://js.stripe.com/v3/"></script>
 </head>
 <body>
+    <!-- ADDED: Container for the particle background -->
+    <div id="particle-background"></div>
 
     <div id="app-container">
         <!-- Sidebar Navigation -->
@@ -48,14 +52,22 @@
                 <!-- Login/Household Management View -->
                 <div id="initial-view">
                     <section id="login-section" class="content-section active">
-                        <!-- Login form will be injected here by script.js -->
+                        <!-- MODIFIED: New structure for glassmorphism login card -->
+                        <div id="login-card">
+                            <img src="header.png" alt="Auto Meal Chef Logo" class="login-logo">
+                             <!-- Login form will be injected here by script.js -->
+                             <div id="login-form-container"></div>
+                        </div>
                     </section>
                     <section id="household-manager" class="content-section">
-                        <h2>Welcome! Join or Create a Household</h2>
-                        <p>To share a pantry, create a new household or join one using an invite code.</p>
-                        <div class="household-action"><h3>Create a New Household</h3><button id="create-household-btn">Create</button></div>
-                        <hr>
-                        <div class="household-action"><h3>Join an Existing Household</h3><input type="text" id="household-code-input" placeholder="Enter Invite Code"><button id="join-household-btn">Join</button></div>
+                         <!-- MODIFIED: Wrapped in a card for consistency -->
+                        <div class="form-card">
+                            <h2>Welcome! Join or Create a Household</h2>
+                            <p>To share a pantry, create a new household or join one using an invite code.</p>
+                            <div class="household-action"><h3>Create a New Household</h3><button id="create-household-btn">Create</button></div>
+                            <hr>
+                            <div class="household-action"><h3>Join an Existing Household</h3><input type="text" id="household-code-input" placeholder="Enter Invite Code"><button id="join-household-btn">Join</button></div>
+                        </div>
                     </section>
                 </div>
 

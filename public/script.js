@@ -2041,15 +2041,6 @@ async function generateAutomatedGroceryList() {
     }
 }
 
-function grantTrial(householdIdToGrant) {
-    console.log(`Attempting to grant trial for household: ${householdIdToGrant}`);
-    const grantTrialAccessFunc = httpsCallable(functions, 'grantTrialAccess');
-    grantTrialAccessFunc({ householdIdToGrant })
-        .then(result => console.log("Trial grant successful:", result.data.message))
-        .catch(error => console.error("Error granting trial access:", error));
-}
-window.grantTrial = grantTrial;
-
 function configurePaywallUI() {
     if (!householdData) return;
     const premiumFeatures = document.querySelectorAll('.premium-feature');
@@ -3076,6 +3067,25 @@ async function handleImportRecipe(event) {
         showToast(`Could not import recipe: ${error.message}`);
     }
 }
+
+// --- Admin Functions (for console use) ---
+function setAdmin(uid, isAdmin = true) {
+    console.log(`Attempting to set admin status for UID: ${uid} to ${isAdmin}`);
+    const setAdminStatusFunc = httpsCallable(functions, 'setAdminStatus');
+    setAdminStatusFunc({ targetUid: uid, isAdmin: isAdmin })
+        .then(result => console.log("Set Admin Status successful:", result.data.message))
+        .catch(error => console.error("Error setting admin status:", error));
+}
+window.setAdmin = setAdmin;
+
+function grantTrial(householdIdToGrant) {
+    console.log(`Attempting to grant trial for household: ${householdIdToGrant}`);
+    const grantTrialAccessFunc = httpsCallable(functions, 'grantTrialAccess');
+    grantTrialAccessFunc({ householdIdToGrant })
+        .then(result => console.log("Trial grant successful:", result.data.message))
+        .catch(error => console.error("Error granting trial access:", error));
+}
+window.grantTrial = grantTrial;
 
 
 // --- MAIN EVENT LISTENER ---

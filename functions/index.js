@@ -202,7 +202,7 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         if (error instanceof HttpsError) {
             throw error;
         }
-        throw new HttpsError('internal', "AI processing failed due to an internal error.");
+        throw new HttpsError('internal', `AI processing failed due to an internal error: ${error.message}`);
     }
 });
 
@@ -279,7 +279,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
 
     } catch (error) {
         console.error("Internal Recipe Function Error:", error);
-        throw new HttpsError('internal', "AI recipe generation failed.");
+        throw new HttpsError('internal', `AI recipe generation failed: ${error.message}`);
     }
 });
 
@@ -355,7 +355,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
 
     } catch (error) {
         console.error("Internal Discover Function Error:", error);
-        throw new HttpsError('internal', "AI recipe discovery failed.");
+        throw new HttpsError('internal', `AI recipe discovery failed: ${error.message}`);
     }
 });
 
@@ -425,7 +425,7 @@ exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforc
 
     } catch (error) {
         console.error("Internal Ask the Chef Function Error:", error);
-        throw new HttpsError('internal', "AI recipe generation failed for the specified query.");
+        throw new HttpsError('internal', `AI recipe generation failed for the specified query: ${error.message}`);
     }
 });
 
@@ -463,7 +463,7 @@ exports.importRecipeFromUrl = onCall({ timeoutSeconds: 540, region: "us-central1
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
         
-        const prompt = `From the following HTML content, extract the recipe. Provide a title, a brief description, a serving size (e.g., "4 servings"), all ingredients, step-by-step cooking instructions, a simple image search keyword, and estimated nutritional information (calories, protein, carbs, fat). For each ingredient, extract its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and categorize it from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Your entire response MUST be ONLY the resulting valid JSON object, starting with { and ending with }, without any surrounding text, comments, or markdown code fences like \`\`\`json. The JSON object must contain these exact keys: "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition". The "ingredients" value must be an array of objects. The "instructions" value must be an array of strings. HTML content: ${htmlContent}`;
+        const prompt = `From the following HTML content, extract the recipe. Provide a title, a brief description, a serving size (e.g., "4 servings"), all ingredients, step-by-step cooking instructions, a simple image search keyword, and estimated nutritional information (calories, protein, carbs, fat). For each ingredient, extract its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and categorize it from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Your entire response MUST be ONLY the resulting valid JSON object, starting with { and ending with }, without any surrounding text, comments, or markdown code fences like \`\`\`json. The JSON object must contain these exact keys: "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition". The "ingredients" value must be an array of objects. HTML content: ${htmlContent}`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -537,7 +537,7 @@ exports.importRecipeFromUrl = onCall({ timeoutSeconds: 540, region: "us-central1
         if (error instanceof HttpsError) {
             throw error;
         }
-        throw new HttpsError('internal', "AI recipe import failed.");
+        throw new HttpsError('internal', `AI recipe import failed: ${error.message}`);
     }
 });
 
@@ -625,7 +625,7 @@ exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) 
 
     } catch (error) {
         console.error("Error generating grocery list:", error);
-        throw new HttpsError('internal', 'Failed to generate grocery list.');
+        throw new HttpsError('internal', `Failed to generate grocery list: ${error.message}`);
     }
 });
 
@@ -747,7 +747,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         if (error instanceof HttpsError) {
             throw error;
         }
-        throw new HttpsError('internal', `An unexpected error occurred while planning ${day}.`);
+        throw new HttpsError('internal', `An unexpected error occurred while planning ${day}: ${error.message}`);
     }
 });
 
@@ -830,7 +830,7 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1", enfor
 
     } catch (error) {
         console.error("Error in scanReceipt function:", error);
-        throw new HttpsError('internal', 'Failed to process receipt.');
+        throw new HttpsError('internal', `Failed to process receipt: ${error.message}`);
     }
 });
 
@@ -1087,6 +1087,12 @@ exports.grantTrialAccess = onCall({ enforceAppCheck: true }, async (request) => 
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
 
+    // Admin check: Only allow users with 'isAdmin' flag to run this.
+    const adminUserDoc = await db.collection('users').doc(request.auth.uid).get();
+    if (!adminUserDoc.exists || !adminUserDoc.data().isAdmin) {
+        throw new HttpsError('permission-denied', 'You must be an admin to perform this action.');
+    }
+
     const { householdIdToGrant } = request.data;
     if (!householdIdToGrant) {
         throw new HttpsError('invalid-argument', 'The function must be called with a "householdIdToGrant".');
@@ -1108,13 +1114,39 @@ exports.grantTrialAccess = onCall({ enforceAppCheck: true }, async (request) => 
             premiumAccessUntil: admin.firestore.Timestamp.fromDate(trialEndDate)
         });
 
-        return { success: true, message: `Trial granted until ${trialEndDate.toLocaleDateString()}.` };
+        return { success: true, message: `Trial granted to ${householdIdToGrant} until ${trialEndDate.toLocaleDateString()}.` };
 
     } catch (error) {
+        console.error("Error in grantTrialAccess function:", error);
         if (error instanceof HttpsError) {
             throw error;
         }
         throw new HttpsError('internal', 'An error occurred while granting trial access.');
+    }
+});
+
+// --- NEW CLOUD FUNCTION (V2): setAdminStatus ---
+// This function allows a designated owner to make other users admins.
+const OWNER_UID = "tjGRwEiWQzf9EKM09lgRxVNQSfj2";
+
+exports.setAdminStatus = onCall({ enforceAppCheck: true }, async (request) => {
+    // Only the designated owner can call this function.
+    if (request.auth.uid !== OWNER_UID) {
+        throw new HttpsError('permission-denied', 'Only the app owner can set admin status.');
+    }
+
+    const { targetUid, isAdmin } = request.data;
+    if (!targetUid || typeof isAdmin !== 'boolean') {
+        throw new HttpsError('invalid-argument', 'Please provide a "targetUid" and an "isAdmin" boolean value.');
+    }
+
+    try {
+        const userRef = db.collection('users').doc(targetUid);
+        await userRef.set({ isAdmin: isAdmin }, { merge: true });
+        return { success: true, message: `User ${targetUid} admin status set to ${isAdmin}.` };
+    } catch (error) {
+        console.error("Error setting admin status:", error);
+        throw new HttpsError('internal', 'An error occurred while setting admin status.');
     }
 });
 
@@ -1211,6 +1243,7 @@ exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: t
 
     } catch (error) {
         console.error("Error in getCommunityRecipes:", error);
-        throw new HttpsError('internal', 'Could not fetch community recipes.');
+        throw new HttpsError('internal', `Could not fetch community recipes: ${error.message}`);
     }
 });
+
