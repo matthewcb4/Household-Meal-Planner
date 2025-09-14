@@ -231,57 +231,6 @@ a:hover { color: var(--primary-accent-color); }
 #household-status-info {
     font-size: 0.8rem;
     margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-/* --- NEW: Tooltip Styles --- */
-.tooltip-container {
-    position: relative;
-    display: inline-block;
-}
-
-.tooltip-icon {
-    cursor: help;
-    color: var(--text-secondary-color);
-}
-
-.tooltip-container .tooltip-text {
-    visibility: hidden;
-    width: 220px;
-    background-color: var(--surface-highlight-color);
-    color: var(--text-color);
-    text-align: center;
-    border-radius: var(--border-radius);
-    padding: 8px;
-    position: absolute;
-    z-index: 1;
-    bottom: 150%; /* Position above the icon */
-    left: 50%;
-    margin-left: -110px; /* Use half of the width to center */
-    opacity: 0;
-    transition: opacity 0.3s;
-    font-size: 0.8rem; /* Match parent font size */
-    font-weight: normal; /* Override bold styles if inherited */
-    line-height: 1.4; /* Better readability */
-    pointer-events: none; /* Prevents tooltip from interfering with other hovers */
-}
-
-/* Tooltip arrow */
-.tooltip-container .tooltip-text::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    margin-left: -5px;
-    border-width: 5px;
-    border-style: solid;
-    border-color: var(--surface-highlight-color) transparent transparent transparent;
-}
-
-.tooltip-container:hover .tooltip-text {
-    visibility: visible;
-    opacity: 1;
 }
 .household-code-container {
     display: flex;
@@ -1198,5 +1147,53 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
 .modal-recipe-item .remove-from-plan-btn:hover {
     background-color: rgba(0, 0, 0, 0.8);
     transform: scale(1.1);
+}
+
+/* NEW: Tooltip Styles */
+.tooltip-container {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.tooltip-icon {
+    color: var(--text-secondary-color);
+    font-size: 0.9em;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    width: 220px;
+    background-color: var(--surface-highlight-color);
+    color: var(--text-color);
+    text-align: center;
+    border-radius: var(--border-radius);
+    padding: 8px;
+    position: absolute;
+    z-index: 1;
+    top: 150%; /* Position below the icon */
+    left: 50%;
+    margin-left: -110px; /* Use half of the width to center */
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.8rem; /* Make text a bit smaller */
+    font-weight: 400;
+}
+
+/* Tooltip arrow */
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    bottom: 100%; /* At the top of the tooltip */
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: transparent transparent var(--surface-highlight-color) transparent;
+}
+
+.tooltip-container:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
 }
 
