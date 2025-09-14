@@ -167,12 +167,12 @@ let loadingInterval = null;
 let isCameraOpen = false;
 let currentTourStep = 0;
 let tourSteps = [];
-// NEW: Sets to track open category states
-let openPantryCategories = new Set();
-let openGroceryCategories = new Set();
-
-
 const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"];
+// NEW: Sets to track open category states, initialized to be open by default
+let openPantryCategories = new Set(PANTRY_CATEGORIES);
+let openGroceryCategories = new Set(PANTRY_CATEGORIES);
+
+
 const CUISINE_OPTIONS = ["American", "Asian", "French", "Greek", "Indian", "Italian", "Mediterranean", "Mexican", "Spanish", "Thai"];
 
 // --- Function to create and manage the auth UI in the top bar ---
@@ -186,7 +186,6 @@ function renderAuthUI(user) {
             <div class="auth-left">
                 <h3 id="welcome-message">Hello, ${user.displayName || user.email}!</h3>
                 <p id="household-status-info" style="display: none;"></p>
-                <button id="upgrade-btn-header" class="upgrade-button" style="display: none;">Upgrade</button>
             </div>
             <div class="auth-right">
                 <div id="household-info" class="household-code-container" style="display: none;"></div>
@@ -2044,7 +2043,6 @@ async function generateAutomatedGroceryList() {
 function configurePaywallUI() {
     if (!householdData) return;
     const premiumFeatures = document.querySelectorAll('.premium-feature');
-    const upgradeBtnHeader = document.getElementById('upgrade-btn-header');
     const householdStatusInfo = document.getElementById('household-status-info');
     const updateCuisineBtn = document.getElementById('update-cuisine-btn');
     const cuisineSelect = document.getElementById('cuisine-select');
@@ -2054,8 +2052,9 @@ function configurePaywallUI() {
     if (householdData.subscriptionTier === 'free') {
         const scansUsed = householdData.usage?.scan?.count || 0;
         const scansLeft = 20 - scansUsed;
-        statusText += ` (${scansLeft} / 20 Scans Left)`;
-        if (upgradeBtnHeader) upgradeBtnHeader.style.display = 'block';
+        const tooltipHTML = `<span class="tooltip-container"><i class="fas fa-question-circle tooltip-icon"></i><span class="tooltip-text">Scans are used for AI features like identifying items from photos and receipts.</span></span>`;
+        statusText += ` (Scans Left: ${scansLeft} / 20 ${tooltipHTML})`;
+        
         premiumFeatures.forEach(el => {
             el.classList.add('disabled');
         });
@@ -2075,7 +2074,6 @@ function configurePaywallUI() {
         if(cuisineSelect) cuisineSelect.value = householdData.cuisine || "";
 
     } else {
-        if (upgradeBtnHeader) upgradeBtnHeader.style.display = 'none';
         premiumFeatures.forEach(el => {
             el.classList.remove('disabled');
             el.querySelectorAll('input, button, select').forEach(input => input.disabled = false);
@@ -2090,7 +2088,7 @@ function configurePaywallUI() {
             cuisineSelect.value = householdData.cuisine || "";
         }
     }
-    if(householdStatusInfo) householdStatusInfo.textContent = statusText;
+    if(householdStatusInfo) householdStatusInfo.innerHTML = statusText;
 }
 
 // NEW FUNCTION TO HANDLE PREFERENCE TOGGLES
@@ -2893,6 +2891,29 @@ async function handleEmailSignUp(e) {
     const displayName = document.getElementById('signup-display-name-input').value;
     const authError = document.getElementById('auth-error');
     authError.style.display = 'none';
+
+    // Password validation
+    if (password.length < 8) {
+        authError.textContent = 'Password must be at least 8 characters long.';
+        authError.style.display = 'block';
+        return;
+    }
+    if (!/[A-Z]/.test(password)) {
+        authError.textContent = 'Password must contain at least one uppercase letter.';
+        authError.style.display = 'block';
+        return;
+    }
+    if (!/[a-z]/.test(password)) {
+        authError.textContent = 'Password must contain at least one lowercase letter.';
+        authError.style.display = 'block';
+        return;
+    }
+    if (!/[0-9]/.test(password)) {
+        authError.textContent = 'Password must contain at least one number.';
+        authError.style.display = 'block';
+        return;
+    }
+
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(userCredential.user, { displayName: displayName });
@@ -2985,7 +3006,7 @@ async function initializeAppUI(user) {
                 if(householdInfoEl) {
                     householdInfoEl.innerHTML = `
                         <div class="invite-code-wrapper">
-                            <span>Invite Code:</span>
+                            <span>Invite Family:</span>
                             <strong id="household-code-text">${householdId}</strong>
                         </div>
                         <button id="copy-household-code-btn" title="Copy Code"><i class="far fa-copy"></i></button>
@@ -3498,6 +3519,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    document.getElementById('copy-calendar-url-btn')?.addEventListener('click', () => {
+        const urlInput = document.getElementById('calendar-url-input');
+        if (urlInput.value) {
+            navigator.clipboard.writeText(urlInput.value)
+                .then(() => showToast('Calendar URL copied to clipboard!'))
+                .catch(err => {
+                    console.error('Failed to copy text: ', err);
+                    showToast('Failed to copy URL.');
+                });
+        }
+    });
+
     document.getElementById('more-nav-link')?.addEventListener('click', (e) => {
         e.preventDefault();
         document.getElementById('more-modal').style.display = 'block';
@@ -3510,3 +3543,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // NEW: Upgrade Modal Listener
     document.getElementById('modal-upgrade-btn')?.addEventListener('click', handleUpgradeClick);
 });
+

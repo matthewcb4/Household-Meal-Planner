@@ -488,7 +488,6 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     min-width: 0; /* Crucial for allowing long text to wrap correctly in a flex item */
 }
 .pantry-item.checked .item-info {
-    text-decoration: line-through;
     color: var(--text-secondary-color);
 }
 .pantry-item .item-info input[type="checkbox"] {
@@ -502,7 +501,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     word-break: break-word;
 }
 .grocery-item .item-info { display: flex; align-items: center; gap: 0.5rem; }
-.grocery-item.checked .item-info { text-decoration: line-through; color: var(--text-secondary-color); }
+.grocery-item.checked .item-info { color: var(--text-secondary-color); }
 .grocery-item .item-info input[type="checkbox"] {
     /* Override global input styles for the checkbox */
     width: auto; /* Prevent it from taking 100% width */
