@@ -12,11 +12,13 @@ const ics = require('ics');
 admin.initializeApp();
 const db = admin.firestore();
 
-// --- Define non-Stripe secrets and environment variables at the top ---
+// --- Define secrets and environment variables at the top ---
 const pexelsKey = defineString("PEXELS_KEY");
 const documentAiProcessorId = defineString("DOCUMENT_AI_PROCESSOR_ID");
 const documentAiLocation = defineString("DOCUMENT_AI_LOCATION");
 const stripePriceId = defineString("STRIPE_PRICE_ID");
+const stripeSecretKey = defineString("STRIPE_SECRET_KEY");
+const stripeWebhookSecret = defineString("STRIPE_WEBHOOK_SECRET");
 
 
 // --- HELPER: Check for Premium Status (Handles Trials & Subscriptions) ---
@@ -67,7 +69,7 @@ const getPexelsImage = async (query) => {
 };
 
 // --- CONSTANT: Define the AI model name ---
-const GEMINI_MODEL_NAME = "gemini-2.5-flash-lite";
+const GEMINI_MODEL_NAME = "gemini-1.5-flash";
 
 // Helper function to add a timeout to fetch calls
 const fetchWithTimeout = async (url, options, timeout = 530000) => {
@@ -162,7 +164,6 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
     
     try {
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
-        const authToken = await auth.getAccessToken();
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
@@ -175,7 +176,7 @@ exports.identifyItems = onCall({ timeoutSeconds: 540, region: "us-central1", enf
 
         const aiResponse = await fetchWithTimeout(apiUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(aiRequest),
         });
 
@@ -225,7 +226,6 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
 
     try {
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
-        const authToken = await auth.getAccessToken();
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
         
@@ -252,7 +252,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         };
         const aiResponse = await fetchWithTimeout(apiUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(aiRequest),
         });
 
@@ -302,7 +302,6 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
 
     try {
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
-        const authToken = await auth.getAccessToken();
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
@@ -328,7 +327,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         };
         const aiResponse = await fetchWithTimeout(apiUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(aiRequest),
         });
 
@@ -382,7 +381,6 @@ exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforc
 
     try {
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
-        const authToken = await auth.getAccessToken();
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
@@ -399,7 +397,7 @@ exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforc
 
         const aiResponse = await fetchWithTimeout(apiUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(aiRequest),
         });
 
@@ -459,7 +457,6 @@ exports.importRecipeFromUrl = onCall({ timeoutSeconds: 540, region: "us-central1
         const htmlContent = await pageResponse.text();
 
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
-        const authToken = await auth.getAccessToken();
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
         
@@ -472,7 +469,7 @@ exports.importRecipeFromUrl = onCall({ timeoutSeconds: 540, region: "us-central1
 
         const aiResponse = await fetchWithTimeout(apiUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(aiRequest),
         });
         
@@ -660,7 +657,6 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         const householdData = householdDoc.data();
 
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
-        const authToken = await auth.getAccessToken();
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
@@ -715,7 +711,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
 
         const aiResponse = await fetchWithTimeout(apiUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(aiRequest),
         });
 
@@ -799,7 +795,6 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1", enfor
         }
 
         const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
-        const authToken = await auth.getAccessToken();
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
         const prompt = `Given this list of grocery items from a receipt, categorize each item into one of the following: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Also, clean up the item names to be generic (e.g., "ORG BANANAS" becomes "bananas"). Respond with a single, valid JSON array of objects, where each object has a "name" and a "category" key. Item list: ${itemNames.join(', ')}`;
@@ -811,7 +806,7 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1", enfor
 
         const aiResponse = await fetch(apiUrl, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(aiRequest),
         });
 
@@ -933,13 +928,17 @@ exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request)
         throw new HttpsError('unauthenticated', 'You must be logged in to make a purchase.');
     }
 
-    const stripe = stripePackage(process.env.STRIPE_SECRET_KEY);
+    const key = stripeSecretKey.value();
+    if (!key) {
+        throw new HttpsError('failed-precondition', 'The STRIPE_SECRET_KEY is not set in the Firebase environment. Please configure this secret to enable payments.');
+    }
+    const stripe = stripePackage(key);
 
     try {
         const uid = request.auth.uid;
         const userDoc = await db.collection('users').doc(uid).get();
 
-        if (!userDoc.exists()) {
+        if (!userDoc.exists) {
             throw new HttpsError('not-found', 'Could not find user data.');
         }
         const householdId = userDoc.data().householdId;
@@ -960,15 +959,13 @@ exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request)
                 quantity: 1,
             }],
             mode: 'subscription', 
-            success_url: `https://automchef.com?payment_success=true`,
-            cancel_url: `https://automchef.com?payment_cancel=true`,
-            // UPDATED: Pass metadata to the subscription for future reference in webhooks
+            success_url: `https://automchef.com/app?payment_success=true`,
+            cancel_url: `https://automchef.com/app?payment_cancel=true`,
             subscription_data: {
                 metadata: {
                     householdId: householdId
                 }
             },
-            // Keep metadata on the session for the initial checkout.session.completed event
             metadata: {
                 householdId: householdId
             }
@@ -984,13 +981,23 @@ exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request)
 
 
 exports.stripeWebhook = onRequest(async (req, res) => {
-    const stripe = stripePackage(process.env.STRIPE_SECRET_KEY);
-    const signature = req.headers['stripe-signature'];
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    let event;
+    const key = stripeSecretKey.value();
+    if (!key) {
+        console.error("Stripe secret key is not configured.");
+        return res.status(500).send("Stripe secret key is not configured.");
+    }
+    const stripe = stripePackage(key);
+    
+    const secret = stripeWebhookSecret.value();
+    if(!secret) {
+        console.error("Stripe webhook secret is not configured.");
+        return res.status(500).send("Stripe webhook secret is not configured.");
+    }
+    const endpointSecret = secret;
 
+    let event;
     try {
-        event = stripe.webhooks.constructEvent(req.rawBody, signature, endpointSecret);
+        event = stripe.webhooks.constructEvent(req.rawBody, req.headers['stripe-signature'], endpointSecret);
     } catch (err) {
         console.log(`⚠️  Webhook signature verification failed.`, err.message);
         return res.sendStatus(400);
@@ -1012,7 +1019,6 @@ exports.stripeWebhook = onRequest(async (req, res) => {
         }
     };
     
-    // NEW: Helper function to revoke premium access
     const revokeAccess = async (householdId) => {
         if (!householdId) {
             console.error('Revoke access called without a householdId.');
@@ -1049,7 +1055,6 @@ exports.stripeWebhook = onRequest(async (req, res) => {
             }
             break;
         }
-        // NEW: Handle failed payments to revoke access
         case 'invoice.payment_failed': {
             const invoice = event.data.object;
             if (invoice.subscription) {
@@ -1062,7 +1067,6 @@ exports.stripeWebhook = onRequest(async (req, res) => {
             }
             break;
         }
-        // NEW: Handle subscription cancellations to revoke access
         case 'customer.subscription.deleted': {
             const subscription = event.data.object;
             const householdId = subscription.metadata.householdId;

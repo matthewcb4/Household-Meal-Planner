@@ -1991,7 +1991,10 @@ function handleToggleAll(listElement, buttonElement) {
     const allLists = listElement.querySelectorAll('ul');
     if (allLists.length === 0) return;
 
-    const shouldExpand = allLists[0].style.display === 'none';
+    // Check if ANY list is collapsed to decide the action.
+    // If even one is collapsed, we should expand all. Otherwise, collapse all.
+    const shouldExpand = Array.from(allLists).some(list => list.style.display === 'none');
+    
     const categorySet = listElement.id === 'pantry-list' ? openPantryCategories : openGroceryCategories;
 
     listElement.querySelectorAll('.category-header').forEach(header => {
@@ -3543,4 +3546,3 @@ document.addEventListener('DOMContentLoaded', () => {
     // NEW: Upgrade Modal Listener
     document.getElementById('modal-upgrade-btn')?.addEventListener('click', handleUpgradeClick);
 });
-
