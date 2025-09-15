@@ -12,6 +12,14 @@
         "destination": "/app.html"
       },
       {
+        "source": "/blog",
+        "destination": "/blog.html"
+      },
+      {
+        "source": "/recipe",
+        "destination": "/recipe.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
@@ -31,4 +39,3 @@
     }
   ]
 }
-

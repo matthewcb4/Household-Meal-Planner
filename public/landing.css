@@ -227,6 +227,13 @@ section {
     opacity: 0.2;
     mix-blend-mode: screen;
 }
+/* NEW: Hero Buttons Container */
+.hero-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
 
 /* --- Features Section --- */
 .features-section {
@@ -261,10 +268,7 @@ section {
     max-width: 1200px;
     margin: 0 auto;
 }
-.how-it-works-image img {
-    border-radius: var(--border-radius);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-}
+
 .how-it-works-steps {
     display: flex;
     flex-direction: column;
@@ -293,6 +297,25 @@ section {
     font-size: 1.25rem;
     margin-bottom: 0.25rem;
 }
+
+/* MODIFIED: Video Player Styles for Portrait Mode */
+.video-container {
+    position: relative;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    max-width: 400px; /* Constrain width for portrait */
+    margin: 0 auto; /* Center the container */
+}
+
+.how-it-works-video {
+    width: 100%;
+    height: auto; /* Allow height to adjust to aspect ratio */
+    display: block;
+}
+
+/* REMOVED: Custom play button styles are no longer needed */
+
 
 /* --- Testimonials Section --- */
 .testimonials-section {
@@ -469,10 +492,8 @@ section {
     .hero-content .hero-subheadline {
         font-size: 1.125rem;
     }
-    .how-it-works-image {
+    .video-container {
         order: 1;
-        max-width: 500px;
-        margin: 0 auto;
     }
     .how-it-works-steps {
         order: 2;
@@ -521,6 +542,10 @@ section {
     }
     .main-nav {
         flex-wrap: wrap;
+    }
+    
+    .hero-buttons {
+        justify-content: center;
     }
 
     .footer-content {

@@ -1,5 +1,25 @@
 // public/landing.js
 
+// --- Import Firebase modules ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// --- Firebase configuration (copied from your app's script) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDcsZlszhp5v93YheCfjkOYdzwf7ZQ_nm8",
+  authDomain: "family-dinner-app-79249.firebaseapp.com",
+  projectId: "family-dinner-app-79249",
+  storageBucket: "family-dinner-app-79249.firebasestorage.app",
+  messagingSenderId: "665272276696",
+  appId: "1:665272276696:web:f5aa5a5888f8abf97e69ad",
+  measurementId: "G-LQ124BNWKH"
+};
+
+// --- Initialize Firebase for the landing page ---
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- Mobile Menu Toggle ---
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
@@ -26,6 +46,65 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    // --- Demo Video Logic ---
+    // This logic waits for a "Watch Demo" button click.
+    // It will not do anything until the corresponding HTML is added to index.html.
+    const watchDemoBtn = document.getElementById('watch-demo-btn');
+    const demoVideo = document.getElementById('demo-video');
+
+    if (watchDemoBtn && demoVideo) {
+        // The smooth scroll is already handled by the generic 'a[href^="#"]' selector.
+        // This adds auto-play functionality when the demo button is clicked.
+        watchDemoBtn.addEventListener('click', () => {
+             // A short delay allows the smooth scroll animation to start.
+             setTimeout(() => {
+                demoVideo.play().catch(error => {
+                    // Autoplay was prevented. This is common in modern browsers.
+                    // The video will still be visible with controls.
+                    console.log('Autoplay was prevented:', error);
+                });
+            }, 500); // 500ms delay for scroll to start
+        });
+    }
+
+    // --- Recipe of the Day Logic ---
+    const dailyRecipeContainer = document.getElementById('daily-recipe-container');
+    if (dailyRecipeContainer) {
+        async function fetchRecipeOfTheDay() {
+            try {
+                const recipesRef = collection(db, 'publicRecipes');
+                const q = query(recipesRef, orderBy('createdAt', 'desc'), limit(1));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    dailyRecipeContainer.innerHTML = '<p>No recipe of the day found. Our AI is cooking one up, check back tomorrow!</p>';
+                    return;
+                }
+
+                const recipeDoc = querySnapshot.docs[0];
+                const recipe = { id: recipeDoc.id, ...recipeDoc.data() };
+                const recipeUrl = `/recipe.html?slug=${encodeURIComponent(recipe.slug)}`;
+
+                dailyRecipeContainer.innerHTML = `
+                    <div class="how-it-works-image">
+                         <a href="${recipeUrl}"><img src="${recipe.imageUrl}" alt="${recipe.title}" onerror="this.onerror=null;this.src='https://placehold.co/1260x750/282828/FFF?text=Image+Not+Found';"></a>
+                    </div>
+                    <div class="step-text" style="text-align: left;">
+                        <h4 style="font-size: 1.5rem; margin-bottom: 1rem;">${recipe.title}</h4>
+                        <p>${recipe.description}</p>
+                        <a href="${recipeUrl}" class="primary-btn">View Full Recipe <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error("Error fetching recipe of the day:", error);
+                dailyRecipeContainer.innerHTML = '<p>Could not load today\'s recipe. Please try again later.</p>';
+            }
+        }
+
+        fetchRecipeOfTheDay();
+    }
 
     // --- Particle Background Animation using Three.js ---
     const particleContainer = document.getElementById('particle-background');
@@ -107,3 +186,4 @@ document.addEventListener('DOMContentLoaded', () => {
         animateParticles();
     }
 });
+

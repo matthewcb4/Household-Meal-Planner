@@ -4,29 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Privacy Policy - Auto Meal Chef</title>
-    <link rel="icon" type="image/jpeg" href="favicon.png">
+    <link rel="icon" type="image/png" href="favicon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="landing.css">
     <style>
         /* Add specific styles for legal pages for better readability */
         body {
             overflow: auto;
-            background-color: #f9fafb;
+            background-color: var(--bg-color);
+            color: var(--text-color);
         }
         .legal-container {
             max-width: 800px;
-            margin: 2rem auto;
+            margin: 10rem auto 4rem;
             padding: 2rem;
-            background-color: #fff;
+            background-color: var(--surface-color);
             border-radius: 12px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.07);
-            border: 1px solid #eaeaea;
+            border: 1px solid var(--border-color);
         }
         .legal-container h1, .legal-container h2, .legal-container h3 {
             text-align: left;
-            color: black;
+            color: var(--text-color);
             margin-top: 1.5em;
             margin-bottom: 0.5em;
         }
@@ -38,7 +39,7 @@
         }
         .legal-container p, .legal-container li {
             line-height: 1.8;
-            color: #555;
+            color: var(--text-secondary-color);
             background-color: transparent;
             border: none;
             padding: 0;
@@ -55,6 +56,23 @@
     </style>
 </head>
 <body>
+    <header class="main-header">
+        <nav class="main-nav">
+            <div class="nav-logo">
+                <a href="/"><img src="header.png" alt="Auto Meal Chef Logo"></a>
+            </div>
+            <ul class="nav-links">
+                <li><a href="/#features">Features</a></li>
+                <li><a href="/#pricing">Pricing</a></li>
+                <li><a href="/blog.html">Blog</a></li>
+            </ul>
+            <div class="nav-auth">
+                <a href="/app.html" class="secondary-btn">Log In</a>
+                <a href="/app.html" class="primary-btn">Sign Up Free</a>
+            </div>
+            <button id="mobile-menu-btn" class="mobile-menu-btn"><i class="fas fa-bars"></i></button>
+        </nav>
+    </header>
     <div class="legal-container">
         <!-- Paste your Privacy Policy content here -->
         <h1>Privacy Policy</h1>
@@ -126,5 +144,6 @@
         
         <a href="/" class="home-link">&larr; Back to App</a>
     </div>
+    <script src="landing.js"></script>
 </body>
 </html>

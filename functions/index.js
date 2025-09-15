@@ -69,7 +69,7 @@ const getPexelsImage = async (query) => {
 };
 
 // --- CONSTANT: Define the AI model name ---
-const GEMINI_MODEL_NAME = "gemini-1.5-flash";
+const GEMINI_MODEL_NAME = "gemini-2.5-flash-lite";
 
 // Helper function to add a timeout to fetch calls
 const fetchWithTimeout = async (url, options, timeout = 530000) => {
@@ -1252,3 +1252,145 @@ exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: t
         throw new HttpsError('internal', `Could not fetch community recipes: ${error.message}`);
     }
 });
+
+
+// --- NEW BLOG/SEO FUNCTIONS ---
+
+// This is the scheduled function that will run automatically every day at 5 AM (server time).
+exports.generateDailyRecipe = onSchedule('every day 05:00', async (event) => {
+    console.log("Running daily recipe generation job.");
+    const prompt = `You are a creative chef. Generate a single, complete, and unique recipe that would be appealing for a daily food blog. 
+        The recipe should have a creative and SEO-friendly title.
+        Provide a brief, engaging description (2-3 sentences).
+        Include a serving size, a detailed list of ingredients (with name, quantity, unit, and category), step-by-step instructions, and estimated nutritional information (calories, protein, carbs, fat).
+        Finally, provide a simple, descriptive keyword phrase for an image search (e.g., "rustic chicken noodle soup").
+        Format your entire response as a single, valid JSON object with keys: "title", "slug", "description", "servingSize", "ingredients", "instructions", "nutrition", and "imageQuery". 
+        The "slug" should be a URL-friendly version of the title (e.g., "rustic-chicken-noodle-soup").`;
+
+    try {
+        const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
+        const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
+        const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
+        
+        const aiRequest = {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { "responseMimeType": "application/json" }
+        };
+
+        const aiResponse = await fetchWithTimeout(apiUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(aiRequest),
+        });
+
+        if (!aiResponse.ok) {
+            const errorText = await aiResponse.text();
+            throw new Error(`AI API request failed: ${errorText}`);
+        }
+        
+        const responseData = await aiResponse.json();
+        const jsonTextResponse = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!jsonTextResponse) {
+             throw new Error('Failed to get a valid response from the AI service.');
+        }
+
+        const recipe = JSON.parse(jsonTextResponse);
+        recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+
+        const publicRecipesRef = db.collection('publicRecipes');
+        await publicRecipesRef.add({
+            ...recipe,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log(`Successfully generated and saved recipe: "${recipe.title}"`);
+        return null;
+
+    } catch (error) {
+        console.error("Error in generateDailyRecipe scheduled function:", error);
+        return null;
+    }
+});
+
+// This function allows the public-facing blog pages to securely fetch recipe data.
+exports.getPublicRecipes = onCall({ region: "us-central1", enforceAppCheck: false }, async (request) => {
+    try {
+        const recipesRef = db.collection('publicRecipes');
+        const q = query(recipesRef, orderBy('createdAt', 'desc'), limit(20));
+        const snapshot = await getDocs(q);
+        const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return { recipes };
+    } catch (error) {
+        console.error("Error fetching public recipes:", error);
+        throw new HttpsError('internal', 'Could not fetch recipes.');
+    }
+});
+
+// This function allows an admin to manually trigger recipe generation.
+exports.generateRecipeForBlog = onCall({ enforceAppCheck: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+    const adminUserDoc = await db.collection('users').doc(request.auth.uid).get();
+    if (!adminUserDoc.exists || !adminUserDoc.data().isAdmin) {
+        throw new HttpsError('permission-denied', 'You must be an admin to perform this action.');
+    }
+
+    // Re-using the same logic from the scheduled function.
+    const prompt = `You are a creative chef. Generate a single, complete, and unique recipe that would be appealing for a daily food blog. 
+        The recipe should have a creative and SEO-friendly title.
+        Provide a brief, engaging description (2-3 sentences).
+        Include a serving size, a detailed list of ingredients (with name, quantity, unit, and category), step-by-step instructions, and estimated nutritional information (calories, protein, carbs, fat).
+        Finally, provide a simple, descriptive keyword phrase for an image search (e.g., "rustic chicken noodle soup").
+        Format your entire response as a single, valid JSON object with keys: "title", "slug", "description", "servingSize", "ingredients", "instructions", "nutrition", and "imageQuery". 
+        The "slug" should be a URL-friendly version of the title (e.g., "rustic-chicken-noodle-soup").`;
+
+    try {
+        const auth = new GoogleAuth({ scopes: "https://www.googleapis.com/auth/cloud-platform" });
+        const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
+        const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
+        
+        const aiRequest = {
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: { "responseMimeType": "application/json" }
+        };
+
+        const aiResponse = await fetchWithTimeout(apiUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${await auth.getAccessToken()}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(aiRequest),
+        });
+
+        if (!aiResponse.ok) {
+            const errorText = await aiResponse.text();
+            throw new HttpsError('internal', `AI API request failed: ${errorText}`);
+        }
+        
+        const responseData = await aiResponse.json();
+        const jsonTextResponse = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!jsonTextResponse) {
+             throw new HttpsError('internal', 'Failed to get a valid response from the AI service.');
+        }
+
+        const recipe = JSON.parse(jsonTextResponse);
+        recipe.imageUrl = await getPexelsImage(recipe.imageQuery || recipe.title);
+
+        const publicRecipesRef = db.collection('publicRecipes');
+        await publicRecipesRef.add({
+            ...recipe,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        
+        return { success: true, message: `Successfully generated and saved recipe: "${recipe.title}"` };
+
+    } catch (error) {
+        console.error("Error in generateRecipeForBlog:", error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', `Failed to generate daily recipe: ${error.message}`);
+    }
+});
+

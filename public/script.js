@@ -37,6 +37,7 @@ try {
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app);
+window.auth = auth; // Make auth globally available for admin tasks
 // Make sure to replace this with your actual Stripe publishable key if it's different.
 const stripe = Stripe('pk_live_51RwOcyPk8em715yUgWedIOa1K2lPO5GLVcRulsJwqQQvGSna5neExF97cikgW7PCdIjlE4zugr5DasBqAE0CTPaV00Pg771UkD');
 
@@ -3110,6 +3111,28 @@ function grantTrial(householdIdToGrant) {
         .catch(error => console.error("Error granting trial access:", error));
 }
 window.grantTrial = grantTrial;
+
+// NEW: Function to manually generate a blog post from the console (for admins)
+function generateBlogRecipe() {
+    if (!currentUser) {
+        console.error("You must be logged in to run this function.");
+        return;
+    }
+    console.log("Attempting to generate a new blog recipe...");
+    const generateRecipeFunc = httpsCallable(functions, 'generateRecipeForBlog');
+    generateRecipeFunc({})
+        .then(result => {
+            if (result.data.success) {
+                console.log("Success:", result.data.message);
+                showToast("New blog recipe generated successfully! Refresh the blog page to see it.");
+            }
+        })
+        .catch(error => {
+            console.error("Error generating blog recipe:", error);
+            showToast(`Error: ${error.message}`);
+        });
+}
+window.generateBlogRecipe = generateBlogRecipe;
 
 
 // --- MAIN EVENT LISTENER ---
