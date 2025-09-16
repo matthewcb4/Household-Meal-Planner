@@ -2,7 +2,9 @@
 
 // --- Import Firebase modules ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+
 
 // --- Firebase configuration (copied from your app's script) ---
 const firebaseConfig = {
@@ -18,6 +20,7 @@ const firebaseConfig = {
 // --- Initialize Firebase for the landing page ---
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const functions = getFunctions(app);
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -73,18 +76,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dailyRecipeContainer) {
         async function fetchRecipeOfTheDay() {
             try {
-                const recipesRef = collection(db, 'publicRecipes');
-                const q = query(recipesRef, orderBy('createdAt', 'desc'), limit(1));
-                const querySnapshot = await getDocs(q);
+                // Call the secure Cloud Function instead of accessing Firestore directly
+                const getPublicRecipes = httpsCallable(functions, 'getPublicRecipes');
+                const result = await getPublicRecipes({}); // Call without args to get the latest list
+                const recipes = result.data.recipes;
 
-                if (querySnapshot.empty) {
+                if (!recipes || recipes.length === 0) {
                     dailyRecipeContainer.innerHTML = '<p>No recipe of the day found. Our AI is cooking one up, check back tomorrow!</p>';
                     return;
                 }
 
-                const recipeDoc = querySnapshot.docs[0];
-                const recipe = { id: recipeDoc.id, ...recipeDoc.data() };
-                const recipeUrl = `/recipe.html?slug=${encodeURIComponent(recipe.slug)}`;
+                const recipe = recipes[0]; // The function returns them sorted, so the first is the latest
+                const recipeUrl = `/recipe?slug=${encodeURIComponent(recipe.slug)}`;
 
                 dailyRecipeContainer.innerHTML = `
                     <div class="how-it-works-image">
@@ -186,4 +189,3 @@ document.addEventListener('DOMContentLoaded', () => {
         animateParticles();
     }
 });
-

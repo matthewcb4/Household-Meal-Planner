@@ -1316,13 +1316,30 @@ exports.generateDailyRecipe = onSchedule('every day 05:00', async (event) => {
 // This function allows the public-facing blog pages to securely fetch recipe data.
 exports.getPublicRecipes = onCall({ region: "us-central1", enforceAppCheck: false }, async (request) => {
     try {
+        const { slug } = request.data || {};
         const recipesRef = db.collection('publicRecipes');
-        const q = query(recipesRef, orderBy('createdAt', 'desc'), limit(20));
-        const snapshot = await getDocs(q);
-        const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        return { recipes };
+
+        if (slug) {
+            // If a slug is provided, fetch that specific recipe
+            const q = recipesRef.where('slug', '==', slug).limit(1);
+            const snapshot = await q.get();
+            if (snapshot.empty) {
+                throw new HttpsError('not-found', 'No recipe found with that slug.');
+            }
+            const recipe = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+            return { recipe }; // Return a single recipe object
+        } else {
+            // If no slug, fetch the latest recipes for the blog list
+            const q = recipesRef.orderBy('createdAt', 'desc').limit(20);
+            const snapshot = await q.get();
+            const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return { recipes }; // Return an array of recipes
+        }
     } catch (error) {
         console.error("Error fetching public recipes:", error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
         throw new HttpsError('internal', 'Could not fetch recipes.');
     }
 });
@@ -1393,4 +1410,5 @@ exports.generateRecipeForBlog = onCall({ enforceAppCheck: true }, async (request
         throw new HttpsError('internal', `Failed to generate daily recipe: ${error.message}`);
     }
 });
+
 

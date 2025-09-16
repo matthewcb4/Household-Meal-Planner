@@ -29,7 +29,7 @@ function createBlogRecipeCard(recipe) {
 
     // Use a placeholder if the image URL is missing
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/282828/FFF?text=${encodeURIComponent(recipe.title)}`;
-    const recipeUrl = `/recipe.html?slug=${recipe.slug}`;
+    const recipeUrl = `/recipe?slug=${recipe.slug}`;
 
     return `
         <a href="${recipeUrl}" class="feature-card" style="text-align: left; text-decoration: none; color: inherit;">
@@ -114,7 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const getPublicRecipes = httpsCallable(functions, 'getPublicRecipes');
 
     // --- LOGIC FOR SINGLE RECIPE PAGE ---
-    if (path.includes('/recipe.html') && params.has('slug')) {
+    if (path.includes('/recipe') && params.has('slug')) {
         const slug = params.get('slug');
         const container = document.getElementById('recipe-content-container');
         try {
@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     else if (path.includes('/blog.html')) {
         const gridContainer = document.getElementById('recipe-grid-container');
         try {
-            const result = await getPublicRecipes({ limit: 21 }); // Fetch latest 21 recipes
+            const result = await getPublicRecipes({}); // Fetch latest recipes
             const recipes = result.data.recipes;
             if (recipes && recipes.length > 0) {
                 gridContainer.innerHTML = recipes.map(createBlogRecipeCard).join('');
