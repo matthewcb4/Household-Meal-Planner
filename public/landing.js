@@ -2,9 +2,7 @@
 
 // --- Import Firebase modules ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
-
 
 // --- Firebase configuration (copied from your app's script) ---
 const firebaseConfig = {
@@ -19,14 +17,13 @@ const firebaseConfig = {
 
 // --- Initialize Firebase for the landing page ---
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 const functions = getFunctions(app);
 
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Mobile Menu Toggle ---
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const mainHeader = document.querySelector('.main-header');
+    const navMenuContent = document.querySelector('.nav-menu-content');
 
     mobileMenuBtn.addEventListener('click', () => {
         mainHeader.classList.toggle('open');
@@ -51,23 +48,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Demo Video Logic ---
-    // This logic waits for a "Watch Demo" button click.
-    // It will not do anything until the corresponding HTML is added to index.html.
     const watchDemoBtn = document.getElementById('watch-demo-btn');
     const demoVideo = document.getElementById('demo-video');
 
     if (watchDemoBtn && demoVideo) {
-        // The smooth scroll is already handled by the generic 'a[href^="#"]' selector.
-        // This adds auto-play functionality when the demo button is clicked.
         watchDemoBtn.addEventListener('click', () => {
-             // A short delay allows the smooth scroll animation to start.
              setTimeout(() => {
                 demoVideo.play().catch(error => {
-                    // Autoplay was prevented. This is common in modern browsers.
-                    // The video will still be visible with controls.
                     console.log('Autoplay was prevented:', error);
                 });
-            }, 500); // 500ms delay for scroll to start
+            }, 500);
         });
     }
 
@@ -76,9 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dailyRecipeContainer) {
         async function fetchRecipeOfTheDay() {
             try {
-                // Call the secure Cloud Function instead of accessing Firestore directly
+                // FIX: Call the Cloud Function instead of querying Firestore directly
                 const getPublicRecipes = httpsCallable(functions, 'getPublicRecipes');
-                const result = await getPublicRecipes({}); // Call without args to get the latest list
+                const result = await getPublicRecipes({ limit: 1 });
                 const recipes = result.data.recipes;
 
                 if (!recipes || recipes.length === 0) {
@@ -86,8 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const recipe = recipes[0]; // The function returns them sorted, so the first is the latest
-                const recipeUrl = `/recipe?slug=${encodeURIComponent(recipe.slug)}`;
+                const recipe = recipes[0];
+                const recipeUrl = `/recipe.html?slug=${encodeURIComponent(recipe.slug)}`;
 
                 dailyRecipeContainer.innerHTML = `
                     <div class="how-it-works-image">
@@ -189,3 +179,4 @@ document.addEventListener('DOMContentLoaded', () => {
         animateParticles();
     }
 });
+

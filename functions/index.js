@@ -1256,10 +1256,32 @@ exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: t
 
 // --- NEW BLOG/SEO FUNCTIONS ---
 
+// NEW HELPER: Get a random recipe theme to make blog posts more dynamic
+const getRecipeTheme = () => {
+    const themes = [
+        "a quick and easy 30-minute weeknight dinner",
+        "a healthy and light lunch salad",
+        "a decadent dessert for a special occasion",
+        "a comforting soup for a cold day",
+        "a unique vegetarian main course",
+        "a seasonal dish perfect for the current time of year",
+        "an international street food classic made at home",
+        "a creative breakfast or brunch idea",
+        "a budget-friendly family meal",
+        "a sophisticated appetizer for a party",
+        "a one-pot or one-pan meal for easy cleanup",
+        "a classic comfort food with a modern twist"
+    ];
+    return themes[Math.floor(Math.random() * themes.length)];
+};
+
 // This is the scheduled function that will run automatically every day at 5 AM (server time).
 exports.generateDailyRecipe = onSchedule('every day 05:00', async (event) => {
     console.log("Running daily recipe generation job.");
-    const prompt = `You are a creative chef. Generate a single, complete, and unique recipe that would be appealing for a daily food blog. 
+    const recipeTheme = getRecipeTheme();
+    console.log(`Generating daily recipe with theme: "${recipeTheme}"`);
+
+    const prompt = `You are a creative chef. Generate a single, complete, and unique recipe based on the following theme: "${recipeTheme}". 
         The recipe should have a creative and SEO-friendly title.
         Provide a brief, engaging description (2-3 sentences).
         Include a serving size, a detailed list of ingredients (with name, quantity, unit, and category), step-by-step instructions, and estimated nutritional information (calories, protein, carbs, fat).
@@ -1316,24 +1338,31 @@ exports.generateDailyRecipe = onSchedule('every day 05:00', async (event) => {
 // This function allows the public-facing blog pages to securely fetch recipe data.
 exports.getPublicRecipes = onCall({ region: "us-central1", enforceAppCheck: false }, async (request) => {
     try {
-        const { slug } = request.data || {};
+        const { slug, limit } = request.data || {};
         const recipesRef = db.collection('publicRecipes');
 
         if (slug) {
-            // If a slug is provided, fetch that specific recipe
-            const q = recipesRef.where('slug', '==', slug).limit(1);
-            const snapshot = await q.get();
+            const snapshot = await recipesRef.where('slug', '==', slug).limit(1).get();
             if (snapshot.empty) {
                 throw new HttpsError('not-found', 'No recipe found with that slug.');
             }
             const recipe = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-            return { recipe }; // Return a single recipe object
+            return { recipe };
         } else {
-            // If no slug, fetch the latest recipes for the blog list
-            const q = recipesRef.orderBy('createdAt', 'desc').limit(20);
-            const snapshot = await q.get();
-            const recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            return { recipes }; // Return an array of recipes
+            const snapshot = await recipesRef.get();
+            let recipes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            recipes.sort((a, b) => {
+                const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                return timeB - timeA;
+            });
+
+            if (limit) {
+                recipes = recipes.slice(0, limit);
+            }
+
+            return { recipes };
         }
     } catch (error) {
         console.error("Error fetching public recipes:", error);
@@ -1344,6 +1373,8 @@ exports.getPublicRecipes = onCall({ region: "us-central1", enforceAppCheck: fals
     }
 });
 
+
+
 // This function allows an admin to manually trigger recipe generation.
 exports.generateRecipeForBlog = onCall({ enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
@@ -1353,9 +1384,12 @@ exports.generateRecipeForBlog = onCall({ enforceAppCheck: true }, async (request
     if (!adminUserDoc.exists || !adminUserDoc.data().isAdmin) {
         throw new HttpsError('permission-denied', 'You must be an admin to perform this action.');
     }
+    
+    const recipeTheme = getRecipeTheme();
+    console.log(`Manually generating blog recipe with theme: "${recipeTheme}"`);
 
     // Re-using the same logic from the scheduled function.
-    const prompt = `You are a creative chef. Generate a single, complete, and unique recipe that would be appealing for a daily food blog. 
+    const prompt = `You are a creative chef. Generate a single, complete, and unique recipe based on the following theme: "${recipeTheme}". 
         The recipe should have a creative and SEO-friendly title.
         Provide a brief, engaging description (2-3 sentences).
         Include a serving size, a detailed list of ingredients (with name, quantity, unit, and category), step-by-step instructions, and estimated nutritional information (calories, protein, carbs, fat).
@@ -1410,5 +1444,4 @@ exports.generateRecipeForBlog = onCall({ enforceAppCheck: true }, async (request
         throw new HttpsError('internal', `Failed to generate daily recipe: ${error.message}`);
     }
 });
-
 

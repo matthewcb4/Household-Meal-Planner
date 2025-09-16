@@ -29,6 +29,7 @@ function createBlogRecipeCard(recipe) {
 
     // Use a placeholder if the image URL is missing
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/282828/FFF?text=${encodeURIComponent(recipe.title)}`;
+    // The recipe slug should already be URL-friendly from the cloud function
     const recipeUrl = `/recipe?slug=${recipe.slug}`;
 
     return `
@@ -47,15 +48,20 @@ function createBlogRecipeCard(recipe) {
 function populateRecipePage(recipe) {
     // Set SEO and page metadata
     document.title = `${recipe.title} | Auto Meal Chef`;
-    document.querySelector('meta[name="description"]').setAttribute('content', recipe.description);
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+        metaDescription.setAttribute('content', recipe.description);
+    }
+
 
     // Populate the page content
     const container = document.getElementById('recipe-content-container');
     if (!container) return;
     
     const imageUrl = recipe.imageUrl || `https://placehold.co/800x400/282828/FFF?text=${encodeURIComponent(recipe.title)}`;
-    const ingredientsList = recipe.ingredients.map(ing => `<li>${ing.quantity} ${ing.unit} ${ing.name}</li>`).join('');
-    const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+    const ingredientsList = (recipe.ingredients || []).map(ing => `<li>${ing.quantity} ${ing.unit} ${ing.name}</li>`).join('');
+    const instructionsList = (recipe.instructions || []).map(step => `<li>${step}</li>`).join('');
+    const nutrition = recipe.nutrition || {};
 
     container.innerHTML = `
         <div class="recipe-header">
@@ -71,15 +77,15 @@ function populateRecipePage(recipe) {
             </div>
             <div class="detail-item">
                 <strong>Calories</strong>
-                <span>${recipe.nutrition.calories || 'N/A'}</span>
+                <span>${nutrition.calories || 'N/A'}</span>
             </div>
             <div class="detail-item">
                 <strong>Protein</strong>
-                <span>${recipe.nutrition.protein || 'N/A'}</span>
+                <span>${nutrition.protein || 'N/A'}</span>
             </div>
              <div class="detail-item">
                 <strong>Carbs</strong>
-                <span>${recipe.nutrition.carbs || 'N/A'}</span>
+                <span>${nutrition.carbs || 'N/A'}</span>
             </div>
         </div>
 
@@ -114,25 +120,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     const getPublicRecipes = httpsCallable(functions, 'getPublicRecipes');
 
     // --- LOGIC FOR SINGLE RECIPE PAGE ---
-    if (path.includes('/recipe') && params.has('slug')) {
+    // Note: Updated path to match firebase.json rewrite for `/recipe`
+    if ((path.includes('/recipe.html') || path === '/recipe') && params.has('slug')) {
         const slug = params.get('slug');
         const container = document.getElementById('recipe-content-container');
         try {
-            const result = await getPublicRecipes({ slug });
-            populateRecipePage(result.data.recipe);
+            // Fetch all recipes and find the one with the matching slug
+            const result = await getPublicRecipes({});
+            const recipe = result.data.recipes.find(r => r.slug === slug);
+            if (recipe) {
+                populateRecipePage(recipe);
+            } else {
+                 throw new Error("Recipe with that slug not found.");
+            }
         } catch (error) {
             console.error("Error fetching single recipe:", error);
             if(container) container.innerHTML = "<h1>Recipe not found</h1><p>Sorry, we couldn't find the recipe you were looking for.</p>";
         }
     } 
     // --- LOGIC FOR BLOG LISTING PAGE ---
-    else if (path.includes('/blog.html')) {
+    else if (path.includes('/blog.html') || path === '/blog') {
         const gridContainer = document.getElementById('recipe-grid-container');
+        if (!gridContainer) return;
+        
         try {
-            const result = await getPublicRecipes({}); // Fetch latest recipes
+            const result = await getPublicRecipes({ limit: 21 }); // Fetch latest 21 recipes
             const recipes = result.data.recipes;
             if (recipes && recipes.length > 0) {
-                gridContainer.innerHTML = recipes.map(createBlogRecipeCard).join('');
+                const recipesByDate = {};
+                
+                // Group recipes by date
+                recipes.forEach(recipe => {
+                    if (recipe.createdAt && recipe.createdAt._seconds) {
+                        // Convert Firestore timestamp from callable function to Date
+                        const date = new Date(recipe.createdAt._seconds * 1000);
+                        const dateString = date.toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
+                        if (!recipesByDate[dateString]) {
+                            recipesByDate[dateString] = [];
+                        }
+                        recipesByDate[dateString].push(recipe);
+                    }
+                });
+
+                // Sort dates from most recent to oldest
+                const sortedDates = Object.keys(recipesByDate).sort((a, b) => new Date(b) - new Date(a));
+
+                let finalHtml = '';
+                // Build the HTML string with date headers
+                sortedDates.forEach(dateString => {
+                    finalHtml += `<h2 class="blog-date-header">${dateString}</h2>`;
+                    // Add all recipe cards for that date
+                    finalHtml += recipesByDate[dateString].map(createBlogRecipeCard).join('');
+                });
+                
+                gridContainer.innerHTML = finalHtml;
             } else {
                 gridContainer.innerHTML = '<p>No recipes found yet. Our AI chef is busy cooking up the first one!</p>';
             }

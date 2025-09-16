@@ -11,21 +11,28 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="landing.css">
+    <!-- ADDED: Three.js library for particle background -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
+    <!-- Container for the particle background -->
+    <div id="particle-background"></div>
+
     <header class="main-header">
         <nav class="main-nav">
             <div class="nav-logo">
                 <a href="/"><img src="header.png" alt="Auto Meal Chef Logo"></a>
             </div>
-            <ul class="nav-links">
-                <li><a href="/#features">Features</a></li>
-                <li><a href="/#pricing">Pricing</a></li>
-                <li><a href="/blog.html">Blog</a></li>
-            </ul>
-            <div class="nav-auth">
-                <a href="/app.html" class="secondary-btn">Log In</a>
-                <a href="/app.html" class="primary-btn">Sign Up Free</a>
+            <div class="nav-menu-content">
+                <ul class="nav-links">
+                    <li><a href="/#features">Features</a></li>
+                    <li><a href="/#pricing">Pricing</a></li>
+                    <li><a href="/blog.html">Blog</a></li>
+                </ul>
+                <div class="nav-auth">
+                    <a href="/app.html" class="secondary-btn">Log In</a>
+                    <a href="/app.html" class="primary-btn">Sign Up Free</a>
+                </div>
             </div>
             <button id="mobile-menu-btn" class="mobile-menu-btn"><i class="fas fa-bars"></i></button>
         </nav>
@@ -78,3 +85,4 @@
     <script type="module" src="landing.js"></script>
 </body>
 </html>
+

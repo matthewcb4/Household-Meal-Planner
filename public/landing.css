@@ -156,11 +156,6 @@ section {
     height: 40px;
     width: auto;
 }
-.nav-container {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-}
 .nav-links {
     display: flex;
     gap: 2rem;
@@ -188,7 +183,7 @@ section {
 
 /* --- Hero Section --- */
 .hero-section {
-    padding-top: 8rem; /* REDUCED top padding */
+    padding-top: 8rem;
     padding-bottom: 6rem;
     max-width: 1200px;
     margin: 0 auto;
@@ -227,7 +222,6 @@ section {
     opacity: 0.2;
     mix-blend-mode: screen;
 }
-/* NEW: Hero Buttons Container */
 .hero-buttons {
     display: flex;
     flex-wrap: wrap;
@@ -237,7 +231,7 @@ section {
 
 /* --- Features Section --- */
 .features-section {
-    background-color: rgba(24, 24, 24, 0.9); /* UPDATED */
+    background-color: transparent;
 }
 .features-grid {
     display: grid;
@@ -298,28 +292,25 @@ section {
     margin-bottom: 0.25rem;
 }
 
-/* MODIFIED: Video Player Styles for Portrait Mode */
 .video-container {
     position: relative;
     border-radius: var(--border-radius);
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    max-width: 400px; /* Constrain width for portrait */
-    margin: 0 auto; /* Center the container */
+    max-width: 400px;
+    margin: 0 auto;
 }
 
 .how-it-works-video {
     width: 100%;
-    height: auto; /* Allow height to adjust to aspect ratio */
+    height: auto;
     display: block;
 }
-
-/* REMOVED: Custom play button styles are no longer needed */
 
 
 /* --- Testimonials Section --- */
 .testimonials-section {
-    background-color: rgba(24, 24, 24, 0.9); /* UPDATED */
+    background-color: transparent;
 }
 .testimonials-grid {
     display: grid;
@@ -329,7 +320,7 @@ section {
     margin: 0 auto;
 }
 .testimonial-card {
-    background-color: rgba(18, 18, 18, 0.9); /* UPDATED */
+    background-color: var(--surface-color);
     padding: 2rem;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
@@ -355,7 +346,7 @@ section {
     margin: 0 auto;
 }
 .pricing-card {
-    background-color: rgba(24, 24, 24, 0.9); /* UPDATED */
+    background-color: var(--surface-color);
     padding: 2.5rem 2rem;
     border-radius: var(--border-radius);
     border: 1px solid var(--border-color);
@@ -436,7 +427,7 @@ section {
 
 /* --- Footer --- */
 .main-footer {
-    background-color: rgba(24, 24, 24, 0.9); /* UPDATED */
+    background-color: var(--surface-color);
     padding: 4rem 2rem;
     border-top: 1px solid var(--border-color);
 }
@@ -471,6 +462,22 @@ section {
     color: var(--text-color);
 }
 
+/* --- NEW: Blog Page Date Headers --- */
+.blog-date-header {
+    width: 100%;
+    grid-column: 1 / -1; /* Make it span all columns in the grid */
+    font-family: var(--font-display);
+    font-size: 2rem;
+    margin-top: 3rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+}
+.features-grid > .blog-date-header:first-of-type {
+    margin-top: 0;
+}
+
 
 /* --- Responsive Styles --- */
 @media (max-width: 992px) {
@@ -500,48 +507,40 @@ section {
     }
 }
 @media (max-width: 768px) {
-    .nav-links {
-        display: none;
-    }
-    .nav-auth {
-       display: none;
+    .main-nav {
+        flex-wrap: wrap;
     }
     .mobile-menu-btn {
         display: block;
     }
 
-    .main-header.open .nav-container {
-        display: flex;
-        flex-direction: column;
+    .nav-menu-content {
+        display: none; /* Hide the menu content by default */
         position: absolute;
-        top: 100%;
+        top: 100%; /* Position it right below the header */
         left: 0;
         width: 100%;
         background-color: var(--surface-color);
         padding: 1rem;
         border-bottom: 1px solid var(--border-color);
-        align-items: center;
-        gap: 1rem;
     }
-    .main-header.open .nav-links {
+    
+    .main-header.open .nav-menu-content {
+        display: block; /* Show it when the header is open */
+    }
+
+    .nav-links, .nav-auth {
         display: flex;
         flex-direction: column;
-        width: 100%;
         align-items: center;
+        width: 100%;
         gap: 1rem;
     }
-     .main-header.open .nav-auth {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        align-items: stretch; /* Make buttons full-width */
-        padding-top: 1rem;
+    
+    .nav-auth {
         margin-top: 1rem;
+        padding-top: 1rem;
         border-top: 1px solid var(--border-color);
-        gap: 1rem;
-    }
-    .main-nav {
-        flex-wrap: wrap;
     }
     
     .hero-buttons {
@@ -557,4 +556,25 @@ section {
         flex-direction: column;
         align-items: center;
     }
+}
+
+/* FIX: Restore desktop navigation alignment */
+@media (min-width: 769px) {
+    .nav-menu-content {
+        display: contents;
+    }
+}
+
+/* FIX: Blog page transparency and text alignment */
+#blog-hero .hero-content, #recipe-grid-section {
+    text-align: center;
+    background-color: transparent;
+}
+#recipe-grid-section .feature-card {
+    background-color: var(--surface-color);
+}
+/* FIX: Center the hero subheadline on the blog page */
+#blog-hero .hero-subheadline {
+    margin-left: auto;
+    margin-right: auto;
 }
