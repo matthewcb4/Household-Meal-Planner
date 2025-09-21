@@ -1473,30 +1473,35 @@ exports.generateRecipeForBlog = onCall({ enforceAppCheck: true }, async (request
     }
 });
 
-// --- NEW FUNCTION: Get an alternate image ---
+// --- UPDATED FUNCTION: Get an alternate image with source preference ---
 exports.getAlternateImage = onCall({ region: "us-central1", enforceAppCheck: true }, async (request) => {
-    const { query } = request.data;
+    const { query, sourcePreference } = request.data;
     if (!query) {
         throw new HttpsError('invalid-argument', 'A query must be provided.');
     }
 
-    const imageUrl = await getUnsplashImage(query);
+    let imageUrl;
+    if (sourcePreference === 'pexels') {
+        imageUrl = await getPexelsImage(query);
+    } else {
+        // Default to Unsplash if no preference or other value is given
+        imageUrl = await getUnsplashImage(query);
+    }
 
     if (imageUrl) {
         return { imageUrl };
     } else {
-        // You could add more fallbacks here if you wanted (e.g., Pixabay)
-        throw new HttpsError('not-found', 'Could not find an alternate image for that query.');
+        throw new HttpsError('not-found', `Could not find an image for that query from ${sourcePreference || 'Unsplash'}.`);
     }
 });
 
-// --- NEW FUNCTION: Update a recipe's image URL in Firestore ---
+// --- UPDATED FUNCTION: Update a recipe's image URL in Firestore for all cases ---
 exports.updateRecipeImage = onCall({ enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
 
-    const { recipeId, newImageUrl, mealPlanDetails } = request.data;
+    const { recipeId, newImageUrl, mealPlanDetails, suggestionDetails } = request.data;
     const userDoc = await db.collection('users').doc(request.auth.uid).get();
     const householdId = userDoc.data()?.householdId;
 
@@ -1519,11 +1524,34 @@ exports.updateRecipeImage = onCall({ enforceAppCheck: true }, async (request) =>
             await mealPlanRef.update({ [updatePath]: newImageUrl });
             return { success: true, message: 'Meal plan recipe image updated.' };
         }
+        // NEW Scenario 3: Update a recipe in the daily suggestions
+        else if (suggestionDetails) {
+            const { suggestionDate, recipeTitle } = suggestionDetails;
+            const suggestionRef = db.collection('households').doc(householdId).collection('dailySuggestions').doc(suggestionDate);
+            const suggestionDoc = await suggestionRef.get();
+
+            if (suggestionDoc.exists) {
+                const data = suggestionDoc.data();
+                let recipes = data.recipes || [];
+                const recipeIndex = recipes.findIndex(r => r.title === recipeTitle);
+
+                if (recipeIndex > -1) {
+                    recipes[recipeIndex].imageUrl = newImageUrl;
+                    await suggestionRef.update({ recipes: recipes });
+                    return { success: true, message: 'Suggested recipe image updated.' };
+                } else {
+                     throw new HttpsError('not-found', 'Could not find the suggested recipe to update.');
+                }
+            } else {
+                 throw new HttpsError('not-found', 'Could not find the daily suggestion list to update.');
+            }
+        }
         else {
-            throw new HttpsError('invalid-argument', 'You must provide either a recipeId or mealPlanDetails.');
+            throw new HttpsError('invalid-argument', 'You must provide recipeId, mealPlanDetails, or suggestionDetails.');
         }
     } catch (error) {
         console.error("Error updating recipe image:", error);
+        if (error instanceof HttpsError) throw error;
         throw new HttpsError('internal', 'Could not update the recipe image in the database.');
     }
 });

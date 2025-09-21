@@ -1036,6 +1036,8 @@ function createRecipeCard(recipe, isFavorite) {
     }
 
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/333/FFF?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+    // UPDATE: Track the image source, defaulting to pexels for originals
+    const imageSource = recipe.imageSource || 'pexels';
 
     let ratingHTML = '';
     if (isFavorite) {
@@ -1083,7 +1085,7 @@ function createRecipeCard(recipe, isFavorite) {
     `;
 
     recipeCard.innerHTML = `
-        <div class="image-container">
+        <div class="image-container" data-image-source="${imageSource}">
             <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/333/FFF?text=Image+Not+Found';">
             <button class="swap-image-btn secondary" data-query="${escapeAttr(recipe.imageQuery || recipe.title)}"><span class="tooltip-text">Change Image</span>🔄</button>
         </div>
@@ -1099,6 +1101,8 @@ function createRecipeCard(recipe, isFavorite) {
 function populateRecipeDetailModal(recipe, isFavorite) {
     const modalContent = document.getElementById('recipe-detail-content');
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/333/FFF?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+    // UPDATE: Track image source in the modal as well
+    const imageSource = recipe.imageSource || 'pexels';
     const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
     const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
 
@@ -1187,7 +1191,7 @@ function populateRecipeDetailModal(recipe, isFavorite) {
 
     modalContent.innerHTML = `
         <span class="close-btn" id="recipe-detail-modal-close-btn">&times;</span>
-        <div class="image-container">
+        <div class="image-container" data-image-source="${imageSource}">
             <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
         </div>
         <h3><a href="${googleSearchUrl}" target="_blank" title="Search on Google">${recipe.title} 🔗</a></h3>
@@ -1771,6 +1775,8 @@ async function toggleFavorite(recipeData, buttonElement) {
             dataToSave.mealType = document.querySelector('input[name="mealType"]:checked').value || 'uncategorized';
         }
         delete dataToSave.id;
+        // Ensure imageSource is saved when favoriting
+        dataToSave.imageSource = dataToSave.imageSource || 'pexels';
         await addDoc(favoritesRef, dataToSave);
         showToast(`"${recipeData.title}" saved to favorites!`);
         if (buttonElement) {
@@ -1794,6 +1800,12 @@ async function handleSwapImageClick(button) {
     if (!card || !query) return;
 
     const img = card.querySelector('.recipe-image');
+    const imageContainer = card.querySelector('.image-container');
+    const currentSource = imageContainer.dataset.imageSource || 'pexels';
+
+    // Determine where to look for the new image
+    const newSourcePreference = currentSource === 'pexels' ? 'unsplash' : 'pexels';
+
     const recipeId = card.dataset.recipeId; // For favorites
     let recipeData = JSON.parse(card.dataset.recipe || '{}');
 
@@ -1806,28 +1818,40 @@ async function handleSwapImageClick(button) {
         mealId: mealPlanItem.dataset.id
     } : null;
 
+
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     button.disabled = true;
 
     try {
         const getAlternateImage = httpsCallable(functions, 'getAlternateImage');
-        const result = await getAlternateImage({ query });
+        const result = await getAlternateImage({ query, sourcePreference: newSourcePreference });
         const newImageUrl = result.data.imageUrl;
 
         if (newImageUrl) {
             img.src = newImageUrl;
+            imageContainer.dataset.imageSource = newSourcePreference; // Update the source tracker
 
             // Persist the change
             const updateRecipeImage = httpsCallable(functions, 'updateRecipeImage');
+            
             if (recipeId) { // It's a favorite recipe
                 await updateRecipeImage({ recipeId, newImageUrl });
-                showToast('Favorite recipe image updated!');
+                showToast(`Favorite recipe image updated from ${newSourcePreference}!`);
             } else if (mealPlanDetails) { // It's a meal plan recipe from the modal
                 await updateRecipeImage({ mealPlanDetails, newImageUrl });
-                showToast('Meal plan image updated!');
+                showToast(`Meal plan image updated from ${newSourcePreference}!`);
+            } else { // It's a suggested recipe
+                 const suggestionDetails = {
+                    suggestionDate: getTodayDateString(),
+                    recipeTitle: recipeData.title
+                };
+                await updateRecipeImage({ suggestionDetails, newImageUrl });
+                showToast(`Suggested recipe image updated from ${newSourcePreference}!`);
             }
+
             // Update the recipe data stored on the element for future actions
             recipeData.imageUrl = newImageUrl;
+            recipeData.imageSource = newSourcePreference;
             card.dataset.recipe = JSON.stringify(recipeData);
 
         } else {
@@ -3651,3 +3675,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // NEW: Upgrade Modal Listener
     document.getElementById('modal-upgrade-btn')?.addEventListener('click', handleUpgradeClick);
 });
+
