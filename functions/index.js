@@ -19,6 +19,7 @@ const documentAiLocation = defineString("DOCUMENT_AI_LOCATION");
 const stripePriceId = defineString("STRIPE_PRICE_ID");
 const stripeSecretKey = defineString("STRIPE_SECRET_KEY");
 const stripeWebhookSecret = defineString("STRIPE_WEBHOOK_SECRET");
+const unsplashAccessKey = defineString("UNSPLASH_ACCESS_KEY");
 
 
 // --- HELPER: Check for Premium Status (Handles Trials & Subscriptions) ---
@@ -64,6 +65,33 @@ const getPexelsImage = async (query) => {
         return null;
     } catch (error) {
         console.error(`Error fetching image from Pexels for query "${query}":`, error);
+        return null;
+    }
+};
+
+// --- NEW HELPER: Unsplash Image Fetching Function ---
+const getUnsplashImage = async (query) => {
+    try {
+        const accessKey = unsplashAccessKey.value();
+        if (!accessKey) {
+            console.error("Unsplash Access Key is not configured.");
+            return null;
+        }
+        // Enhance the query for better results
+        const enhancedQuery = `${query} food`;
+        const url = `https://api.unsplash.com/search/photos?query=${encodeURIComponent(enhancedQuery)}&per_page=1`;
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Client-ID ${accessKey}` }
+        });
+
+        if (!response.ok) {
+            console.error(`Unsplash API error: ${response.statusText}`);
+            return null;
+        }
+        const data = await response.json();
+        return data?.results?.[0]?.urls?.regular || null;
+    } catch (error) {
+        console.error(`Error fetching image from Unsplash for query "${query}":`, error);
         return null;
     }
 };
@@ -938,7 +966,7 @@ exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request)
         const uid = request.auth.uid;
         const userDoc = await db.collection('users').doc(uid).get();
 
-        if (!userDoc.exists) {
+        if (!userDoc.exists()) {
             throw new HttpsError('not-found', 'Could not find user data.');
         }
         const householdId = userDoc.data().householdId;
@@ -1445,3 +1473,57 @@ exports.generateRecipeForBlog = onCall({ enforceAppCheck: true }, async (request
     }
 });
 
+// --- NEW FUNCTION: Get an alternate image ---
+exports.getAlternateImage = onCall({ region: "us-central1", enforceAppCheck: true }, async (request) => {
+    const { query } = request.data;
+    if (!query) {
+        throw new HttpsError('invalid-argument', 'A query must be provided.');
+    }
+
+    const imageUrl = await getUnsplashImage(query);
+
+    if (imageUrl) {
+        return { imageUrl };
+    } else {
+        // You could add more fallbacks here if you wanted (e.g., Pixabay)
+        throw new HttpsError('not-found', 'Could not find an alternate image for that query.');
+    }
+});
+
+// --- NEW FUNCTION: Update a recipe's image URL in Firestore ---
+exports.updateRecipeImage = onCall({ enforceAppCheck: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in.');
+    }
+
+    const { recipeId, newImageUrl, mealPlanDetails } = request.data;
+    const userDoc = await db.collection('users').doc(request.auth.uid).get();
+    const householdId = userDoc.data()?.householdId;
+
+    if (!householdId) {
+        throw new HttpsError('failed-precondition', 'User is not part of a household.');
+    }
+
+    try {
+        // Scenario 1: Update a favorite recipe
+        if (recipeId) {
+            const favoriteRef = db.collection('households').doc(householdId).collection('favoriteRecipes').doc(recipeId);
+            await favoriteRef.update({ imageUrl: newImageUrl });
+            return { success: true, message: 'Favorite recipe image updated.' };
+        }
+        // Scenario 2: Update a recipe in a meal plan
+        else if (mealPlanDetails) {
+            const { weekId, day, meal, mealId } = mealPlanDetails;
+            const mealPlanRef = db.collection('households').doc(householdId).collection('mealPlan').doc(weekId);
+            const updatePath = `meals.${day}.${meal}.${mealId}.imageUrl`;
+            await mealPlanRef.update({ [updatePath]: newImageUrl });
+            return { success: true, message: 'Meal plan recipe image updated.' };
+        }
+        else {
+            throw new HttpsError('invalid-argument', 'You must provide either a recipeId or mealPlanDetails.');
+        }
+    } catch (error) {
+        console.error("Error updating recipe image:", error);
+        throw new HttpsError('internal', 'Could not update the recipe image in the database.');
+    }
+});

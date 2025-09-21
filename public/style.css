@@ -1197,3 +1197,39 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     opacity: 1;
 }
 
+/* NEW: Swap Image Button Styles */
+.swap-image-btn {
+    position: absolute;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+    line-height: 1;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.image-container:hover .swap-image-btn {
+    opacity: 1;
+}
+
+#recipe-detail-content .swap-image-btn {
+    position: static;
+    opacity: 1;
+    margin-left: 0.5rem;
+}
+
+/* This is a new container for the recipe image, needed for positioning context */
+.recipe-card .image-container {
+    position: relative;
+}
+
+.modal-recipe-item .image-container {
+    position: relative;
+}
