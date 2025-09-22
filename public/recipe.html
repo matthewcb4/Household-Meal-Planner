@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- SEO meta tags will be dynamically inserted by blog.js -->
+    <!-- SEO meta tags will be dynamically inserted by content.js -->
     <title>Recipe - Auto Meal Chef</title>
     <meta name="description" content="Discover a delicious AI-generated recipe. Full instructions, ingredients, and nutritional information.">
 
@@ -34,27 +34,38 @@
         }
     </style>
 </head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-LQ124BNWKH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-LQ124BNWKH');
+</script>
 <body>
     <header class="main-header">
          <nav class="main-nav">
             <div class="nav-logo">
                 <a href="/"><img src="/header.png" alt="Auto Meal Chef Logo"></a>
             </div>
-            <ul class="nav-links">
-                <li><a href="/#features">Features</a></li>
-                <li><a href="/#pricing">Pricing</a></li>
-                <li><a href="/blog.html">Blog</a></li>
-            </ul>
-            <div class="nav-auth">
-                <a href="/app.html" class="secondary-btn">Log In</a>
-                <a href="/app.html" class="primary-btn">Sign Up Free</a>
+            <div class="nav-menu-content">
+                <ul class="nav-links">
+                    <li><a href="/#features">Features</a></li>
+                    <li><a href="/#pricing">Pricing</a></li>
+                    <li><a href="/blog.html">Blog</a></li>
+                </ul>
+                <div class="nav-auth">
+                    <a href="/app.html" class="secondary-btn">Log In</a>
+                    <a href="/app.html" class="primary-btn">Sign Up Free</a>
+                </div>
             </div>
             <button id="mobile-menu-btn" class="mobile-menu-btn"><i class="fas fa-bars"></i></button>
         </nav>
     </header>
 
     <main id="recipe-content-container" class="recipe-content-section">
-        <!-- Recipe content will be loaded here by blog.js -->
+        <!-- Recipe content will be loaded here by content.js -->
         <div class="recipe-header">
             <h1>Loading Recipe...</h1>
             <div class="feature-icon" style="font-size: 3rem; text-align: center; margin-top: 2rem;"><i class="fas fa-spinner fa-spin"></i></div>
@@ -85,7 +96,8 @@
         </div>
     </footer>
     
-    <script type="module" src="/blog.js"></script>
-    <script src="/landing.js"></script>
+    <script type="module" src="/nav.js"></script>
+    <script type="module" src="/content.js"></script>
 </body>
 </html>
+
