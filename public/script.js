@@ -1101,7 +1101,6 @@ function createRecipeCard(recipe, isFavorite) {
 function populateRecipeDetailModal(recipe, isFavorite) {
     const modalContent = document.getElementById('recipe-detail-content');
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/333/FFF?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
-    // UPDATE: Track image source in the modal as well
     const imageSource = recipe.imageSource || 'pexels';
     const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
     const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
@@ -1176,7 +1175,7 @@ function populateRecipeDetailModal(recipe, isFavorite) {
     }
     
     const swapButtonHTML = `<button class="swap-image-btn secondary" data-query="${escapeAttr(recipe.imageQuery || recipe.title)}" title="Find a new image">🔄 Change Image</button>`;
-    const cardActionsHTML = `<div class="card-actions"><button class="add-to-plan-btn">Add to Plan</button>${swapButtonHTML}</div>`;
+    const cardActionsHTML = `<div class="card-actions"><button class="add-to-plan-btn">Add to Plan</button></div>`;
 
     let ratingHTML = '';
     if (isFavorite) {
@@ -1190,9 +1189,10 @@ function populateRecipeDetailModal(recipe, isFavorite) {
     const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
 
     modalContent.innerHTML = `
-        <span class="close-btn" id="recipe-detail-modal-close-btn">&times;</span>
         <div class="image-container" data-image-source="${imageSource}">
+            <span class="close-btn" id="recipe-detail-modal-close-btn">&times;</span>
             <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
+            ${swapButtonHTML}
         </div>
         <h3><a href="${googleSearchUrl}" target="_blank" title="Search on Google">${recipe.title} 🔗</a></h3>
         ${servingSizeHTML}
@@ -1794,6 +1794,9 @@ async function toggleFavorite(recipeData, buttonElement) {
     }
 }
 
+// #############################################################################
+// ### THIS IS THE UPDATED FUNCTION FOR THE IMAGE SWAP LOGIC ###
+// #############################################################################
 async function handleSwapImageClick(button) {
     const query = button.dataset.query;
     const card = button.closest('.recipe-card, .modal-content');
@@ -1803,13 +1806,13 @@ async function handleSwapImageClick(button) {
     const imageContainer = card.querySelector('.image-container');
     const currentSource = imageContainer.dataset.imageSource || 'pexels';
 
-    // Determine where to look for the new image
+    // Determine the next source to fetch from
     const newSourcePreference = currentSource === 'pexels' ? 'unsplash' : 'pexels';
 
     const recipeId = card.dataset.recipeId; // For favorites
     let recipeData = JSON.parse(card.dataset.recipe || '{}');
 
-    // For meal plan items, the details are in the dataset of the parent .modal-recipe-item
+    // For meal plan items, details are in the parent .modal-recipe-item
     const mealPlanItem = button.closest('.modal-recipe-item');
     const mealPlanDetails = mealPlanItem ? {
         weekId: getWeekId(currentDate),
@@ -1817,7 +1820,6 @@ async function handleSwapImageClick(button) {
         meal: mealPlanItem.dataset.meal,
         mealId: mealPlanItem.dataset.id
     } : null;
-
 
     button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     button.disabled = true;
@@ -1829,33 +1831,40 @@ async function handleSwapImageClick(button) {
 
         if (newImageUrl) {
             img.src = newImageUrl;
-            imageContainer.dataset.imageSource = newSourcePreference; // Update the source tracker
+            imageContainer.dataset.imageSource = newSourcePreference;
 
-            // Persist the change
+            // Create the payload for the update function
+            const payload = { 
+                newImageUrl: newImageUrl, 
+                newImageSource: newSourcePreference 
+            };
+
             const updateRecipeImage = httpsCallable(functions, 'updateRecipeImage');
             
-            if (recipeId) { // It's a favorite recipe
-                await updateRecipeImage({ recipeId, newImageUrl });
+            if (recipeId) {
+                payload.recipeId = recipeId;
+                await updateRecipeImage(payload);
                 showToast(`Favorite recipe image updated from ${newSourcePreference}!`);
-            } else if (mealPlanDetails) { // It's a meal plan recipe from the modal
-                await updateRecipeImage({ mealPlanDetails, newImageUrl });
+            } else if (mealPlanDetails) {
+                payload.mealPlanDetails = mealPlanDetails;
+                await updateRecipeImage(payload);
                 showToast(`Meal plan image updated from ${newSourcePreference}!`);
-            } else { // It's a suggested recipe
-                 const suggestionDetails = {
+            } else {
+                payload.suggestionDetails = {
                     suggestionDate: getTodayDateString(),
                     recipeTitle: recipeData.title
                 };
-                await updateRecipeImage({ suggestionDetails, newImageUrl });
+                await updateRecipeImage(payload);
                 showToast(`Suggested recipe image updated from ${newSourcePreference}!`);
             }
 
-            // Update the recipe data stored on the element for future actions
+            // Update the local recipe data on the card element
             recipeData.imageUrl = newImageUrl;
             recipeData.imageSource = newSourcePreference;
             card.dataset.recipe = JSON.stringify(recipeData);
 
         } else {
-            showToast("Couldn't find another image.");
+            showToast(`Couldn't find an image from ${newSourcePreference}.`);
         }
     } catch (error) {
         console.error("Error swapping image:", error);
@@ -1868,6 +1877,7 @@ async function handleSwapImageClick(button) {
         button.disabled = false;
     }
 }
+
 
 async function handleCardClick(event) {
     const target = event.target;
@@ -3675,4 +3685,3 @@ document.addEventListener('DOMContentLoaded', () => {
     // NEW: Upgrade Modal Listener
     document.getElementById('modal-upgrade-btn')?.addEventListener('click', handleUpgradeClick);
 });
-
