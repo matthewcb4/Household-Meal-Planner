@@ -966,7 +966,7 @@ exports.createStripeCheckout = onCall({ enforceAppCheck: true }, async (request)
         const uid = request.auth.uid;
         const userDoc = await db.collection('users').doc(uid).get();
 
-        if (!userDoc.exists()) {
+        if (!userDoc.exists) {
             throw new HttpsError('not-found', 'Could not find user data.');
         }
         const householdId = userDoc.data().householdId;
@@ -1053,71 +1053,33 @@ exports.stripeWebhook = onRequest(async (req, res) => {
             return;
         }
         const householdRef = db.collection('households').doc(householdId);
-        // Use set with merge:true for a safer update, preventing errors if the doc doesn't exist.
-        await householdRef.set({
+        await householdRef.update({
             subscriptionTier: 'free',
             premiumAccessUntil: admin.firestore.FieldValue.delete(),
             stripeCustomerId: admin.firestore.FieldValue.delete(),
             stripeSubscriptionId: admin.firestore.FieldValue.delete()
-        }, { merge: true });
+        });
         console.log(`Successfully revoked premium access for household ${householdId}.`);
     };
 
     switch (event.type) {
         case 'checkout.session.completed': {
             const session = event.data.object;
-            // Grant access only when the payment is successful.
-            if (session.payment_status === 'paid') {
-                const subscriptionId = session.subscription;
-                if (!subscriptionId) {
-                    console.error('Checkout session completed with no subscription ID.');
-                    break;
-                }
-                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                const householdId = subscription.metadata.householdId;
-
-                if (householdId) {
-                    const householdRef = db.collection('households').doc(householdId);
-                    const accessUntil = admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000);
-
-                    // Update the household document with all the correct subscription data.
-                    await householdRef.set({
-                        subscriptionTier: 'paid',
-                        premiumAccessUntil: accessUntil,
-                        stripeCustomerId: subscription.customer,
-                        stripeSubscriptionId: subscription.id
-                    }, { merge: true });
-                    console.log(`Successfully granted initial premium access to household ${householdId}.`);
-                } else {
-                    console.error(`Could not find householdId in metadata for subscription ${subscriptionId}`);
-                }
-            }
+            const householdId = session.metadata.householdId;
+            const customerId = session.customer;
+            const subscriptionId = session.subscription;
+            console.log(`Checkout session completed for household ${householdId}.`);
+            await grantAccess(householdId, customerId, subscriptionId);
             break;
         }
         case 'invoice.payment_succeeded': {
             const invoice = event.data.object;
-            // This event handles recurring payments.
-            if (invoice.billing_reason === 'subscription_cycle') {
-                const subscriptionId = invoice.subscription;
-                if (!subscriptionId) {
-                    console.error('Invoice payment succeeded with no subscription ID.');
-                    break;
-                }
-                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                const householdId = subscription.metadata.householdId;
-
-                if (householdId) {
-                    const householdRef = db.collection('households').doc(householdId);
-                    const accessUntil = admin.firestore.Timestamp.fromMillis(subscription.current_period_end * 1000);
-
-                    // Update the household document to extend the premium access.
-                    await householdRef.set({
-                        premiumAccessUntil: accessUntil
-                    }, { merge: true });
-                    console.log(`Successfully extended premium access for household ${householdId}.`);
-                } else {
-                     console.error(`Could not find householdId in metadata for subscription ${subscriptionId}`);
-                }
+            if (invoice.subscription) {
+                 const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+                 const householdId = subscription.metadata.householdId;
+                 const customerId = subscription.customer;
+                 console.log(`Recurring payment successful for household ${householdId}.`);
+                 await grantAccess(householdId, customerId, subscription.id);
             }
             break;
         }
