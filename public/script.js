@@ -1911,6 +1911,78 @@ async function handleCardClick(event) {
     }
 }
 
+async function populateSelectMealModal(day, meal) {
+    const selectMealModalList = document.getElementById('select-meal-modal-list');
+    selectMealModalList.innerHTML = '<div class="loading-spinner"></div>';
+
+    try {
+        let recipes = [];
+
+        // 1. Fetch favorite recipes for this meal type
+        const favoritesRef = getFavoritesRef();
+        if (favoritesRef) {
+            const q = query(favoritesRef, where("mealType", "==", meal), limit(5));
+            const favSnapshot = await getDocs(q);
+            const favoriteRecipes = favSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, isFavorite: true }));
+            recipes.push(...favoriteRecipes);
+        }
+
+        // 2. Fetch some new suggestions if we have less than 5 recipes
+        if (recipes.length < 5) {
+            const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
+            const result = await discoverRecipesFunc({
+                mealType: meal,
+                cuisine: householdData?.cuisine || '', // Use household cuisine if available
+                criteria: [],
+                unitSystem: unitSystem
+            });
+
+            const { recipes: newRecipes } = result.data;
+
+            if (newRecipes) {
+                const favoriteTitles = new Set(recipes.map(r => r.title));
+                const uniqueNewRecipes = newRecipes.filter(r => !favoriteTitles.has(r.title));
+                recipes.push(...uniqueNewRecipes.slice(0, 5 - recipes.length));
+            }
+        }
+
+        if (recipes.length === 0) {
+            selectMealModalList.innerHTML = '<p>No meal ideas found. Try the Recipes tab for more options!</p>';
+            return;
+        }
+
+        // 3. Render the list
+        selectMealModalList.innerHTML = '';
+        const list = document.createElement('ul');
+        list.className = 'select-meal-list';
+
+        recipes.forEach(recipe => {
+            const listItem = document.createElement('li');
+            listItem.className = 'select-meal-item';
+            listItem.dataset.recipe = JSON.stringify(recipe);
+
+            const favIcon = recipe.isFavorite ? '⭐ ' : '';
+
+            listItem.innerHTML = `
+                <div class="select-meal-item-img">
+                    <img src="${recipe.imageUrl || `https://placehold.co/80x80/EEE/31343C?text=${encodeURIComponent(recipe.title)}`}" alt="${recipe.title}" loading="lazy">
+                </div>
+                <div class="select-meal-item-details">
+                    <h4>${favIcon}${recipe.title}</h4>
+                    <p>${(recipe.description || '').substring(0, 100)}...</p>
+                </div>
+            `;
+            list.appendChild(listItem);
+        });
+
+        selectMealModalList.appendChild(list);
+
+    } catch (error) {
+        console.error("Error populating select meal modal:", error);
+        selectMealModalList.innerHTML = `<p>Sorry, couldn't load meal ideas. Please try the "Recipes" tab.</p>`;
+    }
+}
+
 async function handleMealSlotClick(event) {
     const slot = event.target.closest('.meal-slot');
     if (!slot) return;
@@ -1919,98 +1991,114 @@ async function handleMealSlotClick(event) {
     const meal = slot.dataset.meal;
     const mealPlanRef = getMealPlanRef();
     const docSnap = await getDoc(mealPlanRef);
+    const plan = docSnap.exists() ? docSnap.data() : {};
+    const mealsForSlot = plan.meals?.[day]?.[meal];
+    const isSlotEmpty = !mealsForSlot || Object.keys(mealsForSlot).length === 0;
 
-    const modalRecipeList = document.getElementById('modal-recipe-list');
-    const modalSlotTitle = document.getElementById('modal-slot-title');
-    const mealPlanModal = document.getElementById('meal-plan-modal');
+    const modalTitle = `${day.charAt(0).toUpperCase() + day.slice(1)} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
 
-    modalRecipeList.innerHTML = '';
-    modalSlotTitle.textContent = `${day.charAt(0).toUpperCase() + day.slice(1)} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
+    if (isSlotEmpty) {
+        // Open the new "select meal" modal
+        const selectMealModal = document.getElementById('select-meal-modal');
+        const selectMealModalTitle = document.getElementById('select-meal-modal-title');
 
-    if (docSnap.exists()) {
-        const plan = docSnap.data();
-        const mealsForSlot = plan.meals?.[day]?.[meal];
-        if (mealsForSlot) {
-            Object.entries(mealsForSlot).forEach(([mealEntryId, recipe]) => {
-                const recipeCard = document.createElement('div');
-                recipeCard.className = 'recipe-card modal-recipe-item';
-                // Store source info in the recipe data itself for the swap function
-                const recipeWithSource = { ...recipe, source: { day, meal, mealId: mealEntryId } };
-                recipeCard.dataset.recipe = JSON.stringify(recipeWithSource);
-                recipeCard.dataset.day = day;
-                recipeCard.dataset.meal = meal;
-                recipeCard.dataset.id = mealEntryId;
+        selectMealModalTitle.textContent = `Add to ${modalTitle}`;
+        selectMealModal.style.display = 'block';
 
-                const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/EEE/31343C?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
-                const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
-                const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
+        // Store the target slot info for when a recipe is selected
+        selectMealModal.dataset.day = day;
+        selectMealModal.dataset.meal = meal;
 
-                let ingredientsHTML = '<ul>';
-                if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-                    recipe.ingredients.forEach(ing => {
-                         let ingredientText = (typeof ing === 'object' && ing !== null && ing.name) ? `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim() : ing;
-                         ingredientsHTML += `<li>${ingredientText}</li>`;
-                    });
-                }
-                ingredientsHTML += '</ul>';
+        // Populate the modal with recipe suggestions
+        populateSelectMealModal(day, meal);
 
-                let instructionsHTML = '';
-                if (householdData.subscriptionTier === 'paid' && recipe.instructions && recipe.instructions.length > 0) {
-                    const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
-                    instructionsHTML = `
-                        <div class="instructions-container">
-                            <button class="instructions-toggle secondary premium">Show Instructions</button>
-                            <div class="instructions-list" style="display: none;">
-                                <h4>Instructions</h4>
-                                <ol>${instructionsList}</ol>
-                            </div>
+    } else {
+        // Open the existing "meal plan detail" modal
+        const modalRecipeList = document.getElementById('modal-recipe-list');
+        const modalSlotTitle = document.getElementById('modal-slot-title');
+        const mealPlanModal = document.getElementById('meal-plan-modal');
+
+        modalRecipeList.innerHTML = '';
+        modalSlotTitle.textContent = modalTitle;
+
+        Object.entries(mealsForSlot).forEach(([mealEntryId, recipe]) => {
+            const recipeCard = document.createElement('div');
+            recipeCard.className = 'recipe-card modal-recipe-item';
+            const recipeWithSource = { ...recipe, source: { day, meal, mealId: mealEntryId } };
+            recipeCard.dataset.recipe = JSON.stringify(recipeWithSource);
+            recipeCard.dataset.day = day;
+            recipeCard.dataset.meal = meal;
+            recipeCard.dataset.id = mealEntryId;
+
+            const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/EEE/31343C?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+            const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
+            const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
+
+            let ingredientsHTML = '<ul>';
+            if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+                recipe.ingredients.forEach(ing => {
+                     let ingredientText = (typeof ing === 'object' && ing !== null && ing.name) ? `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim() : ing;
+                     ingredientsHTML += `<li>${ingredientText}</li>`;
+                });
+            }
+            ingredientsHTML += '</ul>';
+
+            let instructionsHTML = '';
+            if (householdData.subscriptionTier === 'paid' && recipe.instructions && recipe.instructions.length > 0) {
+                const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+                instructionsHTML = `
+                    <div class="instructions-container">
+                        <button class="instructions-toggle secondary premium">Show Instructions</button>
+                        <div class="instructions-list" style="display: none;">
+                            <h4>Instructions</h4>
+                            <ol>${instructionsList}</ol>
                         </div>
-                    `;
-                }
-
-                let ratingHTML = '<div class="star-rating">';
-                for (let i = 1; i <= 5; i++) {
-                    ratingHTML += `<span class="star ${i <= (recipe.rating || 0) ? 'filled' : ''}" data-rating="${i}" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">★</span>`;
-                }
-                ratingHTML += '</div>';
-
-                let nutritionHTML = '';
-                if (recipe.nutrition) {
-                    nutritionHTML = `
-                        <div class="nutrition-info">
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.calories || 'N/A'}</span><span>Calories</span></div>
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.protein || 'N/A'}</span><span>Protein</span></div>
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.carbs || 'N/A'}</span><span>Carbs</span></div>
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.fat || 'N/A'}</span><span>Fat</span></div>
-                        </div>
-                    `;
-                }
-                const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
-
-                recipeCard.innerHTML = `
-                    <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">X</button>
-                    <div class="image-container">
-                        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
-                        <button class="swap-image-btn secondary" data-query="${escapeAttr(recipe.imageQuery || recipe.title)}">🔄</button>
                     </div>
-                    <h3><a href="${googleSearchUrl}" target="_blank">${recipe.title} 🔗</a></h3>
-                    <div class="modal-card-actions">
-                        <button class="favorite-from-modal-btn secondary">Favorite ⭐</button>
-                        <button class="add-to-plan-btn secondary">Add to Plan Again</button>
-                    </div>
-                    ${servingSizeHTML}
-                    ${ratingHTML}
-                    <p>${recipe.description}</p>
-                    ${nutritionHTML}
-                    ${instructionsHTML}
-                    <strong>Ingredients:</strong>
-                    ${ingredientsHTML}
                 `;
-                modalRecipeList.appendChild(recipeCard);
-            });
-        }
+            }
+
+            let ratingHTML = '<div class="star-rating">';
+            for (let i = 1; i <= 5; i++) {
+                ratingHTML += `<span class="star ${i <= (recipe.rating || 0) ? 'filled' : ''}" data-rating="${i}" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">★</span>`;
+            }
+            ratingHTML += '</div>';
+
+            let nutritionHTML = '';
+            if (recipe.nutrition) {
+                nutritionHTML = `
+                    <div class="nutrition-info">
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.calories || 'N/A'}</span><span>Calories</span></div>
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.protein || 'N/A'}</span><span>Protein</span></div>
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.carbs || 'N/A'}</span><span>Carbs</span></div>
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.fat || 'N/A'}</span><span>Fat</span></div>
+                    </div>
+                `;
+            }
+            const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
+
+            recipeCard.innerHTML = `
+                <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">X</button>
+                <div class="image-container">
+                    <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
+                    <button class="swap-image-btn secondary" data-query="${escapeAttr(recipe.imageQuery || recipe.title)}">🔄</button>
+                </div>
+                <h3><a href="${googleSearchUrl}" target="_blank">${recipe.title} 🔗</a></h3>
+                <div class="modal-card-actions">
+                    <button class="favorite-from-modal-btn secondary">Favorite ⭐</button>
+                    <button class="add-to-plan-btn secondary">Add to Plan Again</button>
+                </div>
+                ${servingSizeHTML}
+                ${ratingHTML}
+                <p>${recipe.description}</p>
+                ${nutritionHTML}
+                ${instructionsHTML}
+                <strong>Ingredients:</strong>
+                ${ingredientsHTML}
+            `;
+            modalRecipeList.appendChild(recipeCard);
+        });
+        mealPlanModal.style.display = 'block';
     }
-    mealPlanModal.style.display = 'block';
 }
 
 async function handleModalClick(event) {
@@ -2024,6 +2112,26 @@ async function handleModalClick(event) {
             list.style.display = isVisible ? 'none' : 'block';
         }
         return;
+    }
+
+    // Handle clicks within the "select meal" modal
+    const selectMealItem = target.closest('.select-meal-item');
+    if (selectMealItem) {
+        const selectMealModal = target.closest('#select-meal-modal');
+        const recipe = JSON.parse(selectMealItem.dataset.recipe);
+        const day = selectMealModal.dataset.day;
+        const meal = selectMealModal.dataset.meal;
+
+        // Calculate the target date based on the current week view
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(day);
+        const targetDate = new Date(startOfWeek);
+        targetDate.setDate(startOfWeek.getDate() + dayIndex);
+
+        await addRecipeToPlan(targetDate, meal, recipe);
+        selectMealModal.style.display = 'none';
+        return; // Exit after handling
     }
 
     const recipeDetailModal = target.closest('#recipe-detail-modal');
