@@ -703,24 +703,47 @@ exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) 
                     const recipe = plan[day][meal][recipeId];
                     if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
                         recipe.ingredients.forEach(ing => {
-                            if (typeof ing !== 'object' || !ing.name) return;
+                            let name, quantity, category;
 
-                            const normalizedName = normalizeIngredientName(ing.name);
+                            // Handle both new object format and legacy string format
+                            if (typeof ing === 'object' && ing.name) {
+                                name = ing.name;
+                                quantity = `${ing.quantity || ''} ${ing.unit || ''}`.trim();
+                                category = ing.category || 'Other';
+                            } else if (typeof ing === 'string') {
+                                // For legacy strings, we can't reliably parse quantity, so it's blank.
+                                name = ing;
+                                quantity = "";
+                                category = 'Other';
+                            } else {
+                                return; // Skip unrecognized format
+                            }
+
+                            const normalizedName = normalizeIngredientName(name);
                             if (!normalizedName || EXCLUDED_ITEMS.has(normalizedName)) {
                                 return; // Skip excluded or empty items
                             }
                             
-                            const quantity = `${ing.quantity || ''} ${ing.unit || ''}`.trim();
-
                             if (neededIngredients.has(normalizedName)) {
                                 const existing = neededIngredients.get(normalizedName);
-                                existing.quantity = aggregateQuantities(existing.quantity, quantity);
-                                // Keep the category from the first item encountered
+                                // If a legacy item (no quantity) is aggregated with another,
+                                // we just mark it as "2 items" etc.
+                                if (quantity === "") {
+                                    if (existing.quantity === "") {
+                                        existing.quantity = "2 items";
+                                    } else if (existing.quantity.endsWith(" items")) {
+                                        const count = parseInt(existing.quantity, 10) + 1;
+                                        existing.quantity = `${count} items`;
+                                    }
+                                    // If a legacy item is added to an item with a real quantity, we don't change the quantity.
+                                } else {
+                                     existing.quantity = aggregateQuantities(existing.quantity, quantity);
+                                }
                             } else {
                                 neededIngredients.set(normalizedName, {
                                     name: normalizedName,
                                     quantity: quantity,
-                                    category: ing.category || 'Other',
+                                    category: category,
                                 });
                             }
                         });
