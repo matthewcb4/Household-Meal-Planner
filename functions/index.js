@@ -1234,7 +1234,7 @@ exports.testStripeSecret = onCall({ enforceAppCheck: true }, async (request) => 
 });
 
 // --- getCommunityRecipes (FIXED FOR TIMEZONES) ---
-exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: false }, async (request) => {
+exports.getCommunityRecipes = onCall({ region: "us-central1", enforceAppCheck: true }, async (request) => {
     try {
         // 1. Get Today's & Yesterday's Suggestions to cover all timezones
         const today = new Date();
@@ -1501,7 +1501,7 @@ exports.updateRecipeImage = onCall({ enforceAppCheck: true }, async (request) =>
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
 
-    const { recipeId, newImageUrl, newImageSource, mealPlanDetails, suggestionDetails } = request.data;
+    const { recipeId, newImageUrl, mealPlanDetails, suggestionDetails } = request.data;
     const userDoc = await db.collection('users').doc(request.auth.uid).get();
     const householdId = userDoc.data()?.householdId;
 
@@ -1509,34 +1509,20 @@ exports.updateRecipeImage = onCall({ enforceAppCheck: true }, async (request) =>
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const updateData = {
-        imageUrl: newImageUrl,
-        imageSource: newImageSource // Save the source of the new image
-    };
-
     try {
         // Scenario 1: Update a favorite recipe
         if (recipeId) {
             const favoriteRef = db.collection('households').doc(householdId).collection('favoriteRecipes').doc(recipeId);
-            await favoriteRef.update(updateData);
+            await favoriteRef.update({ imageUrl: newImageUrl });
             return { success: true, message: 'Favorite recipe image updated.' };
         }
         // Scenario 2: Update a recipe in a meal plan
         else if (mealPlanDetails) {
             const { weekId, day, meal, mealId } = mealPlanDetails;
             const mealPlanRef = db.collection('households').doc(householdId).collection('mealPlan').doc(weekId);
-            const mealPlanDoc = await mealPlanRef.get();
-            if (mealPlanDoc.exists()) {
-                const planData = mealPlanDoc.data();
-                // We need to update the specific nested object
-                if (planData.meals?.[day]?.[meal]?.[mealId]) {
-                    planData.meals[day][meal][mealId].imageUrl = newImageUrl;
-                    planData.meals[day][meal][mealId].imageSource = newImageSource;
-                    await mealPlanRef.set(planData);
-                    return { success: true, message: 'Meal plan recipe image updated.' };
-                }
-            }
-             throw new HttpsError('not-found', 'Could not find the meal plan item to update.');
+            const updatePath = `meals.${day}.${meal}.${mealId}.imageUrl`;
+            await mealPlanRef.update({ [updatePath]: newImageUrl });
+            return { success: true, message: 'Meal plan recipe image updated.' };
         }
         // NEW Scenario 3: Update a recipe in the daily suggestions
         else if (suggestionDetails) {
@@ -1551,7 +1537,6 @@ exports.updateRecipeImage = onCall({ enforceAppCheck: true }, async (request) =>
 
                 if (recipeIndex > -1) {
                     recipes[recipeIndex].imageUrl = newImageUrl;
-                    recipes[recipeIndex].imageSource = newImageSource;
                     await suggestionRef.update({ recipes: recipes });
                     return { success: true, message: 'Suggested recipe image updated.' };
                 } else {
