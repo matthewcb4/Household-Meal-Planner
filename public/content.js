@@ -20,19 +20,23 @@ const app = initializeApp(firebaseConfig);
 const functions = getFunctions(app);
 
 /**
- * Creates an HTML card for a single recipe on the blog listing page.
+ * Creates an HTML card for a single recipe.
  * @param {object} recipe - The recipe data object from Firestore.
  * @returns {string} - The HTML string for the recipe card.
  */
 function createBlogRecipeCard(recipe) {
     if (!recipe) return '';
+
     const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/282828/FFF?text=${encodeURIComponent(recipe.title)}`;
-    const recipeUrl = `/recipe?slug=${recipe.slug}`;
+    const recipeUrl = `/recipe.html?slug=${recipe.slug}`;
 
     return `
         <a href="${recipeUrl}" class="feature-card" style="text-align: left; text-decoration: none; color: inherit;">
             <img src="${imageUrl}" alt="${recipe.title}" style="width: 100%; height: 200px; object-fit: cover; border-radius: var(--border-radius); margin-bottom: 1rem;">
-            <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">${recipe.title}</h3>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">${recipe.title}</h3>
+                <strong style="color: var(--primary-accent-color); font-size: 0.9rem; white-space: nowrap;">${recipe.mealType || ''}</strong>
+            </div>
             <p style="color: var(--text-secondary-color);">${recipe.description}</p>
         </a>
     `;
@@ -53,7 +57,7 @@ function populateRecipePage(recipe) {
     if (!container) return;
     
     const imageUrl = recipe.imageUrl || `https://placehold.co/800x400/282828/FFF?text=${encodeURIComponent(recipe.title)}`;
-    const ingredientsList = (recipe.ingredients || []).map(ing => `<li>${ing.quantity || ''} ${ing.unit || ''} ${ing.name || ''}</li>`.trim()).join('');
+    const ingredientsList = (recipe.ingredients || []).map(ing => `<li>${ing.quantity} ${ing.unit} ${ing.name}</li>`).join('');
     const instructionsList = (recipe.instructions || []).map(step => `<li>${step}</li>`).join('');
     const nutrition = recipe.nutrition || {};
 
@@ -63,6 +67,7 @@ function populateRecipePage(recipe) {
             <h1>${recipe.title}</h1>
             <p>${recipe.description}</p>
         </div>
+
         <div class="recipe-details">
             <div class="detail-item">
                 <strong>Servings</strong>
@@ -81,6 +86,7 @@ function populateRecipePage(recipe) {
                 <span>${nutrition.carbs || 'N/A'}</span>
             </div>
         </div>
+
         <div class="recipe-body">
             <div class="recipe-ingredients">
                 <h2>Ingredients</h2>
@@ -91,6 +97,7 @@ function populateRecipePage(recipe) {
                 <ol>${instructionsList}</ol>
             </div>
         </div>
+        
         <div class="cta-box">
             <h2>Like this recipe?</h2>
             <p>Get unlimited AI-powered meal plans and smart grocery lists with the Auto Meal Chef app.</p>
@@ -99,55 +106,83 @@ function populateRecipePage(recipe) {
     `;
 }
 
-// Main function that runs after the page is loaded
+/**
+ * Groups recipes by date and then by their daily theme title.
+ * @param {Array<object>} recipes - The array of recipe objects.
+ * @returns {Map<string, Map<string, Array<object>>>} - A nested map of recipes.
+ */
+function groupRecipesByDateAndTheme(recipes) {
+    const grouped = new Map();
+
+    recipes.forEach(recipe => {
+        if (recipe.createdAt && recipe.createdAt._seconds) {
+            const date = new Date(recipe.createdAt._seconds * 1000);
+            const dateString = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            const themeTitle = recipe.dailyTitle || 'Individual Recipes';
+
+            if (!grouped.has(dateString)) {
+                grouped.set(dateString, new Map());
+            }
+            const dateGroup = grouped.get(dateString);
+
+            if (!dateGroup.has(themeTitle)) {
+                dateGroup.set(themeTitle, []);
+            }
+            dateGroup.get(themeTitle).push(recipe);
+        }
+    });
+
+    return grouped;
+}
+
+
+/**
+ * Main function that runs on page load.
+ */
 document.addEventListener('DOMContentLoaded', async () => {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
+
     const getPublicRecipes = httpsCallable(functions, 'getPublicRecipes');
 
-    // --- LOGIC FOR SINGLE RECIPE PAGE ---
-    // This code only runs if it finds the 'recipe-content-container' element
-    const recipeContainer = document.getElementById('recipe-content-container');
-    if (recipeContainer && params.has('slug')) {
+    // --- LOGIC FOR INDIVIDUAL RECIPE PAGE ---
+    if ((path.includes('/recipe.html') || path === '/recipe') && params.has('slug')) {
         const slug = params.get('slug');
+        const container = document.getElementById('recipe-content-container');
         try {
-            const result = await getPublicRecipes({ slug: slug });
-            if (result.data.recipe) {
-                populateRecipePage(result.data.recipe);
+            const result = await getPublicRecipes({ slug });
+            const recipe = result.data.recipe;
+            if (recipe) {
+                populateRecipePage(recipe);
             } else {
                  throw new Error("Recipe with that slug not found.");
             }
         } catch (error) {
             console.error("Error fetching single recipe:", error);
-            recipeContainer.innerHTML = "<h1>Recipe not found</h1><p>Sorry, we couldn't find the recipe you were looking for.</p>";
+            if(container) container.innerHTML = "<h1>Recipe not found</h1><p>Sorry, we couldn't find the recipe you were looking for.</p>";
         }
     } 
-    
     // --- LOGIC FOR BLOG LISTING PAGE ---
-    // This code only runs if it finds the 'recipe-grid-container' element
-    const gridContainer = document.getElementById('recipe-grid-container');
-    if (gridContainer) {
+    else if (path.includes('/blog.html') || path === '/blog') {
+        const gridContainer = document.getElementById('recipe-grid-container');
+        if (!gridContainer) return;
+        
         try {
-            const result = await getPublicRecipes({ limit: 21 });
+            const result = await getPublicRecipes({}); 
             const recipes = result.data.recipes;
             if (recipes && recipes.length > 0) {
-                const recipesByDate = {};
+                const groupedRecipes = groupRecipesByDateAndTheme(recipes);
                 
-                recipes.forEach(recipe => {
-                    if (recipe.createdAt && recipe.createdAt._seconds) {
-                        const date = new Date(recipe.createdAt._seconds * 1000);
-                        const dateString = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                        if (!recipesByDate[dateString]) recipesByDate[dateString] = [];
-                        recipesByDate[dateString].push(recipe);
-                    }
-                });
-
-                const sortedDates = Object.keys(recipesByDate).sort((a, b) => new Date(b) - new Date(a));
                 let finalHtml = '';
-                sortedDates.forEach(dateString => {
+                for (const [dateString, themes] of groupedRecipes.entries()) {
                     finalHtml += `<h2 class="blog-date-header">${dateString}</h2>`;
-                    finalHtml += recipesByDate[dateString].map(createBlogRecipeCard).join('');
-                });
+                    for (const [themeTitle, recipeGroup] of themes.entries()) {
+                        finalHtml += `<h3 class="daily-theme-header">${themeTitle}</h3>`;
+                        finalHtml += '<div class="features-grid">';
+                        finalHtml += recipeGroup.map(createBlogRecipeCard).join('');
+                        finalHtml += '</div>';
+                    }
+                }
                 
                 gridContainer.innerHTML = finalHtml;
             } else {
@@ -158,99 +193,114 @@ document.addEventListener('DOMContentLoaded', async () => {
             gridContainer.innerHTML = '<p>Could not load recipes at this time. Please try again later.</p>';
         }
     }
-
     // --- LOGIC FOR HOMEPAGE ---
-    // This code only runs if it finds the 'daily-recipe-container' element
-    const dailyRecipeContainer = document.getElementById('daily-recipe-container');
-    if (dailyRecipeContainer) {
-        try {
-            const result = await getPublicRecipes({ limit: 1 });
-            const recipes = result.data.recipes;
-            if (recipes && recipes.length > 0) {
-                const recipe = recipes[0];
-                const recipeUrl = `/recipe?slug=${encodeURIComponent(recipe.slug)}`;
-                dailyRecipeContainer.innerHTML = `
-                    <div class="how-it-works-image">
-                         <a href="${recipeUrl}"><img src="${recipe.imageUrl}" alt="${recipe.title}" onerror="this.onerror=null;this.src='https://placehold.co/1260x750/282828/FFF?text=Image+Not+Found';"></a>
-                    </div>
-                    <div class="step-text" style="text-align: left;">
-                        <h4 style="font-size: 1.5rem; margin-bottom: 1rem;">${recipe.title}</h4>
-                        <p>${recipe.description}</p>
-                        <a href="${recipeUrl}" class="primary-btn">View Full Recipe <i class="fas fa-arrow-right"></i></a>
-                    </div>
-                `;
+    else if (path === '/' || path.includes('/index.html')) {
+        // --- Recipe of the Day Logic ---
+        const dailyRecipeContainer = document.getElementById('daily-recipe-container');
+        if (dailyRecipeContainer) {
+            try {
+                const result = await getPublicRecipes({ limit: 3 });
+                const recipes = result.data.recipes;
+
+                if (!recipes || recipes.length < 3) {
+                    dailyRecipeContainer.innerHTML = '<p>No recipes of the day found. Our AI is cooking some up, check back tomorrow!</p>';
+                    return;
+                }
+
+                const dailyTitle = recipes[0].dailyTitle || "Today's Top Recipes";
+                
+                let recipesHtml = `<h3 class="daily-theme-header" style="text-align: center; margin-bottom: 2rem;">${dailyTitle}</h3>`;
+                recipesHtml += '<div class="features-grid">';
+                recipesHtml += recipes.map(createBlogRecipeCard).join('');
+                recipesHtml += '</div>';
+
+                dailyRecipeContainer.innerHTML = recipesHtml;
+
+            } catch (error) {
+                console.error("Error fetching recipe of the day:", error);
+                dailyRecipeContainer.innerHTML = '<p>Could not load today\'s recipes. Please try again later.</p>';
             }
-        } catch (error) {
-            console.error("Error fetching recipe of the day:", error);
-            dailyRecipeContainer.innerHTML = '<p>Could not load today\'s recipe. Please try again later.</p>';
         }
-    }
-        
-    // --- Demo Video ---
-    const watchDemoBtn = document.getElementById('watch-demo-btn');
-    const demoVideo = document.getElementById('demo-video');
-    if (watchDemoBtn && demoVideo) {
-        watchDemoBtn.addEventListener('click', () => {
-             setTimeout(() => {
-                demoVideo.play().catch(error => console.log('Autoplay was prevented:', error));
-            }, 500);
-        });
-    }
 
-    // --- Particle Background ---
-    const particleContainer = document.getElementById('particle-background');
-    if (particleContainer && typeof THREE !== 'undefined') {
-        let scene, camera, renderer, particles;
-        let windowHalfX = window.innerWidth / 2;
-        let windowHalfY = window.innerHeight / 2;
-        let mouseX = 0; let mouseY = 0;
+        // --- Particle Background Animation using Three.js ---
+        const particleContainer = document.getElementById('particle-background');
+        if (particleContainer && typeof THREE !== 'undefined') {
+            let scene, camera, renderer, particles, material;
+            let windowHalfX = window.innerWidth / 2;
+            let windowHalfY = window.innerHeight / 2;
+            let mouseX = 0;
+            let mouseY = 0;
 
-        function initParticles() {
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
-            camera.position.z = 1000;
-            const particleCount = 1000;
-            const particlesGeometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-            for (let i = 0; i < particleCount; i++) {
-                const i3 = i * 3;
-                positions[i3] = Math.random() * 2000 - 1000;
-                positions[i3 + 1] = Math.random() * 2000 - 1000;
-                positions[i3 + 2] = Math.random() * 2000 - 1000;
+            function initParticles() {
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 10000);
+                camera.position.z = 1000;
+
+                const particleCount = 1000;
+                const particlesGeometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(particleCount * 3);
+
+                for (let i = 0; i < particleCount; i++) {
+                    const i3 = i * 3;
+                    positions[i3] = Math.random() * 2000 - 1000;
+                    positions[i3 + 1] = Math.random() * 2000 - 1000;
+                    positions[i3 + 2] = Math.random() * 2000 - 1000;
+                }
+                particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                material = new THREE.PointsMaterial({
+                    color: 0x1DB954,
+                    size: 2,
+                    transparent: true,
+                    opacity: 0.7,
+                    blending: THREE.AdditiveBlending
+                });
+
+                particles = new THREE.Points(particlesGeometry, material);
+                scene.add(particles);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                particleContainer.appendChild(renderer.domElement);
+
+                document.addEventListener('mousemove', onDocumentMouseMove, false);
+                window.addEventListener('resize', onWindowResize, false);
             }
-            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            const material = new THREE.PointsMaterial({ color: 0x1DB954, size: 2, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending });
-            particles = new THREE.Points(particlesGeometry, material);
-            scene.add(particles);
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            particleContainer.appendChild(renderer.domElement);
-            document.addEventListener('mousemove', (event) => {
-                mouseX = (event.clientX - windowHalfX) / 2;
-                mouseY = (event.clientY - windowHalfY) / 2;
-            });
-            window.addEventListener('resize', () => {
+
+            function onWindowResize() {
                 windowHalfX = window.innerWidth / 2;
                 windowHalfY = window.innerHeight / 2;
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-        }
+            }
 
-        function animateParticles() {
-            requestAnimationFrame(animateParticles);
-            const time = Date.now() * 0.00005;
-            camera.position.x += (mouseX - camera.position.x) * 0.05;
-            camera.position.y += (-mouseY - camera.position.y) * 0.05;
-            camera.lookAt(scene.position);
-            particles.rotation.x = time * 0.2;
-            particles.rotation.y = time * 0.4;
-            renderer.render(scene, camera);
-        }
+            function onDocumentMouseMove(event) {
+                mouseX = (event.clientX - windowHalfX) / 2;
+                mouseY = (event.clientY - windowHalfY) / 2;
+            }
 
-        initParticles();
-        animateParticles();
+            function animateParticles() {
+                requestAnimationFrame(animateParticles);
+                renderParticles();
+            }
+
+            function renderParticles() {
+                const time = Date.now() * 0.00005;
+                camera.position.x += (mouseX - camera.position.x) * 0.05;
+                camera.position.y += (-mouseY - camera.position.y) * 0.05;
+                camera.lookAt(scene.position);
+
+                particles.rotation.x = time * 0.2;
+                particles.rotation.y = time * 0.4;
+                
+                renderer.render(scene, camera);
+            }
+
+            initParticles();
+            animateParticles();
+        }
     }
 });
+

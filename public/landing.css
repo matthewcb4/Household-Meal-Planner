@@ -33,6 +33,7 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    isolation: isolate; /* Create a stacking context to fix z-index issue */
 }
 
 h1, h2, h3, h4 {
@@ -478,6 +479,16 @@ section {
     margin-top: 0;
 }
 
+/* --- NEW: Daily Theme Header --- */
+.daily-theme-header {
+    width: 100%;
+    grid-column: 1 / -1;
+    font-size: 1.5rem;
+    color: var(--text-secondary-color);
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+
 
 /* --- Responsive Styles --- */
 @media (max-width: 992px) {
@@ -578,3 +589,4 @@ section {
     margin-left: auto;
     margin-right: auto;
 }
+
