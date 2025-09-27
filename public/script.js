@@ -1911,13 +1911,32 @@ async function handleCardClick(event) {
     }
 }
 
-async function populateSelectMealModal(day, meal) {
+async function populateSelectMealModal(day, meal, fetchNew = false) {
     const selectMealModalList = document.getElementById('select-meal-modal-list');
     selectMealModalList.innerHTML = '<div class="loading-spinner"></div>';
 
     try {
-        let recipes = [];
+        // Fetch new suggestions ONLY if requested by the user
+        if (fetchNew) {
+            const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
+            const result = await discoverRecipesFunc({
+                mealType: meal,
+                cuisine: householdData?.cuisine || '',
+                criteria: [],
+                unitSystem: unitSystem
+            });
 
+            const { recipes: newRecipes, remaining } = result.data;
+            if (newRecipes) {
+                // Add new recipes to the front of the global list to ensure they are seen
+                accumulatedRecipes.unshift(...newRecipes);
+            }
+             if (remaining !== undefined) {
+                showToast(`${remaining} suggestion(s) remaining today.`);
+            }
+        }
+
+        let recipes = [];
         // 1. Fetch favorite recipes for this meal type
         const favoritesRef = getFavoritesRef();
         if (favoritesRef) {
@@ -1927,36 +1946,34 @@ async function populateSelectMealModal(day, meal) {
             recipes.push(...favoriteRecipes);
         }
 
-        // 2. Fetch some new suggestions if we have less than 5 recipes
-        if (recipes.length < 5) {
-            const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
-            const result = await discoverRecipesFunc({
-                mealType: meal,
-                cuisine: householdData?.cuisine || '', // Use household cuisine if available
-                criteria: [],
-                unitSystem: unitSystem
-            });
+        // 2. Use existing suggestions from the global array
+        const favoriteTitles = new Set(recipes.map(r => r.title));
+        const uniqueExistingSuggestions = accumulatedRecipes
+            .filter(r => r.mealType === meal && !favoriteTitles.has(r.title));
+        recipes.push(...uniqueExistingSuggestions);
 
-            const { recipes: newRecipes } = result.data;
-
-            if (newRecipes) {
-                const favoriteTitles = new Set(recipes.map(r => r.title));
-                const uniqueNewRecipes = newRecipes.filter(r => !favoriteTitles.has(r.title));
-                recipes.push(...uniqueNewRecipes.slice(0, 5 - recipes.length));
+        // 3. De-duplicate and limit the final list
+        const uniqueRecipes = [];
+        const seenTitles = new Set();
+        for (const recipe of recipes) {
+            if (!seenTitles.has(recipe.title)) {
+                uniqueRecipes.push(recipe);
+                seenTitles.add(recipe.title);
             }
+             if (uniqueRecipes.length >= 5) break;
         }
 
-        if (recipes.length === 0) {
-            selectMealModalList.innerHTML = '<p>No meal ideas found. Try the Recipes tab for more options!</p>';
+        if (uniqueRecipes.length === 0) {
+            selectMealModalList.innerHTML = '<p>No meal ideas found. Click "Suggest More" for AI suggestions.</p>';
             return;
         }
 
-        // 3. Render the list
+        // 4. Render the list
         selectMealModalList.innerHTML = '';
         const list = document.createElement('ul');
         list.className = 'select-meal-list';
 
-        recipes.forEach(recipe => {
+        uniqueRecipes.forEach(recipe => {
             const listItem = document.createElement('li');
             listItem.className = 'select-meal-item';
             listItem.dataset.recipe = JSON.stringify(recipe);
@@ -1979,7 +1996,7 @@ async function populateSelectMealModal(day, meal) {
 
     } catch (error) {
         console.error("Error populating select meal modal:", error);
-        selectMealModalList.innerHTML = `<p>Sorry, couldn't load meal ideas. Please try the "Recipes" tab.</p>`;
+        selectMealModalList.innerHTML = `<p>Sorry, couldn't load meal ideas: ${error.message}</p>`;
     }
 }
 
@@ -2009,8 +2026,8 @@ async function handleMealSlotClick(event) {
         selectMealModal.dataset.day = day;
         selectMealModal.dataset.meal = meal;
 
-        // Populate the modal with recipe suggestions
-        populateSelectMealModal(day, meal);
+        // Populate the modal with recipe suggestions, but don't fetch new ones initially
+        populateSelectMealModal(day, meal, false);
 
     } else {
         // Open the existing "meal plan detail" modal
@@ -3526,6 +3543,14 @@ document.addEventListener('DOMContentLoaded', () => {
             householdData.lastCuisineUpdate = { toDate: () => new Date() };
             configurePaywallUI();
             showToast('Cuisine preference updated!');
+        }
+    });
+
+    document.getElementById('suggest-more-meals-btn')?.addEventListener('click', (e) => {
+        const modal = e.target.closest('#select-meal-modal');
+        if (modal) {
+            const { day, meal } = modal.dataset;
+            populateSelectMealModal(day, meal, true);
         }
     });
 
