@@ -610,7 +610,7 @@ const normalizeIngredientName = (name) => {
     return normalized.trim();
 };
 
-// --- HELPER: Aggregate ingredient quantities ---
+// --- HELPER: Aggregate ingredient quantities (UPDATED) ---
 // Combines quantities, adding them if units match, otherwise listing them.
 const aggregateQuantities = (q1, q2) => {
     if (q1 === undefined || q1 === null || String(q1).trim() === "") return q2;
@@ -658,6 +658,11 @@ const aggregateQuantities = (q1, q2) => {
     // If units match and both are numeric, add them
     if (num1 > 0 && num2 > 0 && unit1 === unit2) {
         const total = num1 + num2;
+        // Special handling for 'item' unit to avoid decimals and handle plurals
+        if (unit1 === 'item') {
+            const roundedTotal = Math.round(total);
+            return `${roundedTotal} item${roundedTotal > 1 ? 's' : ''}`;
+        }
         // Basic formatting, could be improved for complex fractions
         return `${Number(total.toFixed(2))} ${unit1}`;
     }
@@ -711,9 +716,8 @@ exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) 
                                 quantity = `${ing.quantity || ''} ${ing.unit || ''}`.trim();
                                 category = ing.category || 'Other';
                             } else if (typeof ing === 'string') {
-                                // For legacy strings, we can't reliably parse quantity, so it's blank.
                                 name = ing;
-                                quantity = "";
+                                quantity = "1 item"; // Default quantity for legacy items
                                 category = 'Other';
                             } else {
                                 return; // Skip unrecognized format
@@ -724,21 +728,14 @@ exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) 
                                 return; // Skip excluded or empty items
                             }
                             
+                            // If quantity is empty (e.g. from an object with no quantity/unit), default it
+                            if (quantity === "") {
+                                quantity = "1 item";
+                            }
+
                             if (neededIngredients.has(normalizedName)) {
                                 const existing = neededIngredients.get(normalizedName);
-                                // If a legacy item (no quantity) is aggregated with another,
-                                // we just mark it as "2 items" etc.
-                                if (quantity === "") {
-                                    if (existing.quantity === "") {
-                                        existing.quantity = "2 items";
-                                    } else if (existing.quantity.endsWith(" items")) {
-                                        const count = parseInt(existing.quantity, 10) + 1;
-                                        existing.quantity = `${count} items`;
-                                    }
-                                    // If a legacy item is added to an item with a real quantity, we don't change the quantity.
-                                } else {
-                                     existing.quantity = aggregateQuantities(existing.quantity, quantity);
-                                }
+                                existing.quantity = aggregateQuantities(existing.quantity, quantity);
                             } else {
                                 neededIngredients.set(normalizedName, {
                                     name: normalizedName,
