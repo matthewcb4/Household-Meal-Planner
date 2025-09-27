@@ -1911,6 +1911,90 @@ async function handleCardClick(event) {
     }
 }
 
+// Helper function to render a list of recipes into a given container
+function renderRecipeListToContainer(recipes, container, emptyMessage) {
+    container.innerHTML = '';
+    if (!recipes || recipes.length === 0) {
+        container.innerHTML = `<p>${emptyMessage}</p>`;
+        return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'select-meal-list';
+
+    recipes.forEach(recipe => {
+        const listItem = document.createElement('li');
+        listItem.className = 'select-meal-item';
+        listItem.dataset.recipe = JSON.stringify(recipe);
+
+        const favIcon = recipe.isFavorite ? '⭐ ' : '';
+
+        listItem.innerHTML = `
+            <div class="select-meal-item-img">
+                <img src="${recipe.imageUrl || `https://placehold.co/80x80/EEE/31343C?text=${encodeURIComponent(recipe.title)}`}" alt="${recipe.title}" loading="lazy">
+            </div>
+            <div class="select-meal-item-details">
+                <h4>${favIcon}${recipe.title}</h4>
+                <p>${(recipe.description || '').substring(0, 100)}...</p>
+            </div>
+        `;
+        list.appendChild(listItem);
+    });
+    container.appendChild(list);
+}
+
+
+async function populateSelectMealModal(day, meal, fetchNew = false) {
+    const favoritesListContainer = document.getElementById('select-meal-modal-favorites-list');
+    const ideasListContainer = document.getElementById('select-meal-modal-ideas-list');
+
+    // Set loading state for both tabs initially
+    favoritesListContainer.innerHTML = '<div class="loading-spinner"></div>';
+    ideasListContainer.innerHTML = '<div class="loading-spinner"></div>';
+
+    try {
+        // Fetch new suggestions ONLY if requested by the user.
+        if (fetchNew) {
+            const discoverRecipesFunc = httpsCallable(functions, 'discoverRecipes');
+            const result = await discoverRecipesFunc({
+                mealType: meal,
+                cuisine: householdData?.cuisine || '',
+                criteria: [],
+                unitSystem: unitSystem
+            });
+            const { recipes: newRecipes, remaining } = result.data;
+            if (newRecipes) {
+                accumulatedRecipes.unshift(...newRecipes);
+                // Also refresh the main recipe list in the background
+                displayRecipeResults(accumulatedRecipes, 'ideas');
+            }
+            if (remaining !== undefined) {
+                showToast(`${remaining} suggestion(s) remaining today.`);
+            }
+        }
+
+        // 1. Fetch ALL favorite recipes for the "Favorites" tab.
+        let favoriteRecipes = [];
+        const favoritesRef = getFavoritesRef();
+        if (favoritesRef) {
+            const q = query(favoritesRef, orderBy("title"));
+            const favSnapshot = await getDocs(q);
+            favoriteRecipes = favSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id, isFavorite: true }));
+        }
+        renderRecipeListToContainer(favoriteRecipes, favoritesListContainer, 'You have no favorite recipes yet. Star a recipe to add it here!');
+
+        // 2. Populate "Recipe Ideas" tab with accumulated recipes.
+        const favoriteTitles = new Set(favoriteRecipes.map(r => r.title));
+        const uniqueExistingSuggestions = accumulatedRecipes.filter(r => !favoriteTitles.has(r.title));
+        renderRecipeListToContainer(uniqueExistingSuggestions, ideasListContainer, 'No recipe ideas found. Use the "Recipes" tab to generate some!');
+
+    } catch (error) {
+        console.error("Error populating select meal modal:", error);
+        favoritesListContainer.innerHTML = `<p>Sorry, couldn't load favorites: ${error.message}</p>`;
+        ideasListContainer.innerHTML = `<p>Sorry, couldn't load ideas: ${error.message}</p>`;
+    }
+}
+
 async function handleMealSlotClick(event) {
     const slot = event.target.closest('.meal-slot');
     if (!slot) return;
@@ -1919,98 +2003,114 @@ async function handleMealSlotClick(event) {
     const meal = slot.dataset.meal;
     const mealPlanRef = getMealPlanRef();
     const docSnap = await getDoc(mealPlanRef);
+    const plan = docSnap.exists() ? docSnap.data() : {};
+    const mealsForSlot = plan.meals?.[day]?.[meal];
+    const isSlotEmpty = !mealsForSlot || Object.keys(mealsForSlot).length === 0;
 
-    const modalRecipeList = document.getElementById('modal-recipe-list');
-    const modalSlotTitle = document.getElementById('modal-slot-title');
-    const mealPlanModal = document.getElementById('meal-plan-modal');
+    const modalTitle = `${day.charAt(0).toUpperCase() + day.slice(1)} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
 
-    modalRecipeList.innerHTML = '';
-    modalSlotTitle.textContent = `${day.charAt(0).toUpperCase() + day.slice(1)} ${meal.charAt(0).toUpperCase() + meal.slice(1)}`;
+    if (isSlotEmpty) {
+        // Open the new "select meal" modal
+        const selectMealModal = document.getElementById('select-meal-modal');
+        const selectMealModalTitle = document.getElementById('select-meal-modal-title');
 
-    if (docSnap.exists()) {
-        const plan = docSnap.data();
-        const mealsForSlot = plan.meals?.[day]?.[meal];
-        if (mealsForSlot) {
-            Object.entries(mealsForSlot).forEach(([mealEntryId, recipe]) => {
-                const recipeCard = document.createElement('div');
-                recipeCard.className = 'recipe-card modal-recipe-item';
-                // Store source info in the recipe data itself for the swap function
-                const recipeWithSource = { ...recipe, source: { day, meal, mealId: mealEntryId } };
-                recipeCard.dataset.recipe = JSON.stringify(recipeWithSource);
-                recipeCard.dataset.day = day;
-                recipeCard.dataset.meal = meal;
-                recipeCard.dataset.id = mealEntryId;
+        selectMealModalTitle.textContent = `Add to ${modalTitle}`;
+        selectMealModal.style.display = 'block';
 
-                const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/EEE/31343C?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
-                const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
-                const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
+        // Store the target slot info for when a recipe is selected
+        selectMealModal.dataset.day = day;
+        selectMealModal.dataset.meal = meal;
 
-                let ingredientsHTML = '<ul>';
-                if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
-                    recipe.ingredients.forEach(ing => {
-                         let ingredientText = (typeof ing === 'object' && ing !== null && ing.name) ? `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim() : ing;
-                         ingredientsHTML += `<li>${ingredientText}</li>`;
-                    });
-                }
-                ingredientsHTML += '</ul>';
+        // Populate the modal with recipe suggestions, but don't fetch new ones initially
+        populateSelectMealModal(day, meal, false);
 
-                let instructionsHTML = '';
-                if (householdData.subscriptionTier === 'paid' && recipe.instructions && recipe.instructions.length > 0) {
-                    const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
-                    instructionsHTML = `
-                        <div class="instructions-container">
-                            <button class="instructions-toggle secondary premium">Show Instructions</button>
-                            <div class="instructions-list" style="display: none;">
-                                <h4>Instructions</h4>
-                                <ol>${instructionsList}</ol>
-                            </div>
+    } else {
+        // Open the existing "meal plan detail" modal
+        const modalRecipeList = document.getElementById('modal-recipe-list');
+        const modalSlotTitle = document.getElementById('modal-slot-title');
+        const mealPlanModal = document.getElementById('meal-plan-modal');
+
+        modalRecipeList.innerHTML = '';
+        modalSlotTitle.textContent = modalTitle;
+
+        Object.entries(mealsForSlot).forEach(([mealEntryId, recipe]) => {
+            const recipeCard = document.createElement('div');
+            recipeCard.className = 'recipe-card modal-recipe-item';
+            const recipeWithSource = { ...recipe, source: { day, meal, mealId: mealEntryId } };
+            recipeCard.dataset.recipe = JSON.stringify(recipeWithSource);
+            recipeCard.dataset.day = day;
+            recipeCard.dataset.meal = meal;
+            recipeCard.dataset.id = mealEntryId;
+
+            const imageUrl = recipe.imageUrl || `https://placehold.co/600x400/EEE/31343C?text=${encodeURIComponent(recipe.imageQuery || recipe.title)}`;
+            const googleSearchQuery = encodeURIComponent(`${recipe.title} recipe`);
+            const googleSearchUrl = `https://www.google.com/search?q=${googleSearchQuery}`;
+
+            let ingredientsHTML = '<ul>';
+            if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
+                recipe.ingredients.forEach(ing => {
+                     let ingredientText = (typeof ing === 'object' && ing !== null && ing.name) ? `${ing.quantity || ''} ${ing.unit || ''} ${ing.name}`.trim() : ing;
+                     ingredientsHTML += `<li>${ingredientText}</li>`;
+                });
+            }
+            ingredientsHTML += '</ul>';
+
+            let instructionsHTML = '';
+            if (householdData.subscriptionTier === 'paid' && recipe.instructions && recipe.instructions.length > 0) {
+                const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+                instructionsHTML = `
+                    <div class="instructions-container">
+                        <button class="instructions-toggle secondary premium">Show Instructions</button>
+                        <div class="instructions-list" style="display: none;">
+                            <h4>Instructions</h4>
+                            <ol>${instructionsList}</ol>
                         </div>
-                    `;
-                }
-
-                let ratingHTML = '<div class="star-rating">';
-                for (let i = 1; i <= 5; i++) {
-                    ratingHTML += `<span class="star ${i <= (recipe.rating || 0) ? 'filled' : ''}" data-rating="${i}" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">★</span>`;
-                }
-                ratingHTML += '</div>';
-
-                let nutritionHTML = '';
-                if (recipe.nutrition) {
-                    nutritionHTML = `
-                        <div class="nutrition-info">
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.calories || 'N/A'}</span><span>Calories</span></div>
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.protein || 'N/A'}</span><span>Protein</span></div>
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.carbs || 'N/A'}</span><span>Carbs</span></div>
-                            <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.fat || 'N/A'}</span><span>Fat</span></div>
-                        </div>
-                    `;
-                }
-                const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
-
-                recipeCard.innerHTML = `
-                    <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">X</button>
-                    <div class="image-container">
-                        <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
-                        <button class="swap-image-btn secondary" data-query="${escapeAttr(recipe.imageQuery || recipe.title)}">🔄</button>
                     </div>
-                    <h3><a href="${googleSearchUrl}" target="_blank">${recipe.title} 🔗</a></h3>
-                    <div class="modal-card-actions">
-                        <button class="favorite-from-modal-btn secondary">Favorite ⭐</button>
-                        <button class="add-to-plan-btn secondary">Add to Plan Again</button>
-                    </div>
-                    ${servingSizeHTML}
-                    ${ratingHTML}
-                    <p>${recipe.description}</p>
-                    ${nutritionHTML}
-                    ${instructionsHTML}
-                    <strong>Ingredients:</strong>
-                    ${ingredientsHTML}
                 `;
-                modalRecipeList.appendChild(recipeCard);
-            });
-        }
+            }
+
+            let ratingHTML = '<div class="star-rating">';
+            for (let i = 1; i <= 5; i++) {
+                ratingHTML += `<span class="star ${i <= (recipe.rating || 0) ? 'filled' : ''}" data-rating="${i}" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">★</span>`;
+            }
+            ratingHTML += '</div>';
+
+            let nutritionHTML = '';
+            if (recipe.nutrition) {
+                nutritionHTML = `
+                    <div class="nutrition-info">
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.calories || 'N/A'}</span><span>Calories</span></div>
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.protein || 'N/A'}</span><span>Protein</span></div>
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.carbs || 'N/A'}</span><span>Carbs</span></div>
+                        <div class="nutrition-item"><span class="nutrition-value">${recipe.nutrition.fat || 'N/A'}</span><span>Fat</span></div>
+                    </div>
+                `;
+            }
+            const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
+
+            recipeCard.innerHTML = `
+                <button class="remove-from-plan-btn" data-day="${day}" data-meal="${meal}" data-id="${mealEntryId}">X</button>
+                <div class="image-container">
+                    <img src="${imageUrl}" alt="${recipe.title}" class="recipe-image" onerror="this.onerror=null;this.src='https://placehold.co/600x400/EEE/31343C?text=Image+Not+Found';">
+                    <button class="swap-image-btn secondary" data-query="${escapeAttr(recipe.imageQuery || recipe.title)}">🔄</button>
+                </div>
+                <h3><a href="${googleSearchUrl}" target="_blank">${recipe.title} 🔗</a></h3>
+                <div class="modal-card-actions">
+                    <button class="favorite-from-modal-btn secondary">Favorite ⭐</button>
+                    <button class="add-to-plan-btn secondary">Add to Plan Again</button>
+                </div>
+                ${servingSizeHTML}
+                ${ratingHTML}
+                <p>${recipe.description}</p>
+                ${nutritionHTML}
+                ${instructionsHTML}
+                <strong>Ingredients:</strong>
+                ${ingredientsHTML}
+            `;
+            modalRecipeList.appendChild(recipeCard);
+        });
+        mealPlanModal.style.display = 'block';
     }
-    mealPlanModal.style.display = 'block';
 }
 
 async function handleModalClick(event) {
@@ -2024,6 +2124,26 @@ async function handleModalClick(event) {
             list.style.display = isVisible ? 'none' : 'block';
         }
         return;
+    }
+
+    // Handle clicks within the "select meal" modal
+    const selectMealItem = target.closest('.select-meal-item');
+    if (selectMealItem) {
+        const selectMealModal = target.closest('#select-meal-modal');
+        const recipe = JSON.parse(selectMealItem.dataset.recipe);
+        const day = selectMealModal.dataset.day;
+        const meal = selectMealModal.dataset.meal;
+
+        // Calculate the target date based on the current week view
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(day);
+        const targetDate = new Date(startOfWeek);
+        targetDate.setDate(startOfWeek.getDate() + dayIndex);
+
+        await addRecipeToPlan(targetDate, meal, recipe);
+        selectMealModal.style.display = 'none';
+        return; // Exit after handling
     }
 
     const recipeDetailModal = target.closest('#recipe-detail-modal');
@@ -3421,6 +3541,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    document.getElementById('suggest-more-meals-btn')?.addEventListener('click', (e) => {
+        const modal = e.target.closest('#select-meal-modal');
+        if (modal) {
+            const { day, meal } = modal.dataset;
+            populateSelectMealModal(day, meal, true);
+        }
+    });
+
     document.getElementById('manual-add-form')?.addEventListener('submit', handleManualAdd);
     document.getElementById('add-to-pantry-btn')?.addEventListener('click', addItemsToPantry);
     document.getElementById('item-confirmation-list')?.addEventListener('click', handleRemoveConfirmedItem);
@@ -3684,4 +3812,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // NEW: Upgrade Modal Listener
     document.getElementById('modal-upgrade-btn')?.addEventListener('click', handleUpgradeClick);
+
+    // NEW: Event listener for the tabs in the select meal modal
+    document.querySelector('#select-meal-modal .modal-tabs')?.addEventListener('click', (e) => {
+        if (e.target.classList.contains('tab-link')) {
+            const modal = e.target.closest('.modal-content');
+            modal.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
+            modal.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            e.target.classList.add('active');
+            const tabContentId = e.target.dataset.tab;
+            document.getElementById(tabContentId)?.classList.add('active');
+        }
+    });
 });

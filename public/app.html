@@ -343,6 +343,32 @@
     </div>
 
     <div id="meal-plan-modal" class="modal"><div class="modal-content"><span class="close-btn" id="modal-close-btn">&times;</span><h3 id="modal-slot-title"></h3><div id="modal-recipe-list"></div></div></div>
+    <!-- NEW: Modal for selecting a meal to add to an empty slot -->
+    <div id="select-meal-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="select-meal-modal-close-btn">&times;</span>
+            <h3 id="select-meal-modal-title">Add a Meal</h3>
+
+            <div class="modal-tabs">
+                <button class="tab-link active" data-tab="favorites-tab-content">Favorites</button>
+                <button class="tab-link" data-tab="ideas-tab-content">Recipe Ideas</button>
+            </div>
+
+            <div id="favorites-tab-content" class="tab-content active">
+                <div id="select-meal-modal-favorites-list">
+                    <!-- Favorites list will be populated here -->
+                </div>
+            </div>
+            <div id="ideas-tab-content" class="tab-content">
+                <div id="select-meal-modal-ideas-list">
+                    <!-- Recipe ideas list will be populated here -->
+                </div>
+                <div class="modal-actions">
+                    <button id="suggest-more-meals-btn" class="secondary">Suggest More ✨</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <div id="recipe-detail-modal" class="modal"><div class="modal-content" id="recipe-detail-content"></div></div>
     <div id="add-to-plan-modal" class="modal"><div class="modal-content"><span class="close-btn" id="add-to-plan-modal-close-btn">&times;</span><h3>Add Recipe to Meal Plan</h3><p>Select dates and mealtime for: <strong id="add-to-plan-recipe-title"></strong></p><form id="add-to-plan-form"><div id="calendar-container"><div id="calendar-header"><button type="button" id="calendar-prev-month" class="secondary">&lt;</button><h4 id="calendar-month-year"></h4><button type="button" id="calendar-next-month" class="secondary">&gt;</button></div><div id="calendar-grid"></div></div><label for="meal-select">Mealtime:</label><select id="meal-select" required><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select><button type="submit">Add to Plan</button></form></div></div>
     <div id="create-household-modal" class="modal"><div class="modal-content"><span class="close-btn" id="create-household-modal-close-btn">&times;</span><h3>Create Your Household</h3><p>Select your household's primary cuisine preference.</p><form id="create-household-form"><label for="household-cuisine-select">Cuisine Preference</label><select id="household-cuisine-select" required><option value="">Any</option></select><button type="submit">Create Household</button></form></div></div>

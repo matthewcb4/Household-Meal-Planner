@@ -1148,6 +1148,110 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     transform: scale(1.1);
 }
 
+/* --- Modal Tabs --- */
+.modal-tabs {
+    display: flex;
+    border-bottom: 2px solid var(--surface-highlight-color);
+    margin-bottom: 1rem;
+}
+
+.tab-link {
+    background: none;
+    border: none;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--text-secondary-color);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px; /* Align with the container's border */
+    transition: color 0.2s, border-color 0.2s;
+    text-transform: none; /* Override default button styles */
+    letter-spacing: normal;
+    border-radius: 0; /* Override default button styles */
+}
+
+.tab-link:hover {
+    color: var(--text-color);
+}
+
+.tab-link.active {
+    color: var(--primary-accent-color);
+    border-bottom-color: var(--primary-accent-color);
+    font-weight: 700;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadein 0.3s;
+}
+
+/* --- Select Meal Modal --- */
+.select-meal-list {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+    max-height: 50vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.select-meal-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    border-radius: var(--border-radius);
+    background-color: var(--surface-highlight-color);
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border: none; /* Override default li border */
+    margin-bottom: 0; /* Override default li margin */
+}
+
+.select-meal-item:hover {
+    background-color: #3e3e3e;
+}
+
+.select-meal-item-img {
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.select-meal-item-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.select-meal-item-details h4 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1rem;
+    border: none;
+    padding: 0;
+    color: var(--text-color);
+}
+
+.select-meal-item-details p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary-color);
+}
+
+.modal-actions {
+    margin-top: 1rem;
+    text-align: center;
+}
+
 /* NEW: Tooltip Styles */
 .tooltip-container {
     position: relative;
