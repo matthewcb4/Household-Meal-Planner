@@ -1024,8 +1024,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     #app-container {
         grid-template-columns: 1fr; /* Single column layout */
         grid-template-rows: 1fr auto; /* Content on top, sidebar at bottom */
-        height: 100vh; /* Fallback for older browsers */
-        height: 100dvh; /* Dynamic viewport height */
+        height: 100%; /* Use percentage-based height for better PWA compatibility */
         overflow: hidden; /* Prevent the whole container from scrolling */
     }
     .main-content {
