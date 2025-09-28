@@ -292,9 +292,7 @@ function getFavoritesRef() {
     return collection(db, 'households', householdId, 'favoriteRecipes');
 }
 function getWeekId(date = new Date()) {
-    // FIX: Consistently use UTC methods to prevent timezone-related miscalculations.
-    // This ensures that the week number is calculated based on the date's UTC value, not its local representation.
-    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
@@ -653,10 +651,8 @@ async function displayMealPlan() {
         });
 
         if (doc.exists()) {
-            console.log("Meal plan data from Firestore:", doc.data()); // DEBUG
             const plan = doc.data();
             const meals = plan.meals || {};
-            console.log("Processing meals object:", meals); // DEBUG
 
             Object.keys(meals).forEach(day => {
                 if(meals[day]) {
@@ -746,17 +742,8 @@ async function addRecipeToPlan(dateObject, meal, recipe) {
     const mealEntryId = `meal_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const recipeToSave = { ...recipe, rating: 0 };
 
-    // FIX: Use dot notation to update a specific nested field
-    // This prevents overwriting the entire 'meals' object.
-    const updatePath = `meals.${dayAbbr}.${meal}.${mealEntryId}`;
-
     try {
-        // By using a dynamic key with dot notation and { merge: true },
-        // we either create the document or update just the specific
-        // meal path without affecting other meals in the same week.
-        const data = {};
-        data[updatePath] = recipeToSave;
-        await setDoc(mealPlanRef, data, { merge: true });
+        await setDoc(mealPlanRef, { meals: { [dayAbbr]: { [meal]: { [mealEntryId]: recipeToSave } } } }, { merge: true });
     } catch (error) {
         console.error("Error adding recipe to plan:", error);
     }
@@ -2056,12 +2043,7 @@ async function populateSelectMealModal(day, meal, fetchNew = false) {
 
     // Set loading state for both tabs initially
     favoritesListContainer.innerHTML = '<div class="loading-spinner"></div>';
-    // Use a more prominent loader when fetching new ideas, otherwise use the simple spinner.
-    if (fetchNew) {
-        showLoadingState("Finding more ideas...", ideasListContainer);
-    } else {
-        ideasListContainer.innerHTML = '<div class="loading-spinner"></div>';
-    }
+    ideasListContainer.innerHTML = '<div class="loading-spinner"></div>';
 
     try {
         // Fetch new suggestions ONLY if requested by the user.
@@ -2242,7 +2224,6 @@ async function handleModalClick(event) {
     if (selectMealItem) {
         const selectMealModal = target.closest('#select-meal-modal');
         const recipe = JSON.parse(selectMealItem.dataset.recipe);
-        console.log("Recipe object from modal click:", recipe); // DEBUG
         const day = selectMealModal.dataset.day;
         const meal = selectMealModal.dataset.meal;
 
@@ -3746,7 +3727,6 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const meal = document.getElementById('meal-select').value;
         if (currentRecipeToPlan && selectedDates.length > 0 && meal) {
-            console.log("Recipe object from 'Add to Plan' form:", currentRecipeToPlan); // DEBUG
             for (const dateString of selectedDates) {
                 // FIX: Create date object in UTC to prevent timezone shift issues
                 const parts = dateString.split('-'); // "YYYY-MM-DD"
