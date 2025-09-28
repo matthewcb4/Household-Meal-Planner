@@ -290,8 +290,9 @@
                             </div>
                         </div>
                         <div id="grocery-scan-ui-placeholder" style="display: none;"></div>
-                        <form id="add-grocery-item-form" class="inline-form" style="display: none;">
-                            <input type="text" id="grocery-item-name" placeholder="e.g., Milk" required>
+                        <form id="add-grocery-item-form" class="form-grid" style="display: none;">
+                            <input type="text" id="grocery-item-name" placeholder="Item Name" required>
+                            <input type="text" id="grocery-item-quantity" placeholder="Quantity (e.g., 1.5 cups)" value="1 item">
                             <select id="grocery-item-category"></select>
                             <button type="submit">Add</button>
                         </form>
