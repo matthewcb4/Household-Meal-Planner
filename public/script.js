@@ -651,8 +651,10 @@ async function displayMealPlan() {
         });
 
         if (doc.exists()) {
+            console.log("Meal plan data from Firestore:", doc.data()); // DEBUG
             const plan = doc.data();
             const meals = plan.meals || {};
+            console.log("Processing meals object:", meals); // DEBUG
 
             Object.keys(meals).forEach(day => {
                 if(meals[day]) {
@@ -2224,6 +2226,7 @@ async function handleModalClick(event) {
     if (selectMealItem) {
         const selectMealModal = target.closest('#select-meal-modal');
         const recipe = JSON.parse(selectMealItem.dataset.recipe);
+        console.log("Recipe object from modal click:", recipe); // DEBUG
         const day = selectMealModal.dataset.day;
         const meal = selectMealModal.dataset.meal;
 
@@ -3727,6 +3730,7 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const meal = document.getElementById('meal-select').value;
         if (currentRecipeToPlan && selectedDates.length > 0 && meal) {
+            console.log("Recipe object from 'Add to Plan' form:", currentRecipeToPlan); // DEBUG
             for (const dateString of selectedDates) {
                 // FIX: Create date object in UTC to prevent timezone shift issues
                 const parts = dateString.split('-'); // "YYYY-MM-DD"
