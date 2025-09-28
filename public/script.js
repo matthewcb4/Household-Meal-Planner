@@ -484,10 +484,11 @@ async function displayGroceryList() {
                 groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
                     const listItem = document.createElement('li');
                     listItem.className = `grocery-item ${item.checked ? 'checked' : ''}`;
+                    const quantityText = item.quantity ? ` <span class="item-quantity">(${item.quantity})</span>` : '';
                     listItem.innerHTML = `
                         <div class="item-info">
                             <input type="checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
-                            <label>${item.name}</label>
+                            <label>${item.name}${quantityText}</label>
                         </div>
                         <div class="grocery-item-controls">
                             <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>Walmart</span></a>
