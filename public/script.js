@@ -292,7 +292,9 @@ function getFavoritesRef() {
     return collection(db, 'households', householdId, 'favoriteRecipes');
 }
 function getWeekId(date = new Date()) {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    // FIX: Consistently use UTC methods to prevent timezone-related miscalculations.
+    // This ensures that the week number is calculated based on the date's UTC value, not its local representation.
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
@@ -2052,7 +2054,12 @@ async function populateSelectMealModal(day, meal, fetchNew = false) {
 
     // Set loading state for both tabs initially
     favoritesListContainer.innerHTML = '<div class="loading-spinner"></div>';
-    ideasListContainer.innerHTML = '<div class="loading-spinner"></div>';
+    // Use a more prominent loader when fetching new ideas, otherwise use the simple spinner.
+    if (fetchNew) {
+        showLoadingState("Finding more ideas...", ideasListContainer);
+    } else {
+        ideasListContainer.innerHTML = '<div class="loading-spinner"></div>';
+    }
 
     try {
         // Fetch new suggestions ONLY if requested by the user.
@@ -2240,8 +2247,11 @@ async function handleModalClick(event) {
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
         const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(day);
-        const targetDate = new Date(startOfWeek);
-        targetDate.setDate(startOfWeek.getDate() + dayIndex);
+        const localTargetDate = new Date(startOfWeek);
+        localTargetDate.setDate(startOfWeek.getDate() + dayIndex);
+
+        // FIX: Create a new Date object in UTC to avoid timezone issues.
+        const targetDate = new Date(Date.UTC(localTargetDate.getFullYear(), localTargetDate.getMonth(), localTargetDate.getDate(), 12, 0, 0));
 
         await addRecipeToPlan(targetDate, meal, recipe);
         selectMealModal.style.display = 'none';
