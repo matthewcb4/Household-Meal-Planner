@@ -1742,9 +1742,9 @@ async function showMoveToPantryForm() {
         return;
     }
 
-    const formContainer = document.getElementById('move-to-pantry-form-container');
+    const modal = document.getElementById('move-to-pantry-modal');
     const form = document.getElementById('move-to-pantry-form');
-    form.innerHTML = '<h4>Review Items to Move</h4>'; // Clear previous and add a header
+    form.innerHTML = ''; // Clear previous form content
 
     const groceryRef = getGroceryListRef();
     if (!groceryRef) return;
@@ -1773,11 +1773,11 @@ async function showMoveToPantryForm() {
         }
     });
 
-    formContainer.style.display = 'block';
-    formContainer.scrollIntoView({ behavior: 'smooth' });
+    modal.style.display = 'block';
 }
 
 async function handleConfirmMoveToPantry() {
+    const modal = document.getElementById('move-to-pantry-modal');
     const form = document.getElementById('move-to-pantry-form');
     const movedItems = form.querySelectorAll('.move-item-row');
     if (movedItems.length === 0) {
@@ -1829,8 +1829,8 @@ async function handleConfirmMoveToPantry() {
         console.error("Error confirming move to pantry:", error);
         showToast("An error occurred while moving items.");
     } finally {
-        // Hide the form
-        document.getElementById('move-to-pantry-form-container').style.display = 'none';
+        // Hide the modal
+        modal.style.display = 'none';
         form.innerHTML = '';
     }
 }

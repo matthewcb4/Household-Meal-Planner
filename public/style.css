@@ -589,6 +589,11 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--p
     width: 100%; /* Make button fill its wrapper */
 }
 
+/* NEW: Add spacing to all form grids */
+.form-grid {
+    gap: 0.75rem;
+}
+
 .form-control-wrapper .toggle-switch {
    width: fit-content; /* Prevent the toggle switch from expanding */
 }
