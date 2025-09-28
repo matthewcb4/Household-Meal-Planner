@@ -2231,8 +2231,11 @@ async function handleModalClick(event) {
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
         const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(day);
-        const targetDate = new Date(startOfWeek);
-        targetDate.setDate(startOfWeek.getDate() + dayIndex);
+        const localTargetDate = new Date(startOfWeek);
+        localTargetDate.setDate(startOfWeek.getDate() + dayIndex);
+
+        // FIX: Create a new Date object in UTC to avoid timezone issues.
+        const targetDate = new Date(Date.UTC(localTargetDate.getFullYear(), localTargetDate.getMonth(), localTargetDate.getDate(), 12, 0, 0));
 
         await addRecipeToPlan(targetDate, meal, recipe);
         selectMealModal.style.display = 'none';
