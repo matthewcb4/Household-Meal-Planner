@@ -484,10 +484,11 @@ async function displayGroceryList() {
                 groupedItems[category].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
                     const listItem = document.createElement('li');
                     listItem.className = `grocery-item ${item.checked ? 'checked' : ''}`;
+                    const quantityText = item.quantity ? ` <span class="item-quantity">(${item.quantity})</span>` : '';
                     listItem.innerHTML = `
                         <div class="item-info">
                             <input type="checkbox" data-id="${item.id}" ${item.checked ? 'checked' : ''}>
-                            <label>${item.name}</label>
+                            <label>${item.name}${quantityText}</label>
                         </div>
                         <div class="grocery-item-controls">
                             <a href="https://www.walmart.com/search?q=${encodeURIComponent(item.name)}" target="_blank" class="walmart-search-btn" title="Search on Walmart"><span>Walmart</span></a>
@@ -1585,18 +1586,28 @@ async function handleAddGroceryItem(event) {
     const groceryRef = getGroceryListRef();
     if (!groceryRef) return;
     const itemNameInput = document.getElementById('grocery-item-name');
+    const itemQuantityInput = document.getElementById('grocery-item-quantity');
     const groceryItemCategorySelect = document.getElementById('grocery-item-category');
+
     const name = itemNameInput.value.trim();
+    const quantity = itemQuantityInput.value.trim();
     const category = groceryItemCategorySelect.value;
+
     if (name) {
         await addDoc(groceryRef, {
             name: name,
+            quantity: quantity,
             category: category,
             checked: false,
             createdAt: serverTimestamp()
         });
+
+        // Reset form
         itemNameInput.value = '';
-        // onSnapshot handles display
+        itemQuantityInput.value = '1 item';
+
+        // Hide form after adding
+        document.getElementById('add-grocery-item-form').style.display = 'none';
     }
 }
 
@@ -1683,7 +1694,47 @@ async function handleGroceryListClick(event) {
 }
 
 
-async function moveSelectedItemsToPantryDirectly() {
+// --- HELPER: Parse a quantity string like "1.5 cups" into [1.5, "cups"] ---
+function parseQuantity(quantityStr) {
+    if (!quantityStr || typeof quantityStr !== 'string') {
+        return [1, 'item'];
+    }
+    // Regex to separate numeric part from unit part
+    const regex = /^([0-9./\s-]+)?\s*(.*)$/;
+    const match = quantityStr.trim().match(regex);
+
+    if (!match) {
+        return [1, 'item'];
+    }
+
+    let numericPart = 0;
+    const unitPart = match[2] ? match[2].trim() : 'item';
+
+    if (match[1]) {
+        try {
+            const parts = match[1].trim().split(/\s+/);
+            numericPart = parts.reduce((acc, part) => {
+                if (part.includes('/')) {
+                    const [top, bottom] = part.split('/');
+                    return acc + (parseInt(top, 10) / parseInt(bottom, 10));
+                }
+                return acc + parseFloat(part);
+            }, 0);
+        } catch (e) {
+            numericPart = 1; // Default to 1 if parsing fails
+        }
+    }
+
+    // If no number was parsed, default to 1
+    if (numericPart === 0) {
+        numericPart = 1;
+    }
+
+    return [numericPart, unitPart || 'item'];
+}
+
+
+async function showMoveToPantryForm() {
     const groceryList = document.getElementById('grocery-list');
     const checkedItems = groceryList.querySelectorAll('input[type="checkbox"]:checked');
     if (checkedItems.length === 0) {
@@ -1691,7 +1742,46 @@ async function moveSelectedItemsToPantryDirectly() {
         return;
     }
 
-    if (!confirm(`Move ${checkedItems.length} item(s) to your pantry? They will be removed from this list.`)) {
+    const modal = document.getElementById('move-to-pantry-modal');
+    const form = document.getElementById('move-to-pantry-form');
+    form.innerHTML = ''; // Clear previous form content
+
+    const groceryRef = getGroceryListRef();
+    if (!groceryRef) return;
+
+    const itemIdsToMove = Array.from(checkedItems).map(cb => cb.dataset.id);
+    const itemDocsPromises = itemIdsToMove.map(id => getDoc(doc(groceryRef, id)));
+    const groceryItemSnapshots = await Promise.all(itemDocsPromises);
+
+    groceryItemSnapshots.forEach(groceryItemDoc => {
+        if (groceryItemDoc.exists()) {
+            const item = groceryItemDoc.data();
+            const [quantity, unit] = parseQuantity(item.quantity);
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'form-grid move-item-row';
+            itemDiv.dataset.groceryItemId = groceryItemDoc.id;
+            itemDiv.dataset.originalName = item.name;
+            itemDiv.dataset.category = item.category || 'Other';
+
+            itemDiv.innerHTML = `
+                <label>${item.name}</label>
+                <input type="number" class="move-quantity" value="${quantity}" step="0.1">
+                <input type="text" class="move-unit" value="${unit}">
+            `;
+            form.appendChild(itemDiv);
+        }
+    });
+
+    modal.style.display = 'block';
+}
+
+async function handleConfirmMoveToPantry() {
+    const modal = document.getElementById('move-to-pantry-modal');
+    const form = document.getElementById('move-to-pantry-form');
+    const movedItems = form.querySelectorAll('.move-item-row');
+    if (movedItems.length === 0) {
+        showToast("No items to move.");
         return;
     }
 
@@ -1699,46 +1789,49 @@ async function moveSelectedItemsToPantryDirectly() {
     const groceryRef = getGroceryListRef();
     if (!pantryRef || !groceryRef) return;
 
-    try {
-        const batch = writeBatch(db);
+    const batch = writeBatch(db);
 
-        const pantrySnapshot = await getDocs(pantryRef);
-        const existingPantryItems = {};
-        pantrySnapshot.forEach(pantryDoc => {
-            const data = pantryDoc.data();
-            existingPantryItems[data.name.toLowerCase()] = { id: pantryDoc.id, ...data };
-        });
+    const pantrySnapshot = await getDocs(pantryRef);
+    const existingPantryItems = {};
+    pantrySnapshot.forEach(pantryDoc => {
+        existingPantryItems[pantryDoc.data().name.toLowerCase()] = { id: pantryDoc.id, ...pantryDoc.data() };
+    });
 
-        const itemIdsToMove = Array.from(checkedItems).map(cb => cb.dataset.id);
-        const itemDocsPromises = itemIdsToMove.map(id => getDoc(doc(groceryRef, id)));
-        const groceryItemSnapshots = await Promise.all(itemDocsPromises);
+    movedItems.forEach(itemRow => {
+        const name = itemRow.dataset.originalName.toLowerCase();
+        const groceryItemId = itemRow.dataset.groceryItemId;
+        const quantity = parseFloat(itemRow.querySelector('.move-quantity').value);
+        const unit = itemRow.querySelector('.move-unit').value.trim();
+        const category = itemRow.dataset.category;
 
-        groceryItemSnapshots.forEach(groceryItemDoc => {
-            if (groceryItemDoc.exists()) {
-                const item = groceryItemDoc.data();
-                const name = item.name.toLowerCase();
-                const quantity = 1;
-                const unit = 'units';
-                const category = item.category || 'Other';
-
-                if (existingPantryItems[name]) {
-                    const existingItem = existingPantryItems[name];
-                    const newQuantity = (existingItem.quantity || 0) + quantity;
-                    const itemRef = doc(pantryRef, existingItem.id);
-                    batch.update(itemRef, { quantity: newQuantity });
-                } else {
-                    const newItemRef = doc(pantryRef);
-                    batch.set(newItemRef, { name, quantity, unit, category, checked: false, addedBy: currentUser.email, createdAt: serverTimestamp() });
-                }
-                batch.delete(groceryItemDoc.ref);
+        if (name && !isNaN(quantity) && quantity > 0) {
+            if (existingPantryItems[name]) {
+                const existingItem = existingPantryItems[name];
+                // Simple quantity addition if units are the same, otherwise we just overwrite for simplicity.
+                const newQuantity = (existingItem.unit.toLowerCase() === unit.toLowerCase())
+                    ? (existingItem.quantity || 0) + quantity
+                    : quantity;
+                const itemRef = doc(pantryRef, existingItem.id);
+                batch.update(itemRef, { quantity: newQuantity, unit: unit });
+            } else {
+                const newItemRef = doc(pantryRef);
+                batch.set(newItemRef, { name, quantity, unit, category, checked: false, addedBy: currentUser.email, createdAt: serverTimestamp() });
             }
-        });
+            // Delete from grocery list
+            batch.delete(doc(groceryRef, groceryItemId));
+        }
+    });
 
+    try {
         await batch.commit();
-        // onSnapshot handles UI updates
+        showToast(`${movedItems.length} item(s) moved to pantry.`);
     } catch (error) {
-        console.error("Error moving items to pantry:", error);
-        showToast("There was an error moving items to the pantry.");
+        console.error("Error confirming move to pantry:", error);
+        showToast("An error occurred while moving items.");
+    } finally {
+        // Hide the modal
+        modal.style.display = 'none';
+        form.innerHTML = '';
     }
 }
 
@@ -3561,7 +3654,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('start-camera-btn')?.addEventListener('click', startCamera);
     document.getElementById('capture-btn')?.addEventListener('click', captureAndScan);
     document.getElementById('add-grocery-item-form')?.addEventListener('submit', handleAddGroceryItem);
-    document.getElementById('move-to-pantry-btn')?.addEventListener('click', moveSelectedItemsToPantryDirectly);
+    document.getElementById('move-to-pantry-btn')?.addEventListener('click', showMoveToPantryForm);
+    document.getElementById('confirm-move-btn')?.addEventListener('click', handleConfirmMoveToPantry);
     document.getElementById('import-recipe-form')?.addEventListener('submit', handleImportRecipe);
 
 

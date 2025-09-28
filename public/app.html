@@ -290,8 +290,9 @@
                             </div>
                         </div>
                         <div id="grocery-scan-ui-placeholder" style="display: none;"></div>
-                        <form id="add-grocery-item-form" class="inline-form" style="display: none;">
-                            <input type="text" id="grocery-item-name" placeholder="e.g., Milk" required>
+                        <form id="add-grocery-item-form" class="form-grid" style="display: none;">
+                            <input type="text" id="grocery-item-name" placeholder="Item Name" required>
+                            <input type="text" id="grocery-item-quantity" placeholder="Quantity (e.g., 1.5 cups)" value="1 item">
                             <select id="grocery-item-category"></select>
                             <button type="submit">Add</button>
                         </form>
@@ -315,11 +316,6 @@
                             <button id="move-to-pantry-btn" class="secondary">Move to Pantry</button>
                         </div>
                         <div id="grocery-list"></div>
-                        <div id="move-to-pantry-form-container" style="display: none; margin-top: 20px;">
-                            <h3>Confirm Items to Add to Pantry</h3>
-                            <form id="move-to-pantry-form"></form>
-                            <button id="confirm-move-btn" style="margin-top: 10px;">Confirm and Move</button>
-                        </div>
                     </section>
                 </div>
             </main>
@@ -327,6 +323,15 @@
     </div>
 
     <!-- Modals and other floating elements -->
+    <div id="move-to-pantry-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" id="move-to-pantry-modal-close-btn">&times;</span>
+            <h3>Move Items to Pantry</h3>
+            <p>Confirm the quantity and unit for each item being moved.</p>
+            <form id="move-to-pantry-form"></form>
+            <button id="confirm-move-btn" style="margin-top: 10px;">Confirm and Move</button>
+        </div>
+    </div>
     <div id="scan-item-container" style="display: none;">
         <div class="scan-modal-content">
             <span class="close-btn" id="close-scan-btn">&times;</span>

@@ -567,7 +567,113 @@ exports.importRecipeFromUrl = onCall({ timeoutSeconds: 540, region: "us-central1
 });
 
 
-// --- CLOUD FUNCTION (V2): generateGroceryList ---
+// --- HELPER: Excluded grocery items ---
+const EXCLUDED_ITEMS = new Set([
+    "water", "salt", "pepper", "black pepper", "salt and pepper", "cooking spray"
+]);
+
+// --- HELPER: Normalize ingredient names ---
+// Cleans and standardizes ingredient names for better aggregation.
+const normalizeIngredientName = (name) => {
+    if (!name) return "";
+    let normalized = name.toLowerCase().trim();
+
+    // Remove common preparation instructions
+    normalized = normalized.replace(/^(optional|sliced|chopped|diced|minced|crushed|whole|large|small|medium|fresh|to taste|for garnish)\s+/g, '');
+    normalized = normalized.replace(/,.*$/, ''); // Remove anything after a comma
+
+    // Handle plurals simply (e.g., "tomatoes" -> "tomato")
+    if (normalized.endsWith('oes')) {
+        normalized = normalized.slice(0, -2);
+    } else if (normalized.endsWith('s')) {
+        normalized = normalized.slice(0, -1);
+    }
+
+    // Common ingredient synonyms/grouping
+    const mappings = {
+        'avocado': 'avocado',
+        'onion': 'onion',
+        'garlic clove': 'garlic',
+        'clove of garlic': 'garlic',
+        'scallion': 'green onion',
+        'green onion': 'green onion',
+        'bell pepper': 'bell pepper',
+        'chili pepper': 'chili pepper'
+    };
+
+    for (const key in mappings) {
+        if (normalized.includes(key)) {
+            return mappings[key];
+        }
+    }
+
+    return normalized.trim();
+};
+
+// --- HELPER: Aggregate ingredient quantities (UPDATED) ---
+// Combines quantities, adding them if units match, otherwise listing them.
+const aggregateQuantities = (q1, q2) => {
+    if (q1 === undefined || q1 === null || String(q1).trim() === "") return q2;
+    if (q2 === undefined || q2 === null || String(q2).trim() === "") return q1;
+
+    const q1Str = String(q1).trim();
+    const q2Str = String(q2).trim();
+
+    // Regex to separate numeric part from unit part
+    const regex = /^([0-9./\s-]+)?\s*(.*)$/;
+
+    const match1 = q1Str.match(regex);
+    const match2 = q2Str.match(regex);
+
+    let num1 = 0;
+    const unit1 = (match1 && match1[2]) ? match1[2].trim().toLowerCase().replace(/s$/, '') : '';
+    if (match1 && match1[1]) {
+        try {
+            const parts = match1[1].trim().split(/\s+/);
+            num1 = parts.reduce((acc, part) => {
+                if (part.includes('/')) {
+                    const [top, bottom] = part.split('/');
+                    return acc + (parseInt(top, 10) / parseInt(bottom, 10));
+                }
+                return acc + parseFloat(part);
+            }, 0);
+        } catch (e) { /* ignore parse error */ }
+    }
+
+    let num2 = 0;
+    const unit2 = (match2 && match2[2]) ? match2[2].trim().toLowerCase().replace(/s$/, '') : '';
+    if (match2 && match2[1]) {
+        try {
+            const parts = match2[1].trim().split(/\s+/);
+            num2 = parts.reduce((acc, part) => {
+                if (part.includes('/')) {
+                    const [top, bottom] = part.split('/');
+                    return acc + (parseInt(top, 10) / parseInt(bottom, 10));
+                }
+                return acc + parseFloat(part);
+            }, 0);
+        } catch (e) { /* ignore parse error */ }
+    }
+
+    // If units match and both are numeric, add them
+    if (num1 > 0 && num2 > 0 && unit1 === unit2) {
+        const total = num1 + num2;
+        // Special handling for 'item' unit to avoid decimals and handle plurals
+        if (unit1 === 'item') {
+            const roundedTotal = Math.round(total);
+            return `${roundedTotal} item${roundedTotal > 1 ? 's' : ''}`;
+        }
+        // Basic formatting, could be improved for complex fractions
+        return `${Number(total.toFixed(2))} ${unit1}`;
+    }
+
+    // For non-numeric quantities (e.g., "a pinch") or different units
+    if (q1Str === q2Str) return q1Str; // Avoid "1 pinch + 1 pinch"
+    return `${q1Str} & ${q2Str}`;
+};
+
+
+// --- CLOUD FUNCTION (V2): generateGroceryList (UPDATED) ---
 exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'You must be logged in to generate a grocery list.');
@@ -602,16 +708,40 @@ exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) 
                     const recipe = plan[day][meal][recipeId];
                     if (recipe.ingredients && Array.isArray(recipe.ingredients)) {
                         recipe.ingredients.forEach(ing => {
-                            let name, category = 'Other';
+                            let name, quantity, category;
+
+                            // Handle both new object format and legacy string format
                             if (typeof ing === 'object' && ing.name) {
-                                name = ing.name.toLowerCase().trim();
+                                name = ing.name;
+                                quantity = `${ing.quantity || ''} ${ing.unit || ''}`.trim();
                                 category = ing.category || 'Other';
+                            } else if (typeof ing === 'string') {
+                                name = ing;
+                                quantity = "1 item"; // Default quantity for legacy items
+                                category = 'Other';
                             } else {
-                                name = String(ing).replace(/^[0-9.\\s/]+(lbs?|oz|g|kg|cups?|tbsps?)?\\s*/i, '').toLowerCase().trim();
+                                return; // Skip unrecognized format
+                            }
+
+                            const normalizedName = normalizeIngredientName(name);
+                            if (!normalizedName || EXCLUDED_ITEMS.has(normalizedName)) {
+                                return; // Skip excluded or empty items
                             }
                             
-                            if (name) {
-                                neededIngredients.set(name, { name, category });
+                            // If quantity is empty (e.g. from an object with no quantity/unit), default it
+                            if (quantity === "") {
+                                quantity = "1 item";
+                            }
+
+                            if (neededIngredients.has(normalizedName)) {
+                                const existing = neededIngredients.get(normalizedName);
+                                existing.quantity = aggregateQuantities(existing.quantity, quantity);
+                            } else {
+                                neededIngredients.set(normalizedName, {
+                                    name: normalizedName,
+                                    quantity: quantity,
+                                    category: category,
+                                });
                             }
                         });
                     }
@@ -620,21 +750,25 @@ exports.generateGroceryList = onCall({ enforceAppCheck: true }, async (request) 
         }
 
         const pantrySnapshot = await db.collection('households').doc(householdId).collection('pantryItems').get();
-        const pantryItems = new Set(pantrySnapshot.docs.map(doc => doc.data().name.toLowerCase().trim()));
+        // Normalize pantry item names for accurate comparison
+        const pantryItems = new Set(pantrySnapshot.docs.map(doc => normalizeIngredientName(doc.data().name)));
 
         const groceryListRef = db.collection('households').doc(householdId).collection('groceryListItems');
         const groceryListSnapshot = await groceryListRef.get();
-        const existingGroceryItems = new Set(groceryListSnapshot.docs.map(doc => doc.data().name.toLowerCase().trim()));
+        // Normalize existing grocery list item names
+        const existingGroceryItems = new Set(groceryListSnapshot.docs.map(doc => normalizeIngredientName(doc.data().name)));
 
         const batch = db.batch();
         let itemsAdded = 0;
 
         neededIngredients.forEach((ingredient, name) => {
+            // Check against normalized pantry and grocery lists
             if (!pantryItems.has(name) && !existingGroceryItems.has(name)) {
                 const newItemRef = groceryListRef.doc();
                 batch.set(newItemRef, {
                     name: ingredient.name,
                     category: ingredient.category,
+                    quantity: ingredient.quantity, // Add the aggregated quantity
                     checked: false,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
