@@ -742,8 +742,17 @@ async function addRecipeToPlan(dateObject, meal, recipe) {
     const mealEntryId = `meal_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
     const recipeToSave = { ...recipe, rating: 0 };
 
+    // FIX: Use dot notation to update a specific nested field
+    // This prevents overwriting the entire 'meals' object.
+    const updatePath = `meals.${dayAbbr}.${meal}.${mealEntryId}`;
+
     try {
-        await setDoc(mealPlanRef, { meals: { [dayAbbr]: { [meal]: { [mealEntryId]: recipeToSave } } } }, { merge: true });
+        // By using a dynamic key with dot notation and { merge: true },
+        // we either create the document or update just the specific
+        // meal path without affecting other meals in the same week.
+        const data = {};
+        data[updatePath] = recipeToSave;
+        await setDoc(mealPlanRef, data, { merge: true });
     } catch (error) {
         console.error("Error adding recipe to plan:", error);
     }
@@ -2231,11 +2240,8 @@ async function handleModalClick(event) {
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
         const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(day);
-        const localTargetDate = new Date(startOfWeek);
-        localTargetDate.setDate(startOfWeek.getDate() + dayIndex);
-
-        // FIX: Create a new Date object in UTC to avoid timezone issues.
-        const targetDate = new Date(Date.UTC(localTargetDate.getFullYear(), localTargetDate.getMonth(), localTargetDate.getDate(), 12, 0, 0));
+        const targetDate = new Date(startOfWeek);
+        targetDate.setDate(startOfWeek.getDate() + dayIndex);
 
         await addRecipeToPlan(targetDate, meal, recipe);
         selectMealModal.style.display = 'none';
