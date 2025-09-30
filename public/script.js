@@ -3650,6 +3650,10 @@ document.addEventListener('DOMContentLoaded', () => {
              document.getElementById('more-modal').style.display = 'none';
              document.getElementById('feedback-modal').style.display = 'block';
         }
+        if (target.closest('#settings-btn-modal')) {
+            document.getElementById('more-modal').style.display = 'none';
+            switchView('settings-section');
+        }
         if (target.closest('#copy-household-code-btn')) {
             const code = document.getElementById('household-code-text').textContent;
             navigator.clipboard.writeText(code).then(() => showToast('Household code copied!'));
