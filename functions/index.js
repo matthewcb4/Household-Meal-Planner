@@ -261,10 +261,10 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
 
         if (cookingEquipment && cookingEquipment.length > 0) {
-            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please consider these when suggesting recipes.`;
+            prompt += ` The user has access to this equipment: ${cookingEquipment.join(', ')}. The recipe instructions should be compatible with these tools where appropriate.`;
         }
         if (prioritizedEquipment) {
-            prompt += ` IMPORTANT: The user wants to prioritize using their ${prioritizedEquipment}. Ensure at least some suggestions heavily feature this equipment.`;
+            prompt += ` The user would prefer a recipe that uses their ${prioritizedEquipment}. The cooking instructions should be written specifically for a ${prioritizedEquipment}.`;
         }
         
         const otherCriteria = [];
@@ -279,7 +279,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
             }
         }
 
-        prompt += ` Include a mix of 3 simple recipes and 3 more complex recipes. For each recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
+        prompt += ` Include a mix of 3 simple recipes and 3 more complex recipes. For each recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. IMPORTANT: Do not include the name of the cooking equipment in the recipe 'title' unless it is a common part of the dish's name (e.g., 'Grilled Cheese'). Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys. Pantry ingredients: ${pantryItems.join(", ")}`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -344,10 +344,10 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
         
         if (cookingEquipment && cookingEquipment.length > 0) {
-            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please consider these when suggesting recipes.`;
+            prompt += ` The user has access to this equipment: ${cookingEquipment.join(', ')}. The recipe instructions should be compatible with these tools where appropriate.`;
         }
         if (prioritizedEquipment) {
-            prompt += ` IMPORTANT: The user wants to prioritize using their ${prioritizedEquipment}. Ensure at least some suggestions heavily feature this equipment.`;
+            prompt += ` The user would prefer a recipe that uses their ${prioritizedEquipment}. The cooking instructions should be written specifically for a ${prioritizedEquipment}.`;
         }
 
         const otherCriteria = [];
@@ -361,7 +361,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
                 prompt += ` The recipes should also meet the following criteria: ${otherCriteria.join(', ')}.`;
             }
         }
-        prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
+        prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. IMPORTANT: Do not include the name of the cooking equipment in the recipe 'title' unless it is a common part of the dish's name (e.g., 'Grilled Cheese'). Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
 
         const aiRequest = {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -429,15 +429,16 @@ exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforc
         let prompt = `You are an expert chef. A user wants a recipe for "${mealQuery}". Provide a single, detailed recipe for this meal.`;
 
         if (cookingEquipment && cookingEquipment.length > 0) {
-            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please tailor the recipe to use this equipment if relevant.`;
+            prompt += ` The user has access to this equipment: ${cookingEquipment.join(', ')}. The recipe instructions should be compatible with these tools where appropriate.`;
         }
         if (prioritizedEquipment) {
-            prompt += ` IMPORTANT: The user wants to prioritize using their ${prioritizedEquipment}. Ensure the recipe instructions are designed for this equipment.`;
+            prompt += ` The user would prefer a recipe that uses their ${prioritizedEquipment}. The cooking instructions should be written specifically for a ${prioritizedEquipment}.`;
         }
 
         prompt += `
         For the recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of all necessary ingredients, a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
         For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"].
+        IMPORTANT: Do not include the name of the cooking equipment in the recipe 'title' unless it is a common part of the dish's name (e.g., 'Grilled Cheese').
         Format your entire response as a single, valid JSON object with "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys.
         The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;
 
@@ -866,7 +867,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         The user's preferred cuisine is ${finalCuisine}.`;
 
         if (cookingEquipment && cookingEquipment.length > 0) {
-            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please prioritize recipes that can be made with this equipment.`;
+            prompt += ` The user has access to this equipment: ${cookingEquipment.join(', ')}. The recipe instructions should be compatible with these tools where appropriate.`;
         }
 
         if (otherCriteria.length > 0) {
@@ -889,6 +890,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         - The "imageQuery" value should be a simple keyword for an image search.
         - The "instructions" value must be an array of strings.
         - The "nutrition" value must be an object with "calories", "protein", "carbs", and "fat" as string values (e.g., "450 kcal", "30g").
+        - IMPORTANT: Do not include the name of the cooking equipment in the recipe 'title' unless it is a common part of the dish's name (e.g., 'Grilled Cheese').
         
         VERY IMPORTANT: Structure your entire response as a single, valid JSON object. The top-level keys should be the meal types you planned (e.g., "breakfast", "dinner").
         Each meal's value should be an object where the key is a unique meal ID (e.g., "meal_1700000000") and the value is the full recipe object described above.`;
