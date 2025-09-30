@@ -1073,7 +1073,9 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
         }
 
         res.setHeader('Content-Type', 'text/calendar');
-        res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate'); // Cache for 1 hour
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         res.status(200).send(value);
 
     } catch (error) {
