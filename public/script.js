@@ -1193,6 +1193,7 @@ function populateRecipeDetailModal(recipe, isFavorite) {
     }
 
     const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
+    const equipmentHTML = recipe.primaryEquipment ? `<div class="equipment-tag"><i class="fas fa-utensils"></i> ${recipe.primaryEquipment}</div>` : '';
 
     modalContent.innerHTML = `
         <div class="image-container" data-image-source="${imageSource}">
@@ -1201,7 +1202,10 @@ function populateRecipeDetailModal(recipe, isFavorite) {
             ${swapButtonHTML}
         </div>
         <h3><a href="${googleSearchUrl}" target="_blank" title="Search on Google">${recipe.title} 🔗</a></h3>
-        ${servingSizeHTML}
+        <div class="card-meta">
+            ${servingSizeHTML}
+            ${equipmentHTML}
+        </div>
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${nutritionHTML}
