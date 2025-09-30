@@ -246,7 +246,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
     
-    const { pantryItems, mealType, cuisine, criteria, unitSystem, timezone } = request.data;
+    const { pantryItems, mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment } = request.data;
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
@@ -259,6 +259,13 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         
         let prompt = `You are a helpful chef. Given the following list of pantry ingredients, suggest about 5 ${mealType} recipes.`;
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
+
+        if (cookingEquipment && cookingEquipment.length > 0) {
+            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please consider these when suggesting recipes.`;
+        }
+        if (prioritizedEquipment) {
+            prompt += ` IMPORTANT: The user wants to prioritize using their ${prioritizedEquipment}. Ensure at least some suggestions heavily feature this equipment.`;
+        }
         
         const otherCriteria = [];
         if (criteria && criteria.length > 0) {
@@ -322,7 +329,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const { mealType, cuisine, criteria, unitSystem, timezone } = request.data;
+    const { mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment } = request.data;
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
@@ -336,6 +343,13 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         let prompt = `You are a helpful chef. Suggest 6 popular and delicious ${mealType} recipes.`;
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
         
+        if (cookingEquipment && cookingEquipment.length > 0) {
+            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please consider these when suggesting recipes.`;
+        }
+        if (prioritizedEquipment) {
+            prompt += ` IMPORTANT: The user wants to prioritize using their ${prioritizedEquipment}. Ensure at least some suggestions heavily feature this equipment.`;
+        }
+
         const otherCriteria = [];
         if (criteria && criteria.length > 0) {
              if (criteria.includes("Quick Meal (<30 minutes)")) {
@@ -397,7 +411,7 @@ exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforc
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
     
-    const { mealQuery, unitSystem, timezone } = request.data;
+    const { mealQuery, unitSystem, timezone, cookingEquipment, prioritizedEquipment } = request.data;
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
@@ -412,7 +426,16 @@ exports.askTheChef = onCall({ timeoutSeconds: 540, region: "us-central1", enforc
         const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
         const apiUrl = `https://us-central1-aiplatform.googleapis.com/v1/projects/${projectId}/locations/us-central1/publishers/google/models/${GEMINI_MODEL_NAME}:generateContent`;
 
-        const prompt = `You are an expert chef. A user wants a recipe for "${mealQuery}". Provide a single, detailed recipe for this meal.
+        let prompt = `You are an expert chef. A user wants a recipe for "${mealQuery}". Provide a single, detailed recipe for this meal.`;
+
+        if (cookingEquipment && cookingEquipment.length > 0) {
+            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please tailor the recipe to use this equipment if relevant.`;
+        }
+        if (prioritizedEquipment) {
+            prompt += ` IMPORTANT: The user wants to prioritize using their ${prioritizedEquipment}. Ensure the recipe instructions are designed for this equipment.`;
+        }
+
+        prompt += `
         For the recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of all necessary ingredients, a simple image search keyword, step-by-step cooking instructions, and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g").
         For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"].
         Format your entire response as a single, valid JSON object with "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", and "nutrition" as keys.
@@ -794,7 +817,7 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
         throw new HttpsError('unauthenticated', 'You must be logged in.');
     }
 
-    const { day, criteria, pantryItems, existingMeals, unitSystem } = request.data;
+    const { day, criteria, pantryItems, existingMeals, unitSystem, cookingEquipment } = request.data;
     if (!day) {
         throw new HttpsError('invalid-argument', 'The function must be called with a "day".');
     }
@@ -841,6 +864,10 @@ exports.planSingleDay = onCall({ timeoutSeconds: 540, region: "us-central1", enf
 
         let prompt = `You are an expert meal planner. Create a meal plan for a single day, ${day}, with one recipe each for ${mealsToPlan.join(' and ')}.
         The user's preferred cuisine is ${finalCuisine}.`;
+
+        if (cookingEquipment && cookingEquipment.length > 0) {
+            prompt += ` The user has the following cooking equipment available: ${cookingEquipment.join(', ')}. Please prioritize recipes that can be made with this equipment.`;
+        }
 
         if (otherCriteria.length > 0) {
             if (otherCriteria.includes("Quick Meal (<30 minutes)")) {
