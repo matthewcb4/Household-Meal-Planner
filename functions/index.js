@@ -920,12 +920,12 @@ exports.scanReceipt = onCall({ timeoutSeconds: 540, region: "us-central1", enfor
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const usageCheck = await checkAndIncrementUsage(householdId, 'scan');
+    const { image, timezone } = request.data;
+    const usageCheck = await checkAndIncrementUsage(householdId, 'scan', timezone);
     if (!usageCheck.allowed) {
-        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free scans for the month.`);
+        throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your free scans for the day.`);
     }
 
-    const { image } = request.data;
     const projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId;
     const location = documentAiLocation.value(); 
     const processorId = documentAiProcessorId.value();
@@ -1034,7 +1034,7 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
             if (mealPlanDoc.exists) {
                 const plan = mealPlanDoc.data().meals || {};
                 const dayIndexMap = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
-                const mealTimes = { breakfast: 8, lunch: 13, dinner: 19 };
+                const mealTimes = { breakfast: { hour: 6, minute: 30 }, lunch: { hour: 12, minute: 0 }, dinner: { hour: 19, minute: 0 } };
 
                 for (const day in plan) {
                     const dayOffset = dayIndexMap[day];
@@ -1044,14 +1044,14 @@ exports.calendarFeed = onRequest({ cors: true }, async (req, res) => {
                     eventDate.setDate(eventDate.getDate() + dayOffset);
 
                     for (const meal in plan[day]) {
-                        const hour = mealTimes[meal];
-                        if (hour === undefined) continue;
+                        const mealTime = mealTimes[meal];
+                        if (mealTime === undefined) continue;
 
                         for (const recipeId in plan[day][meal]) {
                             const recipe = plan[day][meal][recipeId];
                             const event = {
                                 title: `${meal.charAt(0).toUpperCase() + meal.slice(1)}: ${recipe.title}`,
-                                start: [eventDate.getFullYear(), eventDate.getMonth() + 1, eventDate.getDate(), hour, 0],
+                                start: [eventDate.getFullYear(), eventDate.getMonth() + 1, eventDate.getDate(), mealTime.hour, mealTime.minute],
                                 duration: { hours: 1 },
                                 description: `Recipe: ${recipe.title}\\n\\n${recipe.description || ''}`,
                                 calName: 'Auto Meal Chef Plan',
