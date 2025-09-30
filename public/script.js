@@ -1075,11 +1075,16 @@ function createRecipeCard(recipe, isFavorite) {
 
     const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
 
+    const equipmentHTML = recipe.primaryEquipment ? `<div class="equipment-tag"><i class="fas fa-utensils"></i> ${recipe.primaryEquipment}</div>` : '';
+
     const cardContent = `
         <div class="recipe-card-header">
              <h3>${recipe.title}</h3>
         </div>
-        ${servingSizeHTML}
+        <div class="card-meta">
+            ${servingSizeHTML}
+            ${equipmentHTML}
+        </div>
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${nutritionHTML}
