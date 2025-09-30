@@ -246,7 +246,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
     
-    const { pantryItems, mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment } = request.data;
+    const { pantryItems, mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment, existingTitles } = request.data;
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
@@ -265,6 +265,9 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         }
         if (prioritizedEquipment) {
             prompt += ` The user would prefer a recipe that uses their ${prioritizedEquipment}. The cooking instructions should be written specifically for a ${prioritizedEquipment}.`;
+        }
+        if (existingTitles && existingTitles.length > 0) {
+            prompt += ` CRITICAL: The user has already been suggested the following recipes: ${existingTitles.join(', ')}. Do not suggest these exact recipes or simple variations again. Provide completely new ideas.`;
         }
         
         const otherCriteria = [];
@@ -329,7 +332,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const { mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment } = request.data;
+    const { mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment, existingTitles } = request.data;
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
@@ -348,6 +351,9 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         }
         if (prioritizedEquipment) {
             prompt += ` The user would prefer a recipe that uses their ${prioritizedEquipment}. The cooking instructions should be written specifically for a ${prioritizedEquipment}.`;
+        }
+        if (existingTitles && existingTitles.length > 0) {
+            prompt += ` CRITICAL: The user has already been suggested the following recipes: ${existingTitles.join(', ')}. Do not suggest these exact recipes or simple variations again. Provide completely new ideas.`;
         }
 
         const otherCriteria = [];

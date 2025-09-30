@@ -1293,13 +1293,15 @@ async function generateRecipes(items, source, append = false) {
 
     try {
         let result;
+        const existingTitles = accumulatedRecipes.map(r => r.title);
         const commonPayload = {
             mealType: selectedMealType,
             cuisine: selectedCuisine,
             criteria: allCriteria,
             unitSystem: unitSystem,
             cookingEquipment: cookingEquipment,
-            prioritizedEquipment: prioritizedEquipment
+            prioritizedEquipment: prioritizedEquipment,
+            existingTitles: existingTitles
         };
 
         if (source === 'Suggest from Pantry') {
