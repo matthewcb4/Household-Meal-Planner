@@ -41,6 +41,8 @@
                 <li><a href="#" class="nav-link" data-target="recipe-section"><i class="fas fa-book-open fa-fw"></i> <span>Recipes</span></a></li>
                 <li><a href="#" class="nav-link" data-target="pantry-section"><i class="fas fa-box fa-fw"></i> <span>Pantry</span></a></li>
                 <li><a href="#" class="nav-link" data-target="grocery-list-section"><i class="fas fa-shopping-cart fa-fw"></i> <span>Grocery List</span></a></li>
+                <!-- NEW: Settings Link (now hidden by default, managed by JS) -->
+                <li style="display: none;"><a href="#" class="nav-link" data-target="settings-section"><i class="fas fa-cog fa-fw"></i> <span>Settings</span></a></li>
                 <!-- UPDATED: Added a class to hide this by default until user logs in -->
                 <li class="mobile-only-nav" style="display: none;"><a href="#" id="more-nav-link"><i class="fas fa-ellipsis-h fa-fw"></i> <span>More</span></a></li>
             </ul>
@@ -280,6 +282,53 @@
                         </div>
                         <div id="grocery-list"></div>
                     </section>
+
+                    <!-- NEW: Settings Section -->
+                    <section id="settings-section" class="content-section">
+                        <h2>Settings</h2>
+                        <div class="settings-container">
+                            <div class="settings-group">
+                                <h3>Cooking Equipment</h3>
+                                <p>Select the cooking equipment you have available. This will help tailor recipe suggestions.</p>
+                                <div class="checkbox-group">
+                                    <label><input type="checkbox" name="cookingEquipment" value="Blackstone Grill"><span>Blackstone Grill</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="BBQ Grill"><span>BBQ Grill</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="Ninja Foodi"><span>Ninja Foodi</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="Pressure Cooker"><span>Pressure Cooker</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="Air Fryer"><span>Air Fryer</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="Slow Cooker"><span>Slow Cooker</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="Sous Vide"><span>Sous Vide</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="Wok"><span>Wok</span></label>
+                                    <label><input type="checkbox" name="cookingEquipment" value="Stand Mixer"><span>Stand Mixer</span></label>
+                                </div>
+                            </div>
+
+                            <div class="settings-group">
+                                <h3>Localization</h3>
+                                <div class="form-control-wrapper">
+                                    <label>Unit System</label>
+                                    <div class="toggle-switch">
+                                        <input type="radio" id="imperial-units-settings" name="unitSystem" value="imperial" checked>
+                                        <label for="imperial-units-settings">Imperial</label>
+                                        <input type="radio" id="metric-units-settings" name="unitSystem" value="metric">
+                                        <label for="metric-units-settings">Metric</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="settings-group">
+                                <h3>Allergies & Restrictions</h3>
+                                <p>These selections will apply to all recipe and meal plan suggestions.</p>
+                                <div class="checkbox-group">
+                                    <label><input type="checkbox" name="dietaryCriteria" value="Gluten-Free"><span>Gluten-Free</span></label>
+                                    <label><input type="checkbox" name="dietaryCriteria" value="Dairy-Free"><span>Dairy-Free</span></label>
+                                    <label><input type="checkbox" name="dietaryCriteria" value="Lactose-Intolerance"><span>Lactose-Intolerance</span></label>
+                                    <label><input type="checkbox" name="dietaryCriteria" value="Kosher"><span>Kosher</span></label>
+                                    <label><input type="checkbox" name="dietaryCriteria" value="Halal"><span>Halal</span></label>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </main>
         </div>
@@ -351,6 +400,7 @@
             <h3>More Options</h3>
             <div id="sidebar-calendar-container-mobile"></div>
             <div class="mobile-links-container">
+                 <a href="#" id="settings-btn-modal"><i class="fas fa-cog fa-fw"></i> <span>Settings</span></a>
                  <a href="/blog.html" target="_blank"><i class="fas fa-newspaper fa-fw"></i> <span>Recipe Blog</span></a>
                  <a href="#" id="feedback-btn-modal" title="Send Feedback"><i class="fas fa-comment-dots fa-fw"></i> <span>Send Feedback</span></a>
                  <a href="/terms.html" target="_blank"><i class="fas fa-file-contract fa-fw"></i> <span>Terms & Conditions</span></a>
