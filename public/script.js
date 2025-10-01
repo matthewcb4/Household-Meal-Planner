@@ -1087,16 +1087,11 @@ function createRecipeCard(recipe, isFavorite) {
 
     const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
 
-    const equipmentHTML = recipe.primaryEquipment ? `<div class="equipment-tag"><i class="fas fa-utensils"></i> ${recipe.primaryEquipment}</div>` : '';
-
     const cardContent = `
         <div class="recipe-card-header">
              <h3>${recipe.title}</h3>
         </div>
-        <div class="card-meta">
-            ${servingSizeHTML}
-            ${equipmentHTML}
-        </div>
+        ${servingSizeHTML}
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${nutritionHTML}
@@ -1205,7 +1200,6 @@ function populateRecipeDetailModal(recipe, isFavorite) {
     }
 
     const servingSizeHTML = recipe.servingSize ? `<div class="serving-size-info"><i class="fas fa-user-friends"></i> ${recipe.servingSize}</div>` : '';
-    const equipmentHTML = recipe.primaryEquipment ? `<div class="equipment-tag"><i class="fas fa-utensils"></i> ${recipe.primaryEquipment}</div>` : '';
 
     modalContent.innerHTML = `
         <div class="image-container" data-image-source="${imageSource}">
@@ -1214,10 +1208,7 @@ function populateRecipeDetailModal(recipe, isFavorite) {
             ${swapButtonHTML}
         </div>
         <h3><a href="${googleSearchUrl}" target="_blank" title="Search on Google">${recipe.title} 🔗</a></h3>
-        <div class="card-meta">
-            ${servingSizeHTML}
-            ${equipmentHTML}
-        </div>
+        ${servingSizeHTML}
         ${ratingHTML}
         <p>${recipe.description}</p>
         ${nutritionHTML}
@@ -1314,7 +1305,6 @@ async function generateRecipes(items, source, append = false) {
 
     try {
         let result;
-        const existingTitles = accumulatedRecipes.map(r => r.title);
         const commonPayload = {
             mealType: selectedMealType,
             cuisine: selectedCuisine,
@@ -2478,7 +2468,7 @@ async function saveUserPreferences() {
     if (!currentUser) return;
 
     // Consolidate criteria from both planner and recipe sections
-    const criteriaCheckboxes = document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="dietaryCriteria"]');
+    const criteriaCheckboxes = document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]');
     const allCriteria = new Set();
     criteriaCheckboxes.forEach(cb => {
         if (cb.checked) {
@@ -2486,19 +2476,11 @@ async function saveUserPreferences() {
         }
     });
 
-    const equipmentCheckboxes = document.querySelectorAll('input[name="cookingEquipment"]:checked');
-    const cookingEquipment = Array.from(equipmentCheckboxes).map(cb => cb.value);
-
     userPreferences.criteria = Array.from(allCriteria);
     userPreferences.unitSystem = document.querySelector('input[name="unitSystem"]:checked').value;
-    userPreferences.cookingEquipment = cookingEquipment;
 
     const userDocRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userDocRef, { preferences: userPreferences });
-
-    // NEW: After saving, repopulate the dropdown
-    populatePrioritizeEquipmentDropdown();
-
     showToast('Preferences saved!');
 }
 
@@ -2506,47 +2488,16 @@ async function saveUserPreferences() {
 function loadUserPreferences() {
     const savedCriteria = userPreferences.criteria || [];
     const savedUnitSystem = userPreferences.unitSystem || 'imperial';
-    const savedEquipment = userPreferences.cookingEquipment || [];
 
-    // Set criteria checkboxes across the app (planner, recipe, and now settings)
-    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="dietaryCriteria"]').forEach(checkbox => {
+    // Set criteria checkboxes across the app
+    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"]').forEach(checkbox => {
         checkbox.checked = savedCriteria.includes(checkbox.value);
     });
 
-    // Set cooking equipment checkboxes
-    document.querySelectorAll('input[name="cookingEquipment"]').forEach(checkbox => {
-        checkbox.checked = savedEquipment.includes(checkbox.value);
-    });
-
-    // Set unit system radio buttons across the app
-    document.querySelectorAll(`input[name="unitSystem"][value="${savedUnitSystem}"]`).forEach(radio => {
-        radio.checked = true;
-    });
-
-    // NEW: Populate the prioritize equipment dropdown on load
-    populatePrioritizeEquipmentDropdown();
-}
-
-// NEW: Function to populate the "Prioritize Equipment" dropdown
-function populatePrioritizeEquipmentDropdown() {
-    const select = document.getElementById('prioritize-equipment-select');
-    if (!select) return;
-
-    const savedEquipment = userPreferences.cookingEquipment || [];
-    const currentValue = select.value; // Preserve current selection if possible
-
-    select.innerHTML = '<option value="">Any</option>'; // Start with the default
-
-    savedEquipment.forEach(equipment => {
-        const option = document.createElement('option');
-        option.value = equipment;
-        option.textContent = equipment;
-        select.appendChild(option);
-    });
-
-    // Restore the previous selection if it's still a valid option
-    if (savedEquipment.includes(currentValue)) {
-        select.value = currentValue;
+    // Set unit system radio buttons
+    const unitRadio = document.querySelector(`input[name="unitSystem"][value="${savedUnitSystem}"]`);
+    if (unitRadio) {
+        unitRadio.checked = true;
     }
 }
 
@@ -2582,16 +2533,12 @@ async function handlePlanSingleDayClick(event) {
         return;
     }
 
-    const plannerPageCriteria = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked')).map(cb => cb.value);
-    const dietaryCriteria = Array.from(document.querySelectorAll('input[name="dietaryCriteria"]:checked')).map(cb => cb.value);
-    const allCriteria = [...new Set([...plannerPageCriteria, ...dietaryCriteria])];
-    const cookingEquipment = userPreferences.cookingEquipment || [];
-
+    const plannerCriteria = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked')).map(cb => cb.value);
     const dailyCuisineSelect = document.querySelector(`.daily-cuisine-select[data-day="${dayAbbr}"]`);
     const dailyCuisine = dailyCuisineSelect ? dailyCuisineSelect.value : '';
     const finalCuisine = dailyCuisine || (householdData ? householdData.cuisine : '');
     if (finalCuisine) {
-        allCriteria.push(finalCuisine);
+        plannerCriteria.push(finalCuisine);
     }
 
     let pantryItems = [];
@@ -2606,10 +2553,9 @@ async function handlePlanSingleDayClick(event) {
         const planSingleDayFunc = httpsCallable(functions, 'planSingleDay');
         const result = await planSingleDayFunc({
             day: dayFullName,
-            criteria: allCriteria,
+            criteria: plannerCriteria,
             pantryItems: pantryItems,
-            existingMeals: existingMealsForDay,
-            cookingEquipment: cookingEquipment
+            existingMeals: existingMealsForDay
         });
         const newDayPlan = result.data;
 
@@ -3113,10 +3059,6 @@ async function handlePlanMyWeek() {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const dayAbbreviations = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
     const weeklyPlannerCriteria = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked')).map(cb => cb.value);
-    const dietaryCriteria = Array.from(document.querySelectorAll('input[name="dietaryCriteria"]:checked')).map(cb => cb.value);
-    const allBaseCriteria = [...new Set([...weeklyPlannerCriteria, ...dietaryCriteria])];
-    const cookingEquipment = userPreferences.cookingEquipment || [];
-
     const planSingleDayFunc = httpsCallable(functions, 'planSingleDay');
     let hasErrors = false;
 
@@ -3149,7 +3091,7 @@ async function handlePlanMyWeek() {
             const dailyCuisine = dailyCuisineSelect ? dailyCuisineSelect.value : '';
             const finalCuisine = dailyCuisine || (householdData ? householdData.cuisine : '');
 
-            const dayCriteria = [...allBaseCriteria];
+            const dayCriteria = [...weeklyPlannerCriteria];
             if (finalCuisine && !dayCriteria.includes(finalCuisine)) {
                 dayCriteria.push(finalCuisine);
             }
@@ -3159,8 +3101,7 @@ async function handlePlanMyWeek() {
                 criteria: dayCriteria,
                 pantryItems: pantryItems,
                 existingMeals: existingMealsForDay,
-                unitSystem: unitSystem,
-                cookingEquipment: cookingEquipment
+                unitSystem: unitSystem
             });
 
             const newDayPlan = result.data;
@@ -3759,10 +3700,6 @@ document.addEventListener('DOMContentLoaded', () => {
              document.getElementById('more-modal').style.display = 'none';
              document.getElementById('feedback-modal').style.display = 'block';
         }
-        if (target.closest('#settings-btn-modal')) {
-            document.getElementById('more-modal').style.display = 'none';
-            switchView('settings-section');
-        }
         if (target.closest('#copy-household-code-btn')) {
             const code = document.getElementById('household-code-text').textContent;
             navigator.clipboard.writeText(code).then(() => showToast('Household code copied!'));
@@ -3961,15 +3898,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoadingState(loadingMessages, document.getElementById('recipe-results'), true);
         try {
             const askTheChefFunc = httpsCallable(functions, 'askTheChef');
-            const cookingEquipment = userPreferences.cookingEquipment || [];
-            const prioritizedEquipment = document.getElementById('prioritize-equipment-select').value;
-
-            const result = await askTheChefFunc({
-                mealQuery,
-                unitSystem,
-                cookingEquipment,
-                prioritizedEquipment
-            });
+            const result = await askTheChefFunc({ mealQuery, unitSystem });
 
             // MODIFIED: Handle new response format
             const { recipe: newRecipe, remaining, isPremium } = result.data;
@@ -4079,7 +4008,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('more-modal').style.display = 'block';
     });
 
-    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="unitSystem"], input[name="cookingEquipment"], input[name="dietaryCriteria"]').forEach(element => {
+    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="unitSystem"]').forEach(element => {
         element.addEventListener('change', handlePreferenceChange);
     });
 
