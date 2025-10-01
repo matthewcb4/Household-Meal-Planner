@@ -173,8 +173,13 @@ const PANTRY_CATEGORIES = ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry 
 let openPantryCategories = new Set(PANTRY_CATEGORIES);
 let openGroceryCategories = new Set(PANTRY_CATEGORIES);
 
-
-const CUISINE_OPTIONS = ["American", "Asian", "French", "Greek", "Indian", "Italian", "Mediterranean", "Mexican", "Spanish", "Thai"];
+// This will be populated from Firestore
+let DYNAMIC_OPTIONS = {
+    cuisines: [],
+    allergiesAndRestrictions: [],
+    commonDiets: [],
+    otherPreferences: []
+};
 
 // --- Function to create and manage the auth UI in the top bar ---
 function renderAuthUI(user) {
@@ -316,15 +321,21 @@ function populateCategoryDropdown(selectElement) {
         selectElement.appendChild(option);
     });
 }
-function populateCuisineDropdowns() {
-    const selects = [document.getElementById('cuisine-select'), document.getElementById('household-cuisine-select')];
+function populateCuisineDropdowns(cuisineOptions = []) {
+    const selects = [
+        document.getElementById('cuisine-select'),
+        document.getElementById('household-cuisine-select'),
+        ...document.querySelectorAll('.daily-cuisine-select')
+    ];
     selects.forEach(select => {
         if (select) {
             const currentValue = select.value;
             const anyOption = select.querySelector('option[value=""]');
             select.innerHTML = '';
             if (anyOption) select.appendChild(anyOption);
-            CUISINE_OPTIONS.forEach(cuisine => {
+
+            const optionsToUse = cuisineOptions.length > 0 ? cuisineOptions : DYNAMIC_OPTIONS.cuisines;
+            optionsToUse.forEach(cuisine => {
                 const option = document.createElement('option');
                 option.value = cuisine;
                 option.textContent = cuisine;
@@ -604,7 +615,7 @@ function renderMealPlanner() {
         select.className = 'daily-cuisine-select';
         select.dataset.day = day.toLowerCase();
         let optionsHTML = '<option value="">Household Cuisine</option>';
-        CUISINE_OPTIONS.forEach(c => {
+        DYNAMIC_OPTIONS.cuisines.forEach(c => {
             optionsHTML += `<option value="${c}">${c}</option>`;
         });
         select.innerHTML = optionsHTML;
@@ -2913,6 +2924,71 @@ async function markTourAsSeen() {
         await updateDoc(userDocRef, { hasSeenOnboardingTour: true });
     }
 }
+
+// --- DYNAMIC OPTIONS RENDERING ---
+async function loadAndRenderDynamicOptions() {
+    try {
+        const configRef = doc(db, 'appConfiguration', 'options');
+        const docSnap = await getDoc(configRef);
+
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            DYNAMIC_OPTIONS = {
+                cuisines: data.cuisines || [],
+                allergiesAndRestrictions: data.allergiesAndRestrictions || [],
+                commonDiets: data.commonDiets || [],
+                otherPreferences: data.otherPreferences || []
+            };
+
+            // Render all dynamic elements
+            populateCuisineDropdowns();
+            renderCheckboxOptions('planner-allergies-container', DYNAMIC_OPTIONS.allergiesAndRestrictions, 'plannerCriteria');
+            renderCheckboxOptions('recipe-allergies-container', DYNAMIC_OPTIONS.allergiesAndRestrictions, 'recipeCriteria');
+            renderCheckboxOptions('planner-diets-container', DYNAMIC_OPTIONS.commonDiets, 'plannerCriteria');
+            renderCheckboxOptions('recipe-diets-container', DYNAMIC_OPTIONS.commonDiets, 'recipeCriteria');
+            renderCheckboxOptions('planner-other-container', DYNAMIC_OPTIONS.otherPreferences, 'plannerCriteria');
+            renderCheckboxOptions('recipe-other-container', DYNAMIC_OPTIONS.otherPreferences, 'recipeCriteria');
+
+            // Re-apply any saved user preferences after rendering
+            loadUserPreferences();
+
+        } else {
+            console.error("App configuration document not found in Firestore!");
+            showToast("Could not load app configuration.");
+        }
+    } catch (error) {
+        console.error("Error loading dynamic options:", error);
+        showToast("Error loading app settings.");
+    }
+}
+
+function renderCheckboxOptions(containerId, options, nameAttribute) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.innerHTML = '';
+    options.forEach(option => {
+        const label = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.name = nameAttribute;
+        input.value = option;
+
+        const span = document.createElement('span');
+        // Handle special case for display text
+        if (option === "Quick Meal (<30 minutes)") {
+            span.textContent = "< 30 min";
+        } else {
+            span.textContent = option;
+        }
+
+        label.appendChild(input);
+        label.appendChild(span);
+        container.appendChild(label);
+    });
+}
+
+
 // NEW: Fetch and display community recipes
 async function fetchAndDisplayCommunityRecipes() {
     const container = document.getElementById('community-recipes-container');
@@ -3377,6 +3453,9 @@ async function handleUpgradeClick() {
 async function initializeAppUI(user) {
     currentUser = user;
 
+    // Load dynamic options from Firestore first
+    await loadAndRenderDynamicOptions();
+
     const userDocRef = doc(db, 'users', user.uid);
     let userDoc = await getDoc(userDocRef);
 
@@ -3545,7 +3624,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Service Worker registration failed:', error);
             });
     }
-    populateCuisineDropdowns();
+    // populateCuisineDropdowns(); // This is now called from initializeAppUI after data is fetched
 
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
