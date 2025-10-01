@@ -246,7 +246,7 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
     
-    const { pantryItems, mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment, existingTitles } = request.data;
+    const { pantryItems, mealType, cuisine, criteria, unitSystem, timezone, equipment } = request.data;
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
@@ -259,26 +259,17 @@ exports.suggestRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", en
         
         let prompt = `You are a helpful chef. Given the following list of pantry ingredients, suggest about 5 ${mealType} recipes.`;
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
-
-        if (cookingEquipment && cookingEquipment.length > 0) {
-            prompt += ` The user has access to this equipment: ${cookingEquipment.join(', ')}. The recipe instructions should be compatible with these tools where appropriate.`;
-        }
-        if (prioritizedEquipment) {
-            prompt += ` The user would prefer a recipe that uses their ${prioritizedEquipment}. The cooking instructions should be written specifically for a ${prioritizedEquipment}.`;
-        }
-        if (existingTitles && existingTitles.length > 0) {
-            prompt += ` CRITICAL: The user has already been suggested the following recipes: ${existingTitles.join(', ')}. Do not suggest these exact recipes or simple variations again. Provide completely new ideas.`;
-        }
+        if (equipment) prompt += ` The user would like to use their ${equipment}. Prioritize recipes that use this piece of equipment.`;
         
-        const otherCriteria = [];
         if (criteria && criteria.length > 0) {
-             if (criteria.includes("Quick Meal (<30 minutes)")) {
+            let tempCriteria = criteria.filter(c => c !== equipment); // Filter out equipment
+
+            if (tempCriteria.includes("Quick Meal (<30 minutes)")) {
                 prompt += ` The recipes should also be quick to make, taking less than 30 minutes.`;
-            } else {
-                otherCriteria.push(criteria.filter(c => c !== "Quick Meal (<30 minutes)"));
+                tempCriteria = tempCriteria.filter(c => c !== "Quick Meal (<30 minutes)");
             }
-            if(otherCriteria.length > 0) {
-                prompt += ` The recipes should also meet the following criteria: ${otherCriteria.join(', ')}.`;
+            if (tempCriteria.length > 0) {
+                prompt += ` The recipes should also meet the following other criteria: ${tempCriteria.join(', ')}.`;
             }
         }
 
@@ -332,7 +323,7 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
         throw new HttpsError('failed-precondition', 'User is not part of a household.');
     }
 
-    const { mealType, cuisine, criteria, unitSystem, timezone, cookingEquipment, prioritizedEquipment, existingTitles } = request.data;
+    const { mealType, cuisine, criteria, unitSystem, timezone, equipment } = request.data;
     const usageCheck = await checkAndIncrementUsage(householdId, 'recipeGeneration', timezone);
     if (!usageCheck.allowed) {
         throw new HttpsError('resource-exhausted', `You have used all ${usageCheck.limit} of your AI recipe suggestions for the day.`);
@@ -345,26 +336,17 @@ exports.discoverRecipes = onCall({ timeoutSeconds: 540, region: "us-central1", e
 
         let prompt = `You are a helpful chef. Suggest 6 popular and delicious ${mealType} recipes.`;
         if (cuisine) prompt += ` The user prefers ${cuisine} cuisine.`;
-        
-        if (cookingEquipment && cookingEquipment.length > 0) {
-            prompt += ` The user has access to this equipment: ${cookingEquipment.join(', ')}. The recipe instructions should be compatible with these tools where appropriate.`;
-        }
-        if (prioritizedEquipment) {
-            prompt += ` The user would prefer a recipe that uses their ${prioritizedEquipment}. The cooking instructions should be written specifically for a ${prioritizedEquipment}.`;
-        }
-        if (existingTitles && existingTitles.length > 0) {
-            prompt += ` CRITICAL: The user has already been suggested the following recipes: ${existingTitles.join(', ')}. Do not suggest these exact recipes or simple variations again. Provide completely new ideas.`;
-        }
+        if (equipment) prompt += ` The user would like to use their ${equipment}. Prioritize recipes that use this piece of equipment.`;
 
-        const otherCriteria = [];
         if (criteria && criteria.length > 0) {
-             if (criteria.includes("Quick Meal (<30 minutes)")) {
+            let tempCriteria = criteria.filter(c => c !== equipment); // Filter out equipment
+
+            if (tempCriteria.includes("Quick Meal (<30 minutes)")) {
                 prompt += ` The recipes should also be quick to make, taking less than 30 minutes.`;
-            } else {
-                otherCriteria.push(criteria.filter(c => c !== "Quick Meal (<30 minutes)"));
+                tempCriteria = tempCriteria.filter(c => c !== "Quick Meal (<30 minutes)");
             }
-            if(otherCriteria.length > 0) {
-                prompt += ` The recipes should also meet the following criteria: ${otherCriteria.join(', ')}.`;
+            if (tempCriteria.length > 0) {
+                prompt += ` The recipes should also meet the following other criteria: ${tempCriteria.join(', ')}.`;
             }
         }
         prompt += ` Include a mix of simple and more complex options. For each recipe, provide a title, a brief description, a serving size (e.g., "4 servings"), a list of ingredients, a single, simple keyword for an image search query, a step-by-step list of cooking instructions, the primary cooking equipment used (e.g., "Stovetop", "Air Fryer", "Oven"), and an estimated nutritional information object containing calories, protein, carbs, and fat as strings (e.g., "450 kcal", "30g"). For each ingredient, provide its name, quantity, unit (in the ${unitSystem || 'imperial'} system), and its category from this list: ["Produce", "Meat & Seafood", "Dairy & Eggs", "Pantry Staples", "Frozen", "Other"]. CRITICAL: The recipe 'title' MUST NOT contain the name of any cooking equipment. The instructions should be tailored to the equipment, but the title must be a standard recipe name. Format your entire response as a single, valid JSON array of objects. Each recipe object should have "title", "description", "servingSize", "ingredients", "imageQuery", "instructions", "primaryEquipment", and "nutrition" as keys. The "ingredients" key should be an array of objects, where each ingredient object has "name", "quantity", "unit", and "category" keys.`;

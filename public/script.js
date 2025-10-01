@@ -178,7 +178,8 @@ let DYNAMIC_OPTIONS = {
     cuisines: [],
     allergiesAndRestrictions: [],
     commonDiets: [],
-    otherPreferences: []
+    otherPreferences: [],
+    cookingEquipment: []
 };
 
 // --- Function to create and manage the auth UI in the top bar ---
@@ -1292,11 +1293,11 @@ async function generateRecipes(items, source, append = false) {
 
     const selectedMealType = document.querySelector('input[name="mealType"]:checked').value;
     const selectedCuisine = document.getElementById('cuisine-select').value;
-    const recipePageCriteria = Array.from(document.querySelectorAll('input[name="recipeCriteria"]:checked')).map(cb => cb.value);
-    const dietaryCriteria = Array.from(document.querySelectorAll('input[name="dietaryCriteria"]:checked')).map(cb => cb.value);
-    const allCriteria = [...new Set([...recipePageCriteria, ...dietaryCriteria])];
-    const cookingEquipment = userPreferences.cookingEquipment || [];
-    const prioritizedEquipment = document.getElementById('prioritize-equipment-select').value;
+    const selectedEquipment = document.getElementById('equipment-select').value;
+    const selectedCriteria = Array.from(document.querySelectorAll('input[name="recipeCriteria"]:checked')).map(cb => cb.value);
+    if (selectedEquipment) {
+        selectedCriteria.push(selectedEquipment);
+    }
 
     const loadingMessages = [
         `Whipping up ${selectedCuisine || ''} ${selectedMealType} ideas...`,
@@ -1317,11 +1318,9 @@ async function generateRecipes(items, source, append = false) {
         const commonPayload = {
             mealType: selectedMealType,
             cuisine: selectedCuisine,
-            criteria: allCriteria,
+            criteria: selectedCriteria,
             unitSystem: unitSystem,
-            cookingEquipment: cookingEquipment,
-            prioritizedEquipment: prioritizedEquipment,
-            existingTitles: existingTitles
+            equipment: selectedEquipment
         };
 
         if (source === 'Suggest from Pantry') {
@@ -2937,11 +2936,13 @@ async function loadAndRenderDynamicOptions() {
                 cuisines: data.cuisines || [],
                 allergiesAndRestrictions: data.allergiesAndRestrictions || [],
                 commonDiets: data.commonDiets || [],
-                otherPreferences: data.otherPreferences || []
+                otherPreferences: data.otherPreferences || [],
+                cookingEquipment: data.cookingEquipment || []
             };
 
             // Render all dynamic elements
             populateCuisineDropdowns();
+            populateEquipmentDropdown();
             renderCheckboxOptions('planner-allergies-container', DYNAMIC_OPTIONS.allergiesAndRestrictions, 'plannerCriteria');
             renderCheckboxOptions('recipe-allergies-container', DYNAMIC_OPTIONS.allergiesAndRestrictions, 'recipeCriteria');
             renderCheckboxOptions('planner-diets-container', DYNAMIC_OPTIONS.commonDiets, 'plannerCriteria');
@@ -2986,6 +2987,24 @@ function renderCheckboxOptions(containerId, options, nameAttribute) {
         label.appendChild(span);
         container.appendChild(label);
     });
+}
+
+function populateEquipmentDropdown() {
+    const select = document.getElementById('equipment-select');
+    if (!select) return;
+
+    const currentValue = select.value;
+    const anyOption = select.querySelector('option[value=""]');
+    select.innerHTML = '';
+    if (anyOption) select.appendChild(anyOption);
+
+    DYNAMIC_OPTIONS.cookingEquipment.forEach(equipment => {
+        const option = document.createElement('option');
+        option.value = equipment;
+        option.textContent = equipment;
+        select.appendChild(option);
+    });
+    select.value = currentValue;
 }
 
 
