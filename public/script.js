@@ -2949,6 +2949,8 @@ async function loadAndRenderDynamicOptions() {
             renderCheckboxOptions('recipe-diets-container', DYNAMIC_OPTIONS.commonDiets, 'recipeCriteria');
             renderCheckboxOptions('planner-other-container', DYNAMIC_OPTIONS.otherPreferences, 'plannerCriteria');
             renderCheckboxOptions('recipe-other-container', DYNAMIC_OPTIONS.otherPreferences, 'recipeCriteria');
+            // NEW: Render cooking equipment in the settings page
+            renderCheckboxOptions('settings-equipment-container', DYNAMIC_OPTIONS.cookingEquipment, 'cookingEquipment');
 
             // Re-apply any saved user preferences after rendering
             loadUserPreferences();
