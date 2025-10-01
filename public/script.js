@@ -2534,6 +2534,10 @@ async function handlePlanSingleDayClick(event) {
     }
 
     const plannerCriteria = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked')).map(cb => cb.value);
+    const plannerEquipment = document.getElementById('planner-equipment-select').value;
+    if (plannerEquipment) {
+        plannerCriteria.push(plannerEquipment);
+    }
     const dailyCuisineSelect = document.querySelector(`.daily-cuisine-select[data-day="${dayAbbr}"]`);
     const dailyCuisine = dailyCuisineSelect ? dailyCuisineSelect.value : '';
     const finalCuisine = dailyCuisine || (householdData ? householdData.cuisine : '');
@@ -3059,6 +3063,10 @@ async function handlePlanMyWeek() {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const dayAbbreviations = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
     const weeklyPlannerCriteria = Array.from(document.querySelectorAll('input[name="plannerCriteria"]:checked')).map(cb => cb.value);
+    const plannerEquipment = document.getElementById('planner-equipment-select').value;
+    if (plannerEquipment) {
+        weeklyPlannerCriteria.push(plannerEquipment);
+    }
     const planSingleDayFunc = httpsCallable(functions, 'planSingleDay');
     let hasErrors = false;
 
