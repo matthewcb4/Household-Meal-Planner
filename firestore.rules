@@ -69,5 +69,12 @@ service cloud.firestore {
         // Read/update/delete should be restricted to admins or backend processes.
         allow read, update, delete: if false;
     }
+
+    // App-wide configuration should be readable by any authenticated user.
+    match /appConfiguration/{docId} {
+      allow read: if isSignedIn();
+      // Writes should be restricted to admins from the console.
+      allow write: if false;
+    }
   }
 }
