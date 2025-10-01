@@ -98,37 +98,24 @@
                                         </div>
                                         <div class="sub-criteria-group">
                                             <h4>Allergies & Restrictions</h4>
-                                            <div class="checkbox-group">
-                                                <label><input type="checkbox" name="plannerCriteria" value="Gluten-Free"><span>Gluten-Free</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Dairy-Free"><span>Dairy-Free</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Lactose-Intolerance"><span>Lactose-Intolerance</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Kosher"><span>Kosher</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Halal"><span>Halal</span></label>
+                                            <div class="checkbox-group" id="planner-allergies-container">
+                                                <!-- Options will be populated by script.js -->
                                             </div>
                                         </div>
                                     </div>
                                     <div class="criteria-group">
                                          <div class="sub-criteria-group premium-feature">
                                             <h4>Common Diets <span class="premium-tag">Premium</span></h4>
-                                            <div class="checkbox-group">
-                                                <label><input type="checkbox" name="plannerCriteria" value="Vegetarian"><span>Vegetarian</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Vegan"><span>Vegan</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Pescetarian"><span>Pescetarian</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Keto"><span>Keto</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Paleo"><span>Paleo</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Low Carb"><span>Low Carb</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Low Fat"><span>Low Fat</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="High Protein"><span>High Protein</span></label>
+                                            <div class="checkbox-group" id="planner-diets-container">
+                                                <!-- Options will be populated by script.js -->
                                             </div>
                                         </div>
                                     </div>
                                     <div class="criteria-group">
                                         <div class="sub-criteria-group premium-feature">
                                             <h4>Other <span class="premium-tag">Premium</span></h4>
-                                             <div class="checkbox-group">
-                                                <label><input type="checkbox" name="plannerCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Spicy"><span>Spicy</span></label>
-                                                <label><input type="checkbox" name="plannerCriteria" value="Quick Meal (<30 minutes)"><span>&lt; 30 min</span></label>
+                                             <div class="checkbox-group" id="planner-other-container">
+                                                <!-- Options will be populated by script.js -->
                                             </div>
                                         </div>
                                     </div>
@@ -182,33 +169,20 @@
                                     </div>
                                     <div class="sub-criteria-group">
                                         <h4>Allergies & Restrictions</h4>
-                                        <div class="checkbox-group">
-                                            <label><input type="checkbox" name="recipeCriteria" value="Gluten-Free"><span>Gluten-Free</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Dairy-Free"><span>Dairy-Free</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Lactose-Intolerance"><span>Lactose-Intolerance</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Kosher"><span>Kosher</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Halal"><span>Halal</span></label>
+                                        <div class="checkbox-group" id="recipe-allergies-container">
+                                            <!-- Options will be populated by script.js -->
                                         </div>
                                     </div>
                                     <div class="sub-criteria-group premium-feature">
                                         <h4>Common Diets <span class="premium-tag">Premium</span></h4>
-                                        <div class="checkbox-group">
-                                            <label><input type="checkbox" name="recipeCriteria" value="Vegetarian"><span>Vegetarian</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Vegan"><span>Vegan</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Pescetarian"><span>Pescetarian</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Keto"><span>Keto</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Paleo"><span>Paleo</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Low Carb"><span>Low Carb</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Low Fat"><span>Low Fat</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="High Protein"><span>High Protein</span></label>
+                                        <div class="checkbox-group" id="recipe-diets-container">
+                                            <!-- Options will be populated by script.js -->
                                         </div>
                                     </div>
                                     <div class="sub-criteria-group premium-feature">
                                         <h4>Other <span class="premium-tag">Premium</span></h4>
-                                         <div class="checkbox-group">
-                                            <label><input type="checkbox" name="recipeCriteria" value="Budget-Friendly"><span>Budget-Friendly</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Spicy"><span>Spicy</span></label>
-                                            <label><input type="checkbox" name="recipeCriteria" value="Quick Meal (<30 minutes)"><span>&lt; 30 min</span></label>
+                                         <div class="checkbox-group" id="recipe-other-container">
+                                            <!-- Options will be populated by script.js -->
                                         </div>
                                     </div>
                                 </div>
@@ -376,7 +350,7 @@
     </div>
     <div id="recipe-detail-modal" class="modal"><div class="modal-content" id="recipe-detail-content"></div></div>
     <div id="add-to-plan-modal" class="modal"><div class="modal-content"><span class="close-btn" id="add-to-plan-modal-close-btn">&times;</span><h3>Add Recipe to Meal Plan</h3><p>Select dates and mealtime for: <strong id="add-to-plan-recipe-title"></strong></p><form id="add-to-plan-form"><div id="calendar-container"><div id="calendar-header"><button type="button" id="calendar-prev-month" class="secondary">&lt;</button><h4 id="calendar-month-year"></h4><button type="button" id="calendar-next-month" class="secondary">&gt;</button></div><div id="calendar-grid"></div></div><label for="meal-select">Mealtime:</label><select id="meal-select" required><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option></select><button type="submit">Add to Plan</button></form></div></div>
-    <div id="create-household-modal" class="modal"><div class="modal-content"><span class="close-btn" id="create-household-modal-close-btn">&times;</span><h3>Create Your Household</h3><p>Select your household's primary cuisine preference.</p><form id="create-household-form"><label for="household-cuisine-select">Cuisine Preference</label><select id="household-cuisine-select" required><option value="">Any</option></select><button type="submit">Create Household</button></form></div></div>
+    <div id="create-household-modal" class="modal"><div class="modal-content"><span class="close-btn" id="create-household-modal-close-btn">&times;</span><h3>Create Your Household</h3><p>Select your household's primary cuisine preference.</p><form id="create-household-form"><label for="household-cuisine-select">Cuisine Preference</label><select id="household-cuisine-select" required><option value="">Any</option><!-- Options will be populated by script.js --></select><button type="submit">Create Household</button></form></div></div>
     <div id="how-to-modal" class="modal"><div class="modal-content"><div class="how-to-slider"><div class="how-to-slide active"><h3>Welcome!</h3><p>Let's quickly walk through the main features.</p></div><div class="how-to-slide"><h3>1. Your Pantry</h3><p>Use the 'Pantry' tab to add ingredients you have at home.</p></div><div class="how-to-slide"><h3>2. Get Recipes</h3><p>In the 'Recipes' tab, get meal ideas based on what's in your pantry.</p></div><div class="how-to-slide"><h3>3. Plan Your Week</h3><p>Assign recipes from the 'Recipes' tab onto your 'Meal Planner'.</p></div><div class="how-to-slide"><h3>4. Create a Grocery List</h3><p>Click 'Generate Grocery List' to see what you need to buy.</p></div></div><div class="how-to-navigation"><button id="how-to-prev-btn" class="secondary" style="display: none;">Previous</button><div class="how-to-dots"></div><button id="how-to-next-btn">Next</button><button id="how-to-close-btn" style="display: none;">Got it!</button></div></div></div>
     <div id="sync-calendar-modal" class="modal"><div class="modal-content"><span class="close-btn" id="sync-calendar-modal-close-btn">&times;</span><h3>Sync Your Meal Plan</h3><p>Subscribe to this calendar URL in your favorite calendar app.</p><div class="calendar-url-container"><input type="text" id="calendar-url-input" readonly><button id="copy-calendar-url-btn" title="Copy URL"><i class="far fa-copy"></i></button></div><hr><h4>How to add:</h4><ul class="instructions-list-modal"><li><strong>Google Calendar:</strong> Other calendars &rarr; "+" &rarr; From URL.</li><li><strong>Apple Calendar:</strong> File &rarr; New Calendar Subscription.</li></ul></div></div>
     <div id="feedback-modal" class="modal"><div class="modal-content"><span class="close-btn" id="feedback-modal-close-btn">&times;</span><h3>Share Your Feedback</h3><p>Have a suggestion or found a bug? Let us know!</p><form id="feedback-form"><textarea id="feedback-textarea" placeholder="Your feedback..." required></textarea><button type="submit">Submit Feedback</button></form></div></div>
