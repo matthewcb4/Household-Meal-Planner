@@ -2492,6 +2492,10 @@ async function saveUserPreferences() {
     userPreferences.criteria = Array.from(allCriteria);
     userPreferences.unitSystem = document.querySelector('input[name="unitSystem"]:checked').value;
     userPreferences.cookingEquipment = cookingEquipment;
+    // NEW: Save recipe search dropdown selections
+    userPreferences.recipeCuisine = document.getElementById('cuisine-select').value;
+    userPreferences.recipeEquipment = document.getElementById('equipment-select').value;
+
 
     const userDocRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userDocRef, { preferences: userPreferences });
@@ -2507,6 +2511,10 @@ function loadUserPreferences() {
     const savedCriteria = userPreferences.criteria || [];
     const savedUnitSystem = userPreferences.unitSystem || 'imperial';
     const savedEquipment = userPreferences.cookingEquipment || [];
+    // NEW: Get saved dropdown values
+    const savedCuisine = userPreferences.recipeCuisine || '';
+    const savedRecipeEquipment = userPreferences.recipeEquipment || '';
+
 
     // Set criteria checkboxes across the app (planner, recipe, and now settings)
     document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="dietaryCriteria"]').forEach(checkbox => {
@@ -2522,6 +2530,16 @@ function loadUserPreferences() {
     document.querySelectorAll(`input[name="unitSystem"][value="${savedUnitSystem}"]`).forEach(radio => {
         radio.checked = true;
     });
+
+    // NEW: Apply saved dropdown values
+    const cuisineSelect = document.getElementById('cuisine-select');
+    if (cuisineSelect) {
+        cuisineSelect.value = savedCuisine;
+    }
+    const equipmentSelect = document.getElementById('equipment-select');
+    if (equipmentSelect) {
+        equipmentSelect.value = savedRecipeEquipment;
+    }
 
     // NEW: Populate the prioritize equipment dropdown on load
     populatePrioritizeEquipmentDropdown();
@@ -4081,8 +4099,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('more-modal').style.display = 'block';
     });
 
-    document.querySelectorAll('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="unitSystem"], input[name="cookingEquipment"], input[name="dietaryCriteria"]').forEach(element => {
-        element.addEventListener('change', handlePreferenceChange);
+    // UPDATED: Use event delegation for preference changes to handle dynamically loaded elements.
+    // This ensures that controls added after the initial page load still trigger the save function.
+    document.body.addEventListener('change', (event) => {
+        // Check if the changed element is one of the preference inputs we care about.
+        // Check if the changed element is one of the preference inputs we care about.
+        if (event.target.matches('input[name="plannerCriteria"], input[name="recipeCriteria"], input[name="unitSystem"], input[name="cookingEquipment"], input[name="dietaryCriteria"], #cuisine-select, #equipment-select')) {
+            handlePreferenceChange(event);
+        }
     });
 
     // NEW: Upgrade Modal Listener
