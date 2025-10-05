@@ -3099,17 +3099,30 @@ function startApp() {
     configurePaywallUI();
     loadUserPreferences();
 
-    // UPDATED: Handle payment status from URL parameters
+    // MODIFICATION START: Handle payment status from URL parameters more robustly
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('payment_success')) {
-        showToast("Upgrade successful! Welcome to Premium.");
-        // Clean the URL
-        window.history.replaceState({}, document.title, "/");
+        showToast("Upgrade successful! Finalizing your subscription...");
+        
+        // Immediately hide the upgrade modal if it's open
+        const upgradeModal = document.getElementById('upgrade-modal');
+        if (upgradeModal) upgradeModal.style.display = 'none';
+
+        // Update status info to show processing state
+        const householdStatusInfo = document.getElementById('household-status-info');
+        if (householdStatusInfo) {
+            householdStatusInfo.innerHTML = 'Status: Finalizing Premium Access... <i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        // Clean the URL to prevent re-triggering this logic on refresh
+        window.history.replaceState({}, document.title, "/app.html");
+
     } else if (urlParams.has('payment_cancel')) {
         showToast("Payment was canceled. You can upgrade anytime!");
         // Clean the URL
-        window.history.replaceState({}, document.title, "/");
+        window.history.replaceState({}, document.title, "/app.html");
     }
+    // MODIFICATION END
 }
 
 async function handlePlanMyWeek() {
@@ -3472,12 +3485,23 @@ function toggleAuthMode() {
     authError.style.display = 'none';
 }
 
-async function handleUpgradeClick() {
+// MODIFICATION START: Updated handleUpgradeClick to prevent multiple payments.
+async function handleUpgradeClick(event) {
+    const clickedButton = event.currentTarget;
+    const allUpgradeButtons = document.querySelectorAll('.upgrade-button'); // Assumes all upgrade buttons have this class.
+
+    // Disable all upgrade buttons and show loading state to prevent multiple clicks
+    allUpgradeButtons.forEach(btn => {
+        btn.disabled = true;
+        btn.innerHTML = 'Redirecting... <i class="fas fa-spinner fa-spin"></i>';
+    });
+
     try {
         const createStripeCheckout = httpsCallable(functions, 'createStripeCheckout');
         const result = await createStripeCheckout({});
         if (result && result.data && result.data.id) {
             const { id } = result.data;
+            // The page will redirect here, so no need to re-enable buttons on success.
             await stripe.redirectToCheckout({ sessionId: id });
         } else {
             console.error("Invalid response from createStripeCheckout function:", result);
@@ -3486,8 +3510,15 @@ async function handleUpgradeClick() {
     } catch (error) {
         console.error("Error redirecting to Stripe Checkout:", error);
         showToast("Could not initiate payment. Please try again.");
+        // If an error occurs BEFORE redirecting, re-enable the buttons.
+        allUpgradeButtons.forEach(btn => {
+            btn.disabled = false;
+            // Restore original text. You might want to store this in a data attribute if it varies.
+            btn.innerHTML = 'Upgrade Now';
+        });
     }
 }
+// MODIFICATION END
 
 async function initializeAppUI(user) {
     currentUser = user;
