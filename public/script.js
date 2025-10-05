@@ -2254,15 +2254,15 @@ async function handleModalClick(event) {
         const day = selectMealModal.dataset.day;
         const meal = selectMealModal.dataset.meal;
 
-        // Calculate the target date based on the current week view
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        // Calculate the target date using UTC methods to avoid timezone-related errors.
+        const tempDate = new Date(currentDate.valueOf()); // Clone to avoid modifying global state
         const dayIndex = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'].indexOf(day);
-        const localTargetDate = new Date(startOfWeek);
-        localTargetDate.setDate(startOfWeek.getDate() + dayIndex);
 
-        // FIX: Create a new Date object in UTC to avoid timezone issues.
-        const targetDate = new Date(Date.UTC(localTargetDate.getFullYear(), localTargetDate.getMonth(), localTargetDate.getDate(), 12, 0, 0));
+        // Find the Sunday of the current week in UTC, then set the date to the correct day of that week.
+        tempDate.setUTCDate(tempDate.getUTCDate() - tempDate.getUTCDay() + dayIndex);
+
+        // Create a new Date object representing noon on that UTC day to prevent further timezone issues.
+        const targetDate = new Date(Date.UTC(tempDate.getUTCFullYear(), tempDate.getUTCMonth(), tempDate.getUTCDate(), 12, 0, 0));
 
         await addRecipeToPlan(targetDate, meal, recipe);
         selectMealModal.style.display = 'none';
