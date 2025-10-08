@@ -2422,16 +2422,8 @@ function configurePaywallUI() {
             el.classList.add('disabled');
         });
 
-        if (updateCuisineBtn && householdData.lastCuisineUpdate) {
-            const lastUpdate = householdData.lastCuisineUpdate.toDate();
-            const now = new Date();
-            const thirtyDaysInMillis = 30 * 24 * 60 * 60 * 1000;
-
-            if (now - lastUpdate < thirtyDaysInMillis) {
-                updateCuisineBtn.textContent = `Update available on ${new Date(lastUpdate.getTime() + thirtyDaysInMillis).toLocaleDateString()}`;
-            } else {
-                updateCuisineBtn.textContent = 'Update Cuisine (1 free change)';
-            }
+        if (updateCuisineBtn) {
+            updateCuisineBtn.textContent = 'Update Cuisine';
             updateCuisineBtn.style.display = 'block';
         }
         if(cuisineSelect) cuisineSelect.value = householdData.cuisine || "";
@@ -3734,8 +3726,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 owner: currentUser.uid,
                 members: [currentUser.uid],
                 cuisine: selectedCuisine,
-                subscriptionTier: 'free',
-                lastCuisineUpdate: serverTimestamp()
+                subscriptionTier: 'free'
             });
             batch.update(userRef, { householdId: newHouseholdId });
 
@@ -3846,11 +3837,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const newCuisine = document.getElementById('cuisine-select').value;
             const householdRef = doc(db, 'households', householdId);
             updateDoc(householdRef, {
-                cuisine: newCuisine,
-                lastCuisineUpdate: serverTimestamp()
+                cuisine: newCuisine
             });
             householdData.cuisine = newCuisine;
-            householdData.lastCuisineUpdate = { toDate: () => new Date() };
             configurePaywallUI();
             showToast('Cuisine preference updated!');
         }
