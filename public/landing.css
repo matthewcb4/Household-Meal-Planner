@@ -597,7 +597,7 @@ section {
     gap: 3rem;
     max-width: 1200px;
     margin: 0 auto;
-    align-items: flex-start;
+    /* align-items: flex-start; REMOVED to allow sidebar to be sticky */
 }
 
 .timeline-sidebar {
