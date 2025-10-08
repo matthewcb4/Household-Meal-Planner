@@ -3,15 +3,51 @@
   "short_name": "Meal Chef",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#1DB954",
+  "orientation": "portrait",
+  "background_color": "#121212",
   "theme_color": "#1DB954",
   "description": "Effortlessly plan your household meals, generate grocery lists, and discover new recipes with AI.",
   "icons": [
     {
       "src": "favicon.png",
+      "sizes": "48x48",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon.png",
+      "sizes": "72x72",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon.png",
+      "sizes": "144x144",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon.png",
+      "sizes": "168x168",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "header.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    },
+    {
+      "src": "header.png",
+      "sizes": "384x384",
+      "type": "image/png"
     },
     {
       "src": "header.png",
@@ -21,4 +57,3 @@
     }
   ]
 }
-
