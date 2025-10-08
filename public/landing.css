@@ -590,3 +590,72 @@ section {
     margin-right: auto;
 }
 
+/* --- NEW: Blog Page Layout --- */
+.blog-main-content {
+    display: grid;
+    grid-template-columns: 240px 1fr; /* Sidebar and main content */
+    gap: 3rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    align-items: flex-start;
+}
+
+.timeline-sidebar {
+    position: sticky;
+    top: 100px; /* Adjust based on header height */
+    padding: 1.5rem;
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+}
+
+.timeline-sidebar h3 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.75rem;
+}
+
+#timeline-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+#timeline-list li a {
+    display: block;
+    color: var(--text-secondary-color);
+    text-decoration: none;
+    padding: 0.5rem;
+    border-radius: 8px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    font-weight: 500;
+}
+
+#timeline-list li a:hover {
+    background-color: var(--border-color);
+    color: var(--text-color);
+}
+
+#timeline-list li a.active {
+    background-color: var(--primary-accent-color);
+    color: #000;
+    font-weight: 700;
+}
+
+
+/* Responsive adjustments for blog */
+@media (max-width: 992px) {
+    .blog-main-content {
+        grid-template-columns: 1fr; /* Stack sidebar and content */
+    }
+
+    .timeline-sidebar {
+        position: static; /* Don't stick on smaller screens */
+        margin-bottom: 2rem;
+    }
+}
