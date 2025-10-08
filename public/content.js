@@ -136,19 +136,56 @@ function groupRecipesByDateAndTheme(recipes) {
 }
 
 /**
- * Populates the timeline sidebar with links to each date section.
+ * Populates the timeline sidebar with a collapsible monthly archive.
  * @param {Map<string, any>} groupedRecipes - The grouped recipes map.
  */
 function populateTimeline(groupedRecipes) {
     const timelineList = document.getElementById('timeline-list');
     if (!timelineList) return;
 
-    let timelineHtml = '';
+    // Group dates by month and year
+    const monthlyArchive = new Map();
     for (const dateString of groupedRecipes.keys()) {
-        // Create an ID from the date string, e.g., "june-20-2024"
-        const linkId = dateString.toLowerCase().replace(/,/, '').replace(/\s+/g, '-');
-        timelineHtml += `<li><a href="#date-${linkId}">${dateString}</a></li>`;
+        try {
+            const date = new Date(dateString);
+            // Create a key like "October 2025"
+            const monthYearKey = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+            if (!monthlyArchive.has(monthYearKey)) {
+                monthlyArchive.set(monthYearKey, []);
+            }
+            monthlyArchive.get(monthYearKey).push(dateString);
+        } catch (e) {
+            console.error(`Could not parse date: ${dateString}`, e);
+        }
     }
+
+    let timelineHtml = '';
+    // Sort months chronologically, newest first
+    const sortedMonths = Array.from(monthlyArchive.keys()).sort((a, b) => new Date(b) - new Date(a));
+
+    for (const monthYearKey of sortedMonths) {
+        const dateStrings = monthlyArchive.get(monthYearKey);
+        // Sort days within the month, newest first
+        const sortedDateStrings = dateStrings.sort((a,b) => new Date(b) - new Date(a));
+
+        timelineHtml += `
+            <li class="month-item">
+                <div class="month-header">
+                    <span class="month-name">${monthYearKey}</span>
+                    <span class="toggle-icon">+</span>
+                </div>
+                <ul class="day-links-list" style="display: none;">
+        `;
+
+        for (const dateString of sortedDateStrings) {
+            const linkId = dateString.toLowerCase().replace(/,/, '').replace(/\s+/g, '-');
+            timelineHtml += `<li><a href="#date-${linkId}">${dateString}</a></li>`;
+        }
+
+        timelineHtml += `</ul></li>`;
+    }
+
     timelineList.innerHTML = timelineHtml;
 }
 
@@ -262,7 +299,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- LOGIC FOR BLOG LISTING PAGE ---
     else if (path.includes('/blog.html') || path === '/blog') {
         const gridContainer = document.getElementById('recipe-grid-container');
-        if (!gridContainer) return;
+        const timelineList = document.getElementById('timeline-list');
+        if (!gridContainer || !timelineList) return;
+
+        // Add event listener for collapsible archive
+        timelineList.addEventListener('click', (event) => {
+            const header = event.target.closest('.month-header');
+            if (header) {
+                const list = header.nextElementSibling;
+                const icon = header.querySelector('.toggle-icon');
+                if (list && icon) {
+                    const isVisible = list.style.display !== 'none';
+                    list.style.display = isVisible ? 'none' : 'block';
+                    icon.textContent = isVisible ? '+' : '−';
+                }
+            }
+        });
         
         try {
             const result = await getPublicRecipes({}); 

@@ -647,6 +647,48 @@ section {
     font-weight: 700;
 }
 
+/* --- Collapsible Archive Styles --- */
+#timeline-list .month-item {
+    list-style-type: none; /* Remove bullet points */
+}
+
+#timeline-list .month-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+}
+
+#timeline-list .month-header:hover {
+    background-color: var(--border-color);
+}
+
+#timeline-list .month-name {
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+#timeline-list .toggle-icon {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--text-secondary-color);
+}
+
+#timeline-list .day-links-list {
+    list-style: none;
+    padding-left: 1rem; /* Indent day links */
+    margin-top: 0.25rem;
+}
+
+/* The daily links inside the collapsible list */
+#timeline-list .day-links-list li {
+    padding: 0;
+    margin: 0;
+}
+
 
 /* Responsive adjustments for blog */
 @media (max-width: 992px) {
