@@ -135,6 +135,23 @@ function groupRecipesByDateAndTheme(recipes) {
     return grouped;
 }
 
+/**
+ * Populates the timeline sidebar with links to each date section.
+ * @param {Map<string, any>} groupedRecipes - The grouped recipes map.
+ */
+function populateTimeline(groupedRecipes) {
+    const timelineList = document.getElementById('timeline-list');
+    if (!timelineList) return;
+
+    let timelineHtml = '';
+    for (const dateString of groupedRecipes.keys()) {
+        // Create an ID from the date string, e.g., "june-20-2024"
+        const linkId = dateString.toLowerCase().replace(/,/, '').replace(/\s+/g, '-');
+        timelineHtml += `<li><a href="#date-${linkId}">${dateString}</a></li>`;
+    }
+    timelineList.innerHTML = timelineHtml;
+}
+
 
 /**
  * Main function that runs on page load.
@@ -252,10 +269,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const recipes = result.data.recipes;
             if (recipes && recipes.length > 0) {
                 const groupedRecipes = groupRecipesByDateAndTheme(recipes);
+                populateTimeline(groupedRecipes);
                 
                 let finalHtml = '';
                 for (const [dateString, themes] of groupedRecipes.entries()) {
-                    finalHtml += `<h2 class="blog-date-header">${dateString}</h2>`;
+                    const linkId = dateString.toLowerCase().replace(/,/, '').replace(/\s+/g, '-');
+                    finalHtml += `<h2 id="date-${linkId}" class="blog-date-header">${dateString}</h2>`;
                     for (const [themeTitle, recipeGroup] of themes.entries()) {
                         finalHtml += `<h3 class="daily-theme-header">${themeTitle}</h3>`;
                         finalHtml += '<div class="features-grid">';
@@ -303,4 +322,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 });
-
